@@ -49,9 +49,16 @@ Matrix (sliced per session; `artifacts/stage0/reports.csv`):
 
 | Model | Mode | Chunk | Split | n | WER | CER | RTF | Published | Δ |
 |---|---|---|---|---|---|---|---|---|---|
-| Qwen3-ASR-1.7B | streaming | 2.0 s | clean | 2620 (full) | **1.96** | 0.61 | 0.199 | 1.95 | **+0.01** |
+| Qwen3-ASR-1.7B | streaming | 2.0 s | clean | 2620 (full) | **1.96** | 0.61 | 0.199 | 1.95 (full) | **+0.01** |
+| Qwen3-ASR-1.7B | streaming | 2.0 s | other | 500 (sub) | **3.47** | 1.25 | 0.239 | 4.51 (full) | −1.04 |
+| Qwen3-ASR-1.7B | streaming | 320 ms | other | 500 (sub) | **4.61** | 2.64 | 0.728 | — | — |
 
-Remaining slices (budget priority order): 1.7B offline + streaming test-other
-subsample; 0.6B streaming clean/other; 320 ms path.
+The clean full-split number matches published almost exactly (+0.01). The
+test-other figure is a fixed 500-utterance subsample (seed 0) and reads easier
+than the published full-split number, so it is labelled and not directly
+comparable.
+
+Remaining slices (budget priority order): 1.7B offline (clean+other); 0.6B
+streaming clean/other; 0.6B offline.
 
 `X` is locked after the matrix completes.
