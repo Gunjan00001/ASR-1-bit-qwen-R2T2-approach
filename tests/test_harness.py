@@ -124,8 +124,10 @@ class TestErrors:
 
 class TestStage0Plan:
     def test_plan_size_and_shape(self):
+        # per model: offline clean/other (full), streaming clean/other @2.0s,
+        # plus 320ms clean+other subsampled = 6
         runs = stage0_runs(["a", "b"])
-        assert len(runs) == 10
+        assert len(runs) == 12
         keys = {"model_id", "mode", "config", "split", "chunk_ms", "subsampled", "limit"}
         assert all(keys <= set(run) for run in runs)
 
@@ -145,9 +147,18 @@ class TestStage0Plan:
         assert other["subsampled"] is True
         assert other["limit"] == 500
 
-    def test_extra_chunk_size_present(self):
+    def test_extra_chunk_size_present_for_other(self):
         runs = stage0_runs(["a"])
         assert any(r["chunk_ms"] == 320 and r["config"] == "other" for r in runs)
+
+    def test_extra_chunk_size_present_for_clean_subsampled(self):
+        # primary metric is streaming 320ms clean, on the fixed labelled subsample
+        runs = stage0_runs(["a"])
+        clean320 = next(
+            r for r in runs if r["chunk_ms"] == 320 and r["config"] == "clean" and r["mode"] == "streaming"
+        )
+        assert clean320["subsampled"] is True
+        assert clean320["limit"] == 500
 
 
 class TestFilterRuns:
@@ -172,6 +183,12 @@ class TestFilterRuns:
         result = filter_runs(runs, mode="streaming", config="other")
         assert result
         assert all(r["mode"] == "streaming" and r["config"] == "other" for r in result)
+
+    def test_filter_by_chunk_ms(self):
+        runs = stage0_runs(["a"])
+        result = filter_runs(runs, chunk_ms=320)
+        assert result
+        assert all(r["chunk_ms"] == 320 for r in result)
 
 
 class TestSubsampleOffline:

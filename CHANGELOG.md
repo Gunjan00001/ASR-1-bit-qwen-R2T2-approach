@@ -27,6 +27,8 @@ committed on a per-stage branch and tagged there first.
 | `0.1.10` | 2026-09-20 | `stage-0` | Add `--only-config` matrix slice | — |
 | `0.1.11` | 2026-09-20 | `stage-0` | Only set `HF_HUB_OFFLINE` for local weight dirs (not HF repo ids) | — |
 | `0.1.12` | 2026-09-20 | `stage-0` | Skip artifact commit when `--artifacts` is outside the repo; record 1.7B result | — |
+| `0.1.13` | 2026-09-20 | `stage-0` | Labelled offline subsample (`--offline-sample-n`) | — |
+| `0.1.14` | 2026-09-20 | `stage-0` | 320 ms clean run in the plan + `--only-chunk-ms` slice | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -36,6 +38,19 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.14 — 320 ms clean + chunk slicing
+
+- `stage0_runs` now adds the extra chunk sizes for **clean as well as other**
+  (labelled subsamples), so the primary metric (streaming 320 ms, clean/other)
+  has a reproducible plan entry.
+- Added `--only-chunk-ms` to `run_stage0.py` / `run_kaggle_gate.sh` to execute a
+  single chunk size.
+
+## 0.1.13 — labelled offline subsample
+
+- `--offline-sample-n N` caps offline runs to a labelled N-utterance subsample
+  (full splits hard-kill on long sessions).
 
 ## 0.1.12 — outside-repo artifacts + first gate number
 

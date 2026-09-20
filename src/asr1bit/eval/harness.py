@@ -261,13 +261,16 @@ def filter_runs(
     runs: Sequence[dict[str, Any]],
     mode: str | None = None,
     config: str | None = None,
+    chunk_ms: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Filter Stage 0 runs by ``mode`` and/or ``config`` (None = keep all)."""
+    """Filter Stage 0 runs by ``mode``, ``config`` and/or ``chunk_ms`` (None = keep all)."""
     selected = list(runs)
     if mode is not None:
         selected = [run for run in selected if run["mode"] == mode]
     if config is not None:
         selected = [run for run in selected if run["config"] == config]
+    if chunk_ms is not None:
+        selected = [run for run in selected if run["chunk_ms"] == chunk_ms]
     return selected
 
 
@@ -307,5 +310,8 @@ def stage0_runs(
         runs.append({**run("streaming", "clean", baseline_chunk_ms, False), "model_id": model_id})
         runs.append({**run("streaming", "other", baseline_chunk_ms, True), "model_id": model_id})
         for chunk_ms in extra_chunk_ms:
+            # Primary metric covers streaming 320 ms on clean and other, so add
+            # the extra chunk sizes for both configs (labelled subsamples).
+            runs.append({**run("streaming", "clean", chunk_ms, True), "model_id": model_id})
             runs.append({**run("streaming", "other", chunk_ms, True), "model_id": model_id})
     return runs

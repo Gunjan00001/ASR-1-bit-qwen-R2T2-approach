@@ -63,6 +63,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Cap offline runs to an n-utterance labelled subsample (0 = full).",
     )
+    parser.add_argument(
+        "--only-chunk-ms",
+        type=int,
+        default=0,
+        help="Run only this chunk size in ms (0 = all).",
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -104,13 +110,17 @@ def main() -> int:
         baseline_chunk_ms=args.baseline_chunk_ms,
         extra_chunk_ms=args.extra_chunk_ms,
     )
-    if args.only_mode != "all" or args.only_config != "all":
+    if args.only_mode != "all" or args.only_config != "all" or args.only_chunk_ms:
         runs = filter_runs(
             runs,
             mode=None if args.only_mode == "all" else args.only_mode,
             config=None if args.only_config == "all" else args.only_config,
+            chunk_ms=args.only_chunk_ms or None,
         )
-        print(f"filtered to mode={args.only_mode} config={args.only_config}: {len(runs)} runs")
+        print(
+            f"filtered to mode={args.only_mode} config={args.only_config} "
+            f"chunk_ms={args.only_chunk_ms or 'all'}: {len(runs)} runs"
+        )
     if args.offline_sample_n:
         runs = subsample_offline_runs(runs, args.offline_sample_n, seed=args.subsample_seed)
         print(f"offline runs capped to {args.offline_sample_n} utts/split (labelled subsampled)")
