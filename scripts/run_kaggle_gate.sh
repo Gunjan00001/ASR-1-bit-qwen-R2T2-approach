@@ -288,6 +288,17 @@ commit_artifacts() {
     log "dry-run: skipping artifact commit"
     return 0
   fi
+  local repo_top abs_artifacts
+  repo_top="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"
+  if [[ -z "$repo_top" ]]; then
+    log "not a git repo; skipping artifact commit (files remain for download)"
+    return 0
+  fi
+  abs_artifacts="$(cd "$ARTIFACTS" 2>/dev/null && pwd || echo "$ARTIFACTS")"
+  if [[ "$abs_artifacts" != "$repo_top"* ]]; then
+    log "artifacts dir '$abs_artifacts' is outside the repo '$repo_top'; skipping commit (files remain for download)"
+    return 0
+  fi
   local name
   for name in environment.txt MANIFEST.txt reports.csv reports.json; do
     if [[ -f "$ARTIFACTS/$name" ]]; then

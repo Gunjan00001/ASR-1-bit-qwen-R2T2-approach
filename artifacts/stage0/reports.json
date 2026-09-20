@@ -1,0 +1,28 @@
+[
+  {
+    "model_id": "Qwen/Qwen3-ASR-1.7B",
+    "mode": "streaming",
+    "chunk_ms": 2000,
+    "n_utterances": 2620,
+    "wer": 1.9628727936701156,
+    "cer": 0.6050123493697195,
+    "rtf": 0.1985347797666796,
+    "mean_latency_sec": 1.4740434949618233,
+    "retrospective_latency_sec": 3.4740434949618235,
+    "subsampled": false,
+    "dataset": "openslr/librispeech_asr",
+    "config": "clean",
+    "split": "test",
+    "versions": {
+      "python": "3.12.13",
+      "torch": "2.9.1+cu128",
+      "transformers": "4.57.6",
+      "vllm": "0.14.0",
+      "qwen_asr": "unknown",
+      "cuda_available": true,
+      "cuda": "12.8",
+      "device": "Tesla T4"
+    },
+    "notes": ""
+  }
+]

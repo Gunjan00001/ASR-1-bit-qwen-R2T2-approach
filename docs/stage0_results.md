@@ -36,10 +36,22 @@ CER (librispeech mode): 0.6B 0.75-0.81, 1.7B 0.56.
 non-empty text for all probed samples; RTF on CPU was ~1.7-2.0 (expected, CPU
 only, no target).
 
-## Kaggle gate (pending)
+## Kaggle gate (in progress)
 
-To be filled from `outputs/stage0/reports.csv`:
-- T0.0 spike environment block and PASS/FAIL.
-- Throughput probe extrapolation (full-split streaming feasibility).
-- Matrix: fp16 offline/streaming WER, latency, RTF vs published.
-- Locked `X`.
+Gate environment (recorded in `artifacts/stage0/environment_*.txt`): Kaggle T4,
+python 3.12.13, torch 2.9.1+cu128, transformers 4.57.6, vllm 0.14.0, CUDA 12.8,
+`sm75` (fp16; Triton attention backend — FlashInfer JIT fails on sm75).
+
+**T0.0 spike: PASS** (vLLM streaming on T4). Sample 15.05 s: chunk 2.0 s
+RTF 0.078; chunk 0.32 s RTF 0.291.
+
+Matrix (sliced per session; `artifacts/stage0/reports.csv`):
+
+| Model | Mode | Chunk | Split | n | WER | CER | RTF | Published | Δ |
+|---|---|---|---|---|---|---|---|---|---|
+| Qwen3-ASR-1.7B | streaming | 2.0 s | clean | 2620 (full) | **1.96** | 0.61 | 0.199 | 1.95 | **+0.01** |
+
+Remaining slices (budget priority order): 1.7B offline + streaming test-other
+subsample; 0.6B streaming clean/other; 320 ms path.
+
+`X` is locked after the matrix completes.

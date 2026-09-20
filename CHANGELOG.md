@@ -26,6 +26,7 @@ committed on a per-stage branch and tagged there first.
 | `0.1.9` | 2026-09-20 | `stage-0` | Slice the matrix (`--only-mode`) so gate sessions fit; probe uses `MODELS[0]` | — |
 | `0.1.10` | 2026-09-20 | `stage-0` | Add `--only-config` matrix slice | — |
 | `0.1.11` | 2026-09-20 | `stage-0` | Only set `HF_HUB_OFFLINE` for local weight dirs (not HF repo ids) | — |
+| `0.1.12` | 2026-09-20 | `stage-0` | Skip artifact commit when `--artifacts` is outside the repo; record 1.7B result | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -35,6 +36,15 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.12 — outside-repo artifacts + first gate number
+
+- `commit_artifacts` now detects when `--artifacts` lies outside the git repo
+  (e.g. `/kaggle/working` while the repo is at `/kaggle/temp/repo`) and skips the
+  commit instead of failing at the end of an otherwise successful run.
+- **Gate result:** Qwen3-ASR-1.7B streaming @ 2.0 s, full LibriSpeech test-clean
+  (2620 utts): **WER 1.96** vs published **1.95** (+0.01), CER 0.61, RTF 0.199.
+  Artifacts committed under `artifacts/stage0/`; see `docs/stage0_results.md`.
 
 ## 0.1.11 — offline-mode fix
 
