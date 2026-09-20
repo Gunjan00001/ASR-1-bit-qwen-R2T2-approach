@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from asr1bit.data.load import Utterance
-from asr1bit.eval.harness import WERReport, run_baseline, stage0_runs
+from asr1bit.eval.harness import WERReport, filter_runs, run_baseline, stage0_runs
 from asr1bit.qwen.backends import StreamTrace
 
 SR = 16000
@@ -142,3 +142,27 @@ class TestStage0Plan:
     def test_extra_chunk_size_present(self):
         runs = stage0_runs(["a"])
         assert any(r["chunk_ms"] == 320 and r["config"] == "other" for r in runs)
+
+
+class TestFilterRuns:
+    def test_none_returns_all(self):
+        runs = stage0_runs(["a"])
+        assert filter_runs(runs) == runs
+
+    def test_filter_by_mode(self):
+        runs = stage0_runs(["a", "b"])
+        offline = filter_runs(runs, mode="offline")
+        assert offline
+        assert all(r["mode"] == "offline" for r in offline)
+
+    def test_filter_by_config(self):
+        runs = stage0_runs(["a"])
+        other = filter_runs(runs, config="other")
+        assert other
+        assert all(r["config"] == "other" for r in other)
+
+    def test_filter_by_mode_and_config(self):
+        runs = stage0_runs(["a"])
+        result = filter_runs(runs, mode="streaming", config="other")
+        assert result
+        assert all(r["mode"] == "streaming" and r["config"] == "other" for r in result)

@@ -22,7 +22,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from asr1bit.eval.harness import QwenEngine, run_baseline, stage0_runs
+from asr1bit.eval.harness import QwenEngine, filter_runs, run_baseline, stage0_runs
 from asr1bit.qwen.backends import environment_report
 
 DEFAULT_MODELS = ["Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"]
@@ -39,6 +39,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--step-ms", type=int, default=500)
     parser.add_argument("--results-dir", default="outputs/stage0")
     parser.add_argument("--language", default=None, help="default None = official protocol")
+    parser.add_argument(
+        "--only-mode",
+        choices=["all", "offline", "streaming"],
+        default="all",
+        help="Run only this mode (slice the matrix so sessions fit).",
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -80,6 +86,9 @@ def main() -> int:
         baseline_chunk_ms=args.baseline_chunk_ms,
         extra_chunk_ms=args.extra_chunk_ms,
     )
+    if args.only_mode != "all":
+        runs = filter_runs(runs, mode=args.only_mode)
+        print(f"filtered to mode={args.only_mode}: {len(runs)} runs")
 
     print("=== environment ===")
     print(json.dumps(environment_report(), indent=2))

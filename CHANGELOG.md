@@ -23,6 +23,7 @@ committed on a per-stage branch and tagged there first.
 | `0.1.6` | 2026-09-20 | `stage-0` | Force Triton attention backend (FlashInfer JIT fails on sm75) | — |
 | `0.1.7` | 2026-09-20 | `stage-0` | Put `src` on `PYTHONPATH` so `asr1bit` imports without relying on the editable install | — |
 | `0.1.8` | 2026-09-20 | `stage-0` | Fix `.gitignore` (`data/` → `/data/`); commit `src/asr1bit/data/` package | — |
+| `0.1.9` | 2026-09-20 | `stage-0` | Slice the matrix (`--only-mode`) so gate sessions fit; probe uses `MODELS[0]` | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -32,6 +33,16 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.9 — matrix slicing
+
+- `run_stage0.py`/`run_kaggle_gate.sh` accept `--only-mode {all,offline,streaming}`
+  so the 10-run matrix can be executed in slices that fit a session; each slice
+  writes its own `reports.*` and per-utterance `.jsonl`.
+- `stage_probe` now probes `MODELS[0]` instead of always loading 0.6B.
+- Also fixed the `data` package to pass `ruff` (it had been skipped while ignored).
+- Context: Kaggle run v7 (full matrix, 0.6B+1.7B) was killed with **no output**
+  after ~34 min, so the matrix is now run in smaller, downloadable slices.
 
 ## 0.1.8 — data package was git-ignored
 

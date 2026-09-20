@@ -11,9 +11,10 @@ from __future__ import annotations
 import io
 import json
 import random
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Any
 
 import numpy as np
 import soundfile as sf

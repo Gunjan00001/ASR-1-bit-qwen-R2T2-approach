@@ -233,6 +233,20 @@ def run_baseline(
     )
 
 
+def filter_runs(
+    runs: Sequence[dict[str, Any]],
+    mode: str | None = None,
+    config: str | None = None,
+) -> list[dict[str, Any]]:
+    """Filter Stage 0 runs by ``mode`` and/or ``config`` (None = keep all)."""
+    selected = list(runs)
+    if mode is not None:
+        selected = [run for run in selected if run["mode"] == mode]
+    if config is not None:
+        selected = [run for run in selected if run["config"] == config]
+    return selected
+
+
 def stage0_runs(
     models: Sequence[str],
     *,
