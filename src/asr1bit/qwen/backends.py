@@ -113,7 +113,7 @@ def load_model(
         return Qwen3ASRModel.LLM(
             model=model_id,
             gpu_memory_utilization=gpu_memory_utilization,
-            max_new_tokens=32,
+            max_new_tokens=max_new_tokens,
             max_model_len=max_model_len,
         )
 

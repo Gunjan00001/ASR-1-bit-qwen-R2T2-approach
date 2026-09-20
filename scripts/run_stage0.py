@@ -25,6 +25,7 @@ from typing import Any
 from asr1bit.eval.harness import (
     QwenEngine,
     filter_runs,
+    max_new_tokens_for_mode,
     run_baseline,
     stage0_runs,
     subsample_offline_runs,
@@ -139,8 +140,18 @@ def main() -> int:
     reports: list = []
 
     for model_id in args.models:
-        engine = QwenEngine(model_id, backend=args.backend, language=args.language)
-        for run in [r for r in runs if r["model_id"] == model_id]:
+        model_runs = [r for r in runs if r["model_id"] == model_id]
+        # Official protocol: streaming uses 32 new tokens, offline 1024.
+        engines: dict = {}
+        for mode in sorted({r["mode"] for r in model_runs}):
+            engines[mode] = QwenEngine(
+                model_id,
+                backend=args.backend,
+                language=args.language,
+                max_new_tokens=max_new_tokens_for_mode(mode),
+            )
+        for run in model_runs:
+            engine = engines[run["mode"]]
             identifier = run_id(run)
             print(f"=== {identifier} ===", flush=True)
             report = run_baseline(
@@ -161,7 +172,7 @@ def main() -> int:
             reports.append(report)
             print(json.dumps(report.to_dict()), flush=True)
             _write_summary(out_dir, reports)
-        del engine
+        del engines
         _free_cuda()
 
     print("=== summary ===")

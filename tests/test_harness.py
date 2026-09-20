@@ -9,10 +9,16 @@ from asr1bit.data.load import Utterance
 from asr1bit.eval.harness import (
     WERReport,
     filter_runs,
+    max_new_tokens_for_mode,
     run_baseline,
     stage0_runs,
     subsample_offline_runs,
 )
+
+
+def test_max_new_tokens_for_mode():
+    assert max_new_tokens_for_mode("streaming") == 32
+    assert max_new_tokens_for_mode("offline") == 1024
 from asr1bit.qwen.backends import StreamTrace
 
 SR = 16000

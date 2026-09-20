@@ -158,6 +158,19 @@ class TestLoadModel:
         call = _FakeQwen3ASRModel.calls[-1]
         assert call["gpu_memory_utilization"] == 0.9
         assert call["max_model_len"] == 8192
+        assert call["max_new_tokens"] == 1024  # offline default, not the streaming 32
+
+    def test_vllm_streaming_max_new_tokens(self, monkeypatch):
+        import sys
+        import types
+
+        fake = types.ModuleType("qwen_asr")
+        fake.Qwen3ASRModel = _FakeQwen3ASRModel
+        _FakeQwen3ASRModel.calls = []
+        monkeypatch.setitem(sys.modules, "qwen_asr", fake)
+
+        load_model("m", backend="vllm", max_new_tokens=32)
+        assert _FakeQwen3ASRModel.calls[-1]["max_new_tokens"] == 32
 
     def test_transformers_passes_dtype_and_device(self, monkeypatch):
         import sys

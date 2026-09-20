@@ -233,6 +233,11 @@ def run_baseline(
     )
 
 
+def max_new_tokens_for_mode(mode: str) -> int:
+    """Official Stage 0 generation budget: 32 streaming, 1024 offline."""
+    return 32 if mode == "streaming" else 1024
+
+
 def subsample_offline_runs(
     runs: Sequence[dict[str, Any]],
     n: int,
