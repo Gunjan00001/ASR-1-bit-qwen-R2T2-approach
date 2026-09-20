@@ -36,6 +36,32 @@ Kaggle images ship a preinstalled torch; if the nightly install leaves a broken
 combination, `pip install -q --force-reinstall torch --index-url` a matching
 cu129 build and re-run Cell 2. Record the resulting versions.
 
+## Cell 2b — cache the models (do not re-download every session)
+
+Weights are large (0.6B ~1.2 GB, 1.7B ~3.4 GB). Kaggle wipes `/kaggle/working`
+between sessions, so download once into a directory and persist it as a Kaggle
+Dataset (or attach an existing community dataset / Kaggle Model), then reuse it.
+
+```python
+# One-time: download to a persistent location outside /kaggle/working
+import os
+os.makedirs("/kaggle/working/qwen3-asr-weights", exist_ok=True)
+!huggingface-cli download Qwen/Qwen3-ASR-0.6B --local-dir /kaggle/working/qwen3-asr-weights/0.6B
+!huggingface-cli download Qwen/Qwen3-ASR-1.7B --local-dir /kaggle/working/qwen3-asr-weights/1.7B
+# Then (Kaggle UI / API) create a Dataset from /kaggle/working/qwen3-asr-weights
+# and attach it to this notebook at /kaggle/input/qwen3-asr-weights.
+```
+
+Then point the harness at the local directories (no hub access needed):
+
+```python
+!python scripts/run_stage0.py --backend vllm \
+  --models /kaggle/input/qwen3-asr-weights/0.6B /kaggle/input/qwen3-asr-weights/1.7B
+```
+
+Set `HF_HOME=/kaggle/working/hf` for intra-session reuse of the LibriSpeech
+parquet, and set `HF_HUB_OFFLINE=1` once the weights are attached.
+
 ## Cell 3 — T0.0 go/no-go spike
 
 ```python
@@ -49,7 +75,20 @@ compute capability) and non-empty offline + streaming text at `chunk_size_sec`
 Copy the whole output block back — the environment lines are recorded with the
 Stage 0 results, and the 0.32 run previews the low-latency chunk path.
 
-## Cell 4 — Stage 0 baseline matrix
+## Cell 4 — throughput probe (before the matrix)
+
+Measure whether full-split streaming fits a session and pick a subsample if not:
+
+```python
+!python scripts/throughput_probe.py --backend vllm --n 50 --config clean
+!python scripts/throughput_probe.py --backend vllm --n 50 --config other
+```
+
+This prints mean wall time per utterance, extrapolated full-split hours, and the
+coverage that fits `--budget-hours` (default 12). If coverage < 1, the script
+recommends a labelled subsample size; record it for the report.
+
+## Cell 5 — Stage 0 baseline matrix
 
 After the spike passes, run the matrix (offline full clean/other; streaming
 2.0 s on full test-clean; streaming 2.0 s + 320 ms on a fixed 500-utterance

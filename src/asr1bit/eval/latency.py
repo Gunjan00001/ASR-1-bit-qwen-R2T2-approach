@@ -19,6 +19,18 @@ def rtf(total_decode_sec: float, audio_sec: float) -> float:
     return total_decode_sec / audio_sec
 
 
+def estimate_wall_seconds(mean_utt_wall_sec: float, n_utterances: int) -> float:
+    """Extrapolate mean per-utterance wall time to a full set."""
+    return mean_utt_wall_sec * n_utterances
+
+
+def coverage_fraction(total_sec: float, budget_hours: float) -> float:
+    """Fraction of ``total_sec`` that fits in a ``budget_hours`` session (<= 1)."""
+    if budget_hours <= 0 or total_sec <= 0:
+        return 0.0
+    return min(1.0, total_sec / (budget_hours * 3600.0))
+
+
 def chunk_latency_stats(decode_secs: Sequence[float], chunk_size_sec: float) -> dict[str, float]:
     """Summarize per-chunk decode times.
 

@@ -1,5 +1,6 @@
 """Tests for the LibriSpeech data loader (Stage 0, T0.2)."""
 
+import io
 import json
 
 import numpy as np
@@ -104,6 +105,13 @@ def _hf_record(uid, text, sr=16000, seconds=1.0):
     return {"id": uid, "text": text, "audio": {"array": audio, "sampling_rate": sr}}
 
 
+def _hf_record_bytes(uid, text, sr=16000, seconds=0.5):
+    audio = np.zeros(int(sr * seconds), dtype=np.float32)
+    buffer = io.BytesIO()
+    sf.write(buffer, audio, sr, format="WAV")
+    return {"id": uid, "text": text, "audio": {"bytes": buffer.getvalue(), "path": None}}
+
+
 class TestIterLibrispeech:
     def test_yields_normalized_records(self):
         dataset = _StubDataset([_hf_record("1", "Hello, World!")])
@@ -128,6 +136,13 @@ class TestIterLibrispeech:
         dataset = _StubDataset([_hf_record(str(i), "hi") for i in range(10)])
         utterances = list(iter_librispeech("clean", "test", dataset=dataset, indices=[0, 3, 5]))
         assert [u.id for u in utterances] == ["0", "3", "5"]
+
+    def test_decodes_encoded_audio_bytes(self):
+        dataset = _StubDataset([_hf_record_bytes("1", "Hello, World!")])
+        utterances = list(iter_librispeech("clean", "test", dataset=dataset))
+        assert utterances[0].audio.dtype == np.float32
+        assert abs(utterances[0].duration - 0.5) < 1e-3
+        assert utterances[0].reference == "hello world"
 
     def test_sample_n_is_deterministic(self):
         def fresh():

@@ -13,6 +13,7 @@ from asr1bit.text import (
     collapse_whitespace,
     normalize_text,
     remove_punctuation,
+    split_hyphens,
     to_lowercase,
 )
 
@@ -29,6 +30,9 @@ class TestBuildingBlocks:
 
     def test_collapse_whitespace(self):
         assert collapse_whitespace("a   b\n\tc") == "a b c"
+
+    def test_split_hyphens(self):
+        assert split_hyphens("well-known") == "well known"
 
 
 class TestNormalize:
@@ -68,3 +72,25 @@ class TestNormalize:
 
     def test_default_mode_is_librispeech(self):
         assert "librispeech" in MODES
+
+
+class TestHyphenVariant:
+    def test_librispeech_mode_joins_hyphen(self):
+        assert normalize_text("well-known", mode="librispeech") == "wellknown"
+
+    def test_hyph_mode_splits_hyphen_to_space(self):
+        assert normalize_text("well-known", mode="librispeech_hyph") == "well known"
+
+    def test_default_mode_splits_hyphens(self):
+        # Stage 0 smoke (0.6B offline, 100/300 utts): hyph 2.93 vs plain 3.31.
+        assert normalize_text("well-known") == "well known"
+
+    def test_hyph_mode_registered(self):
+        assert "librispeech_hyph" in MODES
+
+    def test_hyph_mode_still_strips_other_punctuation(self):
+        assert normalize_text("Well-known, isn't it?", mode="librispeech_hyph") == "well known isnt it"
+
+    def test_hyph_mode_idempotent(self):
+        once = normalize_text("A well-known fact.", mode="librispeech_hyph")
+        assert normalize_text(once, mode="librispeech_hyph") == once

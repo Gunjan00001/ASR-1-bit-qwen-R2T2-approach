@@ -10,7 +10,7 @@ from collections.abc import Sequence
 
 import jiwer
 
-from asr1bit.text import normalize_text
+from asr1bit.text import DEFAULT_MODE, normalize_text
 
 Unit = str  # "word" | "char"
 
@@ -32,7 +32,7 @@ def wer(
     hypothesis: str,
     *,
     normalize: bool = True,
-    mode: str = "librispeech",
+    mode: str = DEFAULT_MODE,
     unit: Unit = "word",
 ) -> float:
     """Error rate (percent) for a single pair. ``unit='char'`` gives CER."""
@@ -45,7 +45,7 @@ def corpus_wer(
     hypotheses: Sequence[str],
     *,
     normalize: bool = True,
-    mode: str = "librispeech",
+    mode: str = DEFAULT_MODE,
 ) -> float:
     """Corpus-level WER (percent) aggregated over total edit distance."""
     refs = _prepare(references, normalize, mode)
@@ -60,7 +60,7 @@ def corpus_cer(
     hypotheses: Sequence[str],
     *,
     normalize: bool = True,
-    mode: str = "librispeech",
+    mode: str = DEFAULT_MODE,
 ) -> float:
     """Corpus-level CER (percent)."""
     refs = _prepare(references, normalize, mode)

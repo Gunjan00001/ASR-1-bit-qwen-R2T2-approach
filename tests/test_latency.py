@@ -2,7 +2,12 @@
 
 import pytest
 
-from asr1bit.eval.latency import chunk_latency_stats, rtf
+from asr1bit.eval.latency import (
+    chunk_latency_stats,
+    coverage_fraction,
+    estimate_wall_seconds,
+    rtf,
+)
 
 
 class TestRtf:
@@ -31,3 +36,17 @@ class TestChunkLatencyStats:
         assert stats["n_chunks"] == 0
         assert stats["total_decode_sec"] == 0.0
         assert stats["retrospective_latency_sec"] == 0.0
+
+
+class TestThroughput:
+    def test_estimate_wall_seconds(self):
+        assert estimate_wall_seconds(mean_utt_wall_sec=2.0, n_utterances=100) == 200.0
+
+    def test_coverage_fraction(self):
+        assert coverage_fraction(total_sec=6 * 3600, budget_hours=12) == 0.5
+
+    def test_coverage_capped_at_one(self):
+        assert coverage_fraction(total_sec=20 * 3600, budget_hours=12) == 1.0
+
+    def test_coverage_zero_budget(self):
+        assert coverage_fraction(total_sec=10.0, budget_hours=0) == 0.0
