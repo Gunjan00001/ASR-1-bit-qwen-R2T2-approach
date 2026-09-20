@@ -22,7 +22,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from asr1bit.eval.harness import QwenEngine, filter_runs, run_baseline, stage0_runs
+from asr1bit.eval.harness import (
+    QwenEngine,
+    filter_runs,
+    run_baseline,
+    stage0_runs,
+    subsample_offline_runs,
+)
 from asr1bit.qwen.backends import environment_report
 
 DEFAULT_MODELS = ["Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"]
@@ -50,6 +56,12 @@ def parse_args() -> argparse.Namespace:
         choices=["all", "clean", "other"],
         default="all",
         help="Run only this LibriSpeech config (slice the matrix).",
+    )
+    parser.add_argument(
+        "--offline-sample-n",
+        type=int,
+        default=0,
+        help="Cap offline runs to an n-utterance labelled subsample (0 = full).",
     )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -99,6 +111,9 @@ def main() -> int:
             config=None if args.only_config == "all" else args.only_config,
         )
         print(f"filtered to mode={args.only_mode} config={args.only_config}: {len(runs)} runs")
+    if args.offline_sample_n:
+        runs = subsample_offline_runs(runs, args.offline_sample_n, seed=args.subsample_seed)
+        print(f"offline runs capped to {args.offline_sample_n} utts/split (labelled subsampled)")
 
     print("=== environment ===")
     print(json.dumps(environment_report(), indent=2))

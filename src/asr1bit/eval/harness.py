@@ -233,6 +233,30 @@ def run_baseline(
     )
 
 
+def subsample_offline_runs(
+    runs: Sequence[dict[str, Any]],
+    n: int,
+    seed: int = 0,
+) -> list[dict[str, Any]]:
+    """Return copies of ``runs`` with offline runs capped to an ``n`` subsample.
+
+    Offline full splits can exceed a Kaggle session; this labels the affected
+    runs as subsampled. ``n <= 0`` returns the runs unchanged.
+    """
+    if n <= 0:
+        return list(runs)
+    out: list[dict[str, Any]] = []
+    for run in runs:
+        run = dict(run)
+        if run["mode"] == "offline":
+            run["limit"] = n
+            run["sample_n"] = n
+            run["sample_seed"] = seed
+            run["subsampled"] = True
+        out.append(run)
+    return out
+
+
 def filter_runs(
     runs: Sequence[dict[str, Any]],
     mode: str | None = None,

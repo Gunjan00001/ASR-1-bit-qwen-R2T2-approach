@@ -6,7 +6,13 @@ import numpy as np
 import pytest
 
 from asr1bit.data.load import Utterance
-from asr1bit.eval.harness import WERReport, filter_runs, run_baseline, stage0_runs
+from asr1bit.eval.harness import (
+    WERReport,
+    filter_runs,
+    run_baseline,
+    stage0_runs,
+    subsample_offline_runs,
+)
 from asr1bit.qwen.backends import StreamTrace
 
 SR = 16000
@@ -166,3 +172,25 @@ class TestFilterRuns:
         result = filter_runs(runs, mode="streaming", config="other")
         assert result
         assert all(r["mode"] == "streaming" and r["config"] == "other" for r in result)
+
+
+class TestSubsampleOffline:
+    def test_offline_runs_become_subsampled(self):
+        out = subsample_offline_runs(stage0_runs(["a"]), 500, seed=0)
+        for run in out:
+            if run["mode"] == "offline":
+                assert run["limit"] == 500
+                assert run["sample_n"] == 500
+                assert run["subsampled"] is True
+
+    def test_streaming_runs_untouched(self):
+        out = subsample_offline_runs(stage0_runs(["a"]), 500)
+        streaming = next(r for r in out if r["mode"] == "streaming" and r["config"] == "clean")
+        assert streaming["subsampled"] is False
+        assert streaming["limit"] is None
+
+    def test_zero_is_noop_and_input_not_mutated(self):
+        runs = stage0_runs(["a"])
+        assert subsample_offline_runs(runs, 0) == runs
+        subsample_offline_runs(runs, 500)
+        assert runs[0]["limit"] is None
