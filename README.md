@@ -14,7 +14,31 @@ published streaming quality on CPU/edge.
 
 ## Status
 
-`v0.1.0` — repository scaffold and project plan. Implementation begins at Stage 0.
+Stage 0 (baselines & harness) in progress. See [`docs/PLANNING.md`](docs/PLANNING.md)
+for the stage plan, pinned evaluation protocol, and gate.
+
+## Development
+
+Local dev/unit-test environment is Python **3.12** (pinned in `.python-version`),
+created with [`uv`](https://docs.astral.sh/uv/):
+
+```bash
+uv python install 3.12
+uv venv --python 3.12 .venv
+uv pip install --python .venv/Scripts/python.exe -e ".[dev]"   # Windows
+# uv pip install --python .venv/bin/python -e ".[dev]"          # Linux/macOS
+```
+
+Run the suite and linter:
+
+```bash
+.venv/Scripts/python.exe -m pytest -q
+.venv/Scripts/python.exe -m ruff check .
+```
+
+The Kaggle/Colab runtime (Linux + CUDA, includes `qwen-asr[vllm]`) is described
+in `requirements-stage0.txt`. Qwen3-ASR streaming is **vLLM-only**, so streaming
+baselines run on GPU hosts, not on the local dev machine.
 
 ## Layout
 
