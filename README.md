@@ -53,4 +53,8 @@ docs/          # planning and design docs
 
 ## Versioning
 
-Tags use `MAJOR.MINOR.BUGS` (third component is the patch/bug count).
+Tags use `MAJOR.MINOR.BUGS`: **MAJOR** = end-to-end milestone, **MINOR** = a
+completed stage (gate passed), **BUGS** = fixes and non-stage checkpoints.
+Stage work lands on a per-stage branch (e.g. `stage-0`) and `main` advances only
+when a stage gate passes. Checkpoints are documented in
+[`CHANGELOG.md`](CHANGELOG.md).
