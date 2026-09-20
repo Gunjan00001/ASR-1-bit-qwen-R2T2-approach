@@ -36,6 +36,7 @@ PYTHON="${PYTHON:-python}"
 
 log() { printf '[gate] %s\n' "$*"; }
 die() { printf '[gate] ERROR: %s\n' "$*" >&2; exit 1; }
+begin_stage() { log "BEGIN stage=$1 artifacts=$ARTIFACTS"; }
 
 usage() {
   awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"
@@ -107,6 +108,7 @@ PY
 }
 
 stage_preflight() {
+  begin_stage preflight
   log "preflight: record versions + assert CUDA"
   mkdir -p "$ARTIFACTS"
   if [[ "$DRY_RUN" == "1" ]]; then
@@ -138,6 +140,7 @@ PY
 }
 
 stage_setup() {
+  begin_stage setup
   log "setup: vLLM nightly (cu129) + extras + editable install"
   if [[ "$DRY_RUN" == "1" ]]; then
     echo "[dry-run] pip install -U vllm --pre (cu129 nightly index)"
@@ -157,6 +160,7 @@ stage_setup() {
 }
 
 stage_spike() {
+  begin_stage spike
   log "spike: T0.0 vLLM streaming go/no-go"
   if [[ "$DRY_RUN" == "1" ]]; then
     echo "[dry-run] scripts/spike_vllm_streaming.py --model ${MODELS[0]} | tee $ARTIFACTS/spike.log"
@@ -179,6 +183,7 @@ stage_spike() {
 }
 
 stage_probe() {
+  begin_stage probe
   log "probe: throughput on clean and other"
   local config
   for config in clean other; do
@@ -194,7 +199,8 @@ stage_probe() {
 }
 
 stage_matrix() {
-  log "matrix: run_stage0.py --backend vllm"
+  begin_stage matrix
+  log "matrix: run_stage0.py --backend vllm (re-runnable; resumes from existing .jsonl)"
   local args=(--backend vllm --results-dir "$ARTIFACTS" --models "${MODELS[@]}")
   if [[ "$DRY_RUN" == "1" ]]; then
     args+=(--dry-run)
@@ -207,6 +213,7 @@ stage_matrix() {
 }
 
 collect_artifacts() {
+  mkdir -p "$ARTIFACTS"
   log "collecting artifacts -> $ARTIFACTS"
   local manifest="$ARTIFACTS/MANIFEST.txt"
   local names=(environment.txt spike.log reports.csv reports.json)
@@ -257,21 +264,55 @@ commit_artifacts() {
     log "no artifact changes to commit"
     return 0
   fi
-  git commit -q -m "results(stage0): Kaggle gate artifacts ($STAGE)" || die "artifact commit failed"
+  git -c user.name="${GIT_AUTHOR_NAME:-kaggle-gate}" \
+      -c user.email="${GIT_AUTHOR_EMAIL:-gate@example.com}" \
+      commit -q -m "results(stage0): Kaggle gate artifacts ($STAGE)" \
+    || die "artifact commit failed"
   log "committed small artifacts (per-utterance .jsonl left untracked)"
-  if [[ "$GATE_PUSH" == "1" ]]; then
-    if git push; then
-      log "pushed artifacts"
-    else
-      log "push failed (missing credentials); artifacts are committed locally"
-    fi
-  else
+
+  if [[ "$GATE_PUSH" != "1" ]]; then
     log "set GATE_PUSH=1 to push artifacts"
+    return 0
   fi
+
+  local token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  if [[ -z "$token" ]]; then
+    log "WARNING: GATE_PUSH=1 but GITHUB_TOKEN is unset; artifacts committed locally only"
+    log "  add a Kaggle Secret named GITHUB_TOKEN (fine-grained, 'contents: write') and export it"
+    return 0
+  fi
+  local remote_url auth_url
+  remote_url="$(git remote get-url origin 2>/dev/null || echo "")"
+  if [[ -z "$remote_url" ]]; then
+    log "WARNING: no 'origin' remote; skipping push"
+    return 0
+  fi
+  auth_url="$(printf '%s' "$remote_url" | sed -E "s#^https://#https://x-access-token:${token}@#")"
+  local push_out rc=0
+  push_out="$(git push "$auth_url" "HEAD:${GATE_BRANCH:-stage-0}" 2>&1)" || rc=$?
+  push_out="${push_out//$token/***}"
+  if [[ "$rc" -eq 0 ]]; then
+    log "pushed artifacts to origin (${GATE_BRANCH:-stage-0})"
+  else
+    log "WARNING: push failed (check token scope); artifacts committed locally only"
+    printf '%s\n' "$push_out" | sed 's/^/  /'
+  fi
+  return 0
+}
+
+on_exit() {
+  local rc=$?
+  trap - EXIT INT TERM
+  collect_artifacts || true
+  exit "$rc"
 }
 
 main() {
   parse_args "$@"
+  # Always collect artifacts on exit, even on a failed spike or a killed session.
+  trap on_exit EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   log "stage=$STAGE models=${MODELS[*]} artifacts=$ARTIFACTS dry_run=$DRY_RUN"
   case "$STAGE" in
     setup)  stage_preflight; stage_setup ;;

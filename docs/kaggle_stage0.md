@@ -42,8 +42,49 @@ After **Cell 1** (clone) and **Cell 2** (install), one command does the rest:
 
 Useful flags: `--models <path>...` for cached weights (sets `HF_HUB_OFFLINE=1`;
 `--no-offline` to override), `--dry-run` (prints the plan, passes `--dry-run` to
-the matrix), `--push` (push the artifact commit; needs git credentials),
+the matrix), `--push` (push the artifact commit; see auth below),
 `--artifacts DIR`, `--budget-hours H`, `--probe-n N`.
+
+### Artifacts are collected on exit (even on failure)
+
+Collection runs from an `EXIT` trap (plus `INT`/`TERM`), so `spike.log`,
+`environment.txt`, `MANIFEST.txt`, and any partial `reports.*` /
+`throughput_*.json` are written **regardless of outcome** — a failed spike or a
+killed session still leaves evidence. The exit code is preserved. The
+per-utterance `.jsonl` are intentionally left untracked on Kaggle.
+
+### Push auth (`GATE_PUSH=1`)
+
+Store a **fine-grained GitHub token** (`contents: write` on this repo) as a
+Kaggle Secret named `GITHUB_TOKEN`, then expose it before running:
+
+```python
+import os
+from kaggle_secrets import UserSecretsClient
+os.environ["GITHUB_TOKEN"] = UserSecretsClient().get_secret("GITHUB_TOKEN")
+```
+
+```bash
+!GATE_PUSH=1 bash scripts/run_kaggle_gate.sh --stage all
+```
+
+`--push` commits the small artifacts locally with a fallback git identity, then
+pushes `HEAD` to `GATE_BRANCH` (default `stage-0`) using the token. If the token
+is missing, push is **skipped with a warning** and the run still succeeds; if the
+push itself fails, it warns and leaves the commit local. The token is scrubbed
+from any push output.
+
+### Recoverability
+
+Every stage logs `BEGIN stage=<name> artifacts=<dir>` at start. `--stage all`
+runs preflight → setup → spike → probe → matrix and stops on the first failure.
+`run_stage0.py` persists each utterance to `<run>.jsonl` and skips completed ids
+on re-run, so a mid-matrix kill is resumed by simply re-running:
+
+```bash
+bash scripts/run_kaggle_gate.sh --stage matrix \
+  --models /kaggle/input/qwen3-asr-weights/0.6B /kaggle/input/qwen3-asr-weights/1.7B
+```
 
 ```bash
 # cached weights + push artifacts for review:
