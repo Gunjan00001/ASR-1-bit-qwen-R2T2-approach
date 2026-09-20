@@ -1,0 +1,23 @@
+# Base run configuration (Stage 0).
+name: base
+
+model:
+  student: Qwen/Qwen3-ASR-0.6B
+  teacher: Qwen/Qwen3-ASR-0.6B
+  aligner: Qwen/Qwen3-ForcedAligner-0.6B
+
+quantization:
+  bit_width: 1          # 1 = binary {-1,+1}; 1.58 = ternary {-1,0,+1}
+  quantize_activations: true
+  learnable_scales: true
+  layer_policy: decoder_projections
+
+streaming:
+  chunk_ms: 320
+  lookahead_ms: 0
+  unfixed_token_num: 1
+
+eval:
+  datasets: [librispeech_test_clean, librispeech_test_other]
+  chunk_sizes_ms: [160, 320, 1000]
+  language: English

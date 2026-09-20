@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asr1bit"
+version = "0.1.0"
+description = "Qwen-only 1-bit streaming ASR targeting R2T2-class quality on CPU/edge."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Gunjan00001" }]
+keywords = [
+    "asr",
+    "speech-recognition",
+    "streaming",
+    "quantization",
+    "binary",
+    "bitnet",
+    "qwen",
+    "qwen3-asr",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch",
+    "transformers",
+    "qwen-asr",
+    "librosa",
+    "soundfile",
+    "jiwer",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+train = ["bitsandbytes", "peft", "datasets", "accelerate"]
+dev = ["pytest>=7", "ruff>=0.5"]
+all = ["bitsandbytes", "peft", "datasets", "accelerate", "pytest>=7", "ruff>=0.5"]
+
+[project.urls]
+Repository = "https://github.com/Gunjan00001/ASR-1-bit-qwen-R2T2-approach"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["asr1bit*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
