@@ -22,6 +22,7 @@ committed on a per-stage branch and tagged there first.
 | `0.1.5` | 2026-09-20 | `stage-0` | Cap vLLM `max_model_len` to fit the T4 KV cache | — |
 | `0.1.6` | 2026-09-20 | `stage-0` | Force Triton attention backend (FlashInfer JIT fails on sm75) | — |
 | `0.1.7` | 2026-09-20 | `stage-0` | Put `src` on `PYTHONPATH` so `asr1bit` imports without relying on the editable install | — |
+| `0.1.8` | 2026-09-20 | `stage-0` | Fix `.gitignore` (`data/` → `/data/`); commit `src/asr1bit/data/` package | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -31,6 +32,15 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.8 — data package was git-ignored
+
+- `.gitignore` had an unanchored `data/`, which silently ignored
+  `src/asr1bit/data/` — so `load.py` and the package were never committed and
+  the Kaggle clone lacked them (`No module named 'asr1bit.data'`). Anchored the
+  rule to `/data/` and committed the package.
+- Found by Kaggle run v6 (spike PASS, probe import failure). Local tests passed
+  because the files existed on disk but were untracked.
 
 ## 0.1.7 — import-path fix + first spike PASS
 
