@@ -101,6 +101,38 @@ class TestGroupSize:
         assert layer(torch.randn(2, 8)).shape == (2, 4)
 
 
+class TestSteCapability:
+    def test_overfits_one_synthetic_batch_at_alpha_one(self):
+        """STE must let a single BitLinear learn a separable batch at alpha=1."""
+        torch.manual_seed(0)
+        x = torch.randn(64, 8)
+        labels = (x.sum(dim=1) > 0).long()
+        layer = BitLinear(8, 2, bit_width=1, quantize_activations=False)
+        layer.alpha = 1.0
+        optimizer = torch.optim.Adam(layer.parameters(), lr=0.05)
+        initial = None
+        for _ in range(800):
+            optimizer.zero_grad()
+            loss = F.cross_entropy(layer(x), labels)
+            if initial is None:
+                initial = float(loss.detach())
+            loss.backward()
+            assert torch.isfinite(layer.weight.grad).all()
+            optimizer.step()
+        final = float(loss.detach())
+        accuracy = float((layer(x).argmax(dim=1) == labels).float().mean())
+        assert final < initial
+        assert accuracy >= 0.95
+
+    def test_grads_are_finite_and_nonzero(self):
+        torch.manual_seed(0)
+        layer = BitLinear(8, 4, bit_width=1)
+        F.cross_entropy(layer(torch.randn(4, 8)), torch.tensor([0, 1, 2, 3])).backward()
+        grad = layer.weight.grad
+        assert torch.isfinite(grad).all()
+        assert grad.norm() > 0
+
+
 class TestProgressiveAlpha:
     def test_default_alpha_is_one(self):
         assert BitLinear(4, 4).alpha == 1.0
@@ -111,6 +143,13 @@ class TestProgressiveAlpha:
         layer.alpha = 0.0
         x = torch.randn(3, 8)
         assert torch.allclose(layer(x), F.linear(x, linear.weight, linear.bias), atol=1e-6)
+
+    def test_alpha_zero_is_exactly_linear(self):
+        linear = nn.Linear(8, 4)
+        layer = BitLinear.from_linear(linear, quantize_activations=False)
+        layer.alpha = 0.0
+        x = torch.randn(5, 8)
+        assert torch.equal(layer(x), F.linear(x, linear.weight, linear.bias))
 
     def test_alpha_one_is_quantized(self):
         linear = nn.Linear(8, 4)

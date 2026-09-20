@@ -287,3 +287,30 @@ Label subsampled results explicitly.
 - Towards One-bit ASR — arXiv:2505.21245 (Interspeech 2025)
 - VibeVoice-ASR-BitNet — Microsoft Research technical report
 - DeepSeek-V4.1-Flash — DeepSeek-AI technical report
+
+## 16. Decisions log
+
+Dated, append-only. Record what changed, why, and alternatives rejected.
+
+- **2026-09-20 — Stage 0 gate passed.** fp16 baselines reproduced on T4; primary
+  metric streaming 320 ms clean `2.24` / other `4.61`; `X = +1.5` locked; tagged
+  `0.2.0` (branch `stage-0` merged to `main`).
+- **2026-09-20 — Stage 1 runs on Colab T4 (not Kaggle).** Rationale: the QAT and
+  ablation environment already lives there; avoids Kaggle quota and contention
+  with `asr-1bit-qat-attn`. Fallback to Kaggle only if Colab sessions become the
+  blocker.
+- **2026-09-20 — Stage 1 stability protocol.** First QAT run was **invalid**
+  (post-QAT fp16 WER 256% → shadow-weight corruption; loss spike at the α ramp).
+  New protocol: constant **α=1**, fp32 master + **fp32 AdamW**, lr 1e-5 with
+  warmup, **no autocast** (T4 has no bf16), gradient checkpointing **off**,
+  activation quant **off**, per-step finite-grad assertion + grad-norm logging.
+  Re-enable features **one at a time**: grad-ckpt → activation quant → 8-bit Adam
+  → autocast. Alternatives rejected: blindly retrying the α ramp + Adam8bit, and
+  chasing LoRA (torchao incompatible; unnecessary for Stage 1).
+- **2026-09-20 — QAT-only training is the protocol, not a fallback.** Only
+  `BitLinear` shadow weights are trainable; encoder/embeddings/LM head/norms are
+  frozen. LoRA is deferred beyond Stage 1.
+- **2026-09-20 — Documentation discipline.** `docs/LAB_NOTES.md` is append-only
+  (five fields per entry); this section records dated decisions; failed runs are
+  recorded with diagnosis and never deleted. Docs are committed with the code
+  they describe.

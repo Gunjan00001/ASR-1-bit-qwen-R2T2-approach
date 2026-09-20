@@ -1,13 +1,14 @@
 """Stage 1 (T1.4/T1.5): progressive QAT on Qwen3-ASR-0.6B + offline WER ablations.
 
-Loads the transformers backend, binarizes/ternarizes the decoder projections via
-``apply_layer_policy``, runs a short progressive-alpha QAT (fp32 shadow + STE,
-optional 8-bit Adam + LoRA + gradient checkpointing), then evaluates offline WER
-on a fixed labelled subset for fp16 / binary / ternary.
+Stabilized debug configuration (see docs/LAB_NOTES.md):
+- only BitLinear shadows are trainable (frozen QAT setup, not a fallback),
+- fp32 master weights + fp32 AdamW by default (8-bit Adam behind a flag),
+- no autocast, gradient checkpointing OFF, activation quant OFF by default,
+- constant alpha=1.0 by default (alpha ramp behind a flag),
+- per-layer gradient norms logged and finiteness asserted before every step.
 
-Streaming/vLLM eval is deferred; this uses the Stage 0 harness (offline,
-portable transformers backend). Run in a fresh subprocess (vLLM spawn-safety is
-not needed here, but isolation keeps the notebook kernel clean).
+Enable the risky features one at a time via flags to find which one breaks
+training. Streaming/vLLM eval is deferred.
 """
 
 from __future__ import annotations
@@ -26,13 +27,12 @@ from asr1bit.eval.wer import corpus_cer, corpus_wer
 from asr1bit.qwen import backends
 from asr1bit.replace import apply_layer_policy
 from asr1bit.train.qat import (
-    QATConfig,
     build_optimizer,
-    enable_gradient_checkpointing,
-    lora_targets,
+    check_finite_grads,
+    grad_norms,
     progressive_alpha,
+    set_activation_quant,
     set_qat_alpha,
-    trainable_parameter_count,
 )
 
 
@@ -92,11 +92,7 @@ def evaluate(wrapper, utterances, limit: int) -> dict:
     for utt in utterances[:limit]:
         hyps.append(backends.offline_transcribe(wrapper, utt.audio, language=None))
         refs.append(utt.text)
-    return {
-        "n": len(refs),
-        "wer": corpus_wer(refs, hyps),
-        "cer": corpus_cer(refs, hyps),
-    }
+    return {"n": len(refs), "wer": corpus_wer(refs, hyps), "cer": corpus_cer(refs, hyps)}
 
 
 def set_precision(model, bit_width: float, alpha: float) -> None:
@@ -114,12 +110,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--group-size", type=int, default=0, help="0 = per-tensor")
     p.add_argument("--steps", type=int, default=60)
     p.add_argument("--train-n", type=int, default=64)
-    p.add_argument("--eval-n", type=int, default=100)
-    p.add_argument("--lr", type=float, default=2e-4)
+    p.add_argument("--eval-n", type=int, default=15)
+    p.add_argument("--lr", type=float, default=1e-5)
+    p.add_argument("--warmup-steps", type=int, default=5)
     p.add_argument("--batch-size", type=int, default=1)
-    p.add_argument("--max-new-tokens", type=int, default=256, help="Cap generation (bounds degenerate outputs).")
-    p.add_argument("--use-lora", type=int, default=1)
-    p.add_argument("--use-8bit", type=int, default=1)
+    p.add_argument("--max-new-tokens", type=int, default=256)
+    p.add_argument("--optimizer", choices=["adamw", "adam8bit"], default="adamw")
+    p.add_argument("--grad-checkpointing", type=int, default=0)
+    p.add_argument("--activation-quant", type=int, default=0)
+    p.add_argument("--autocast", type=int, default=0)
+    p.add_argument("--alpha-ramp", type=int, default=0, help="1 = progressive alpha 0->1")
+    p.add_argument("--alpha-warmup-frac", type=float, default=0.3)
+    p.add_argument("--log-grad-norms", type=int, default=1)
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
 
@@ -127,8 +129,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     group_size = args.group_size or None
+    config_record = vars(args) | {"group_size": group_size}
     print("=== environment ===")
     print(json.dumps(backends.environment_report(), indent=2), flush=True)
+    print("=== config ===")
+    print(json.dumps(config_record, indent=2), flush=True)
 
     wrapper = backends.load_model(
         args.model, backend="transformers", dtype=torch.float32, device="cuda:0",
@@ -138,81 +143,92 @@ def main() -> int:
     processor = wrapper.processor
     patch_outer_forward(model)
 
-    print("=== data ===", flush=True)
     train_utts = list(iter_librispeech("clean", "validation", sample_n=args.train_n, sample_seed=0))
     eval_utts = list(iter_librispeech("clean", "test", sample_n=args.eval_n, sample_seed=0))
     train_examples = build_examples(train_utts, processor)
     print(f"train={len(train_examples)} eval={len(eval_utts)}", flush=True)
 
-    results: dict = {"model": args.model, "policy": args.policy, "bit_width": args.bit_width,
-                     "group_size": group_size, "steps": args.steps, "eval_n": len(eval_utts)}
+    results: dict = {"config": config_record, "eval_n": len(eval_utts)}
 
-    print("=== baseline (pretrained, fp32 shadow, alpha=0) ===", flush=True)
+    print("=== baseline (pretrained) ===", flush=True)
     results["pretrained"] = evaluate(wrapper, eval_utts, args.eval_n)
     print(json.dumps(results["pretrained"]), flush=True)
 
     apply_layer_policy(model, args.policy, bit_width=args.bit_width, group_size=group_size)
     model.to("cuda:0")
-    replaced = getattr(model, "bitlinear_replaced", 0)
-    results["bitlinear_replaced"] = replaced
-    print(f"replaced {replaced} linears with BitLinear", flush=True)
+    results["bitlinear_replaced"] = getattr(model, "bitlinear_replaced", 0)
 
-    used_lora = False
-    if args.use_lora:
-        try:
-            from asr1bit.train.qat import apply_lora
+    # QAT-only: freeze everything except BitLinear shadows.
+    for param in model.parameters():
+        param.requires_grad_(False)
+    for module in model.modules():
+        if isinstance(module, BitLinear):
+            module.weight.requires_grad_(True)
+            if module.bias is not None:
+                module.bias.requires_grad_(True)
+    set_activation_quant(model, bool(args.activation_quant))
+    if args.grad_checkpointing:
+        model.gradient_checkpointing_enable()
+        if hasattr(model.config, "use_cache"):
+            model.config.use_cache = False
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    results["trainable_params"] = trainable
+    print(f"replaced={results['bitlinear_replaced']} trainable={trainable}", flush=True)
 
-            model = apply_lora(model, target_modules=lora_targets(model))
-            model.to("cuda:0")
-            wrapper.model = model
-            used_lora = True
-            patch_outer_forward(model)
-        except Exception as exc:  # noqa: BLE001
-            print(f"WARNING: LoRA unavailable ({exc}); freezing to BitLinear shadows", flush=True)
-    if not used_lora:
-        from asr1bit.train.qat import freeze_non_bitlinear
+    optimizer = build_optimizer(model, lr=args.lr, use_8bit=(args.optimizer == "adam8bit"))
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer, lr_lambda=lambda step: min(1.0, (step + 1) / max(1, args.warmup_steps))
+    )
+    scaler = torch.amp.GradScaler("cuda") if args.autocast else None
 
-        print(f"frozen to BitLinear shadows: {freeze_non_bitlinear(model)} trainable", flush=True)
-    results["used_lora"] = used_lora
-    enable_gradient_checkpointing(model)
-    results["trainable_params"] = trainable_parameter_count(model)
-
-    optimizer = build_optimizer(model, lr=args.lr, use_8bit=bool(args.use_8bit))
-    config = QATConfig(steps=args.steps, lr=args.lr, use_8bit=bool(args.use_8bit))
-
+    batches = [collate(train_examples[i : i + args.batch_size], processor)
+               for i in range(0, len(train_examples), args.batch_size)]
+    alpha_warmup = max(1, int(args.steps * args.alpha_warmup_frac))
     history = []
-    batches = [
-        collate(train_examples[i : i + args.batch_size], processor)
-        for i in range(0, len(train_examples), args.batch_size)
-    ]
-    warmup = max(1, int(args.steps * config.alpha_warmup_frac))
     print("=== QAT ===", flush=True)
     started = time.perf_counter()
     for step in range(args.steps):
-        alpha = progressive_alpha(step, warmup)
+        alpha = progressive_alpha(step, alpha_warmup) if args.alpha_ramp else 1.0
         set_qat_alpha(model, alpha)
         batch = {k: (v.cuda() if torch.is_tensor(v) else v) for k, v in batches[step % len(batches)].items()}
         optimizer.zero_grad()
-        out = model(**batch)
-        loss = out.loss if hasattr(out, "loss") else out[0]
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
-        optimizer.step()
-        if (step + 1) % 5 == 0 or step == 0:
-            record = {"step": step + 1, "alpha": alpha, "loss": float(loss.detach())}
+        if scaler is not None:
+            with torch.amp.autocast("cuda", dtype=torch.float16):
+                out = model(**batch)
+                loss = out.loss if hasattr(out, "loss") else out[0]
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            check_finite_grads(model)
+            norms = grad_norms(model)
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            out = model(**batch)
+            loss = out.loss if hasattr(out, "loss") else out[0]
+            loss.backward()
+            check_finite_grads(model)
+            norms = grad_norms(model)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+        scheduler.step()
+        max_norm = max(norms.values()) if norms else 0.0
+        if step == 0 and args.log_grad_norms:
+            top = sorted(norms.items(), key=lambda kv: -kv[1])[:5]
+            print("top grad norms:", [(n.split(".")[-2] + "." + n.split(".")[-1], round(v, 4)) for n, v in top], flush=True)
+        if step % 5 == 0 or step == args.steps - 1:
+            record = {"step": step + 1, "alpha": alpha, "loss": float(loss.detach()),
+                      "lr": scheduler.get_last_lr()[0], "max_grad_norm": max_norm}
             history.append(record)
             print(json.dumps(record), flush=True)
     results["history"] = history
     results["qat_seconds"] = time.perf_counter() - started
 
     print("=== ablations (offline WER) ===", flush=True)
-    # Restore fast inference: grad checkpointing off + KV cache on.
     disable = getattr(model, "gradient_checkpointing_disable", None)
     if callable(disable):
         disable()
-    config_obj = getattr(model, "config", None)
-    if config_obj is not None and hasattr(config_obj, "use_cache"):
-        config_obj.use_cache = True
+    if hasattr(model.config, "use_cache"):
+        model.config.use_cache = True
     model.eval()
     with torch.no_grad():
         set_precision(model, 1.0, 0.0)
@@ -221,11 +237,11 @@ def main() -> int:
         results["binary"] = evaluate(wrapper, eval_utts, args.eval_n)
         set_precision(model, 1.58, 1.0)
         results["ternary"] = evaluate(wrapper, eval_utts, args.eval_n)
-    print(json.dumps({k: results[k] for k in ("fp16", "binary", "ternary")}, indent=2), flush=True)
+    print(json.dumps({k: results[k] for k in ("pretrained", "fp16", "binary", "ternary")}, indent=2), flush=True)
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    tag = f"{args.policy}_bw{args.bit_width}_g{group_size}"
+    tag = f"{args.policy}_bw{args.bit_width}_g{group_size}_lr{args.lr}_{args.optimizer}"
     (out_dir / f"stage1_{tag}.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     print("wrote", out_dir / f"stage1_{tag}.json", flush=True)
     return 0

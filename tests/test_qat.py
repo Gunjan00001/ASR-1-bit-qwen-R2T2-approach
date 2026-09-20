@@ -9,10 +9,13 @@ from asr1bit.bitlinear import BitLinear
 from asr1bit.replace import apply_layer_policy
 from asr1bit.train.qat import (
     build_optimizer,
+    check_finite_grads,
     enable_gradient_checkpointing,
     freeze_non_bitlinear,
+    grad_norms,
     non_bitlinear_linear_names,
     progressive_alpha,
+    set_activation_quant,
     set_qat_alpha,
     train_step,
 )
@@ -83,6 +86,20 @@ class TestNonBitlinearLinearNames:
         assert "lm_head" in names
 
 
+class TestSetActivationQuant:
+    def test_toggles_all_bitlinear(self):
+        model = _FakeASR()
+        apply_layer_policy(model, "decoder_attn")
+        assert set_activation_quant(model, False) == 8
+        for module in model.modules():
+            if isinstance(module, BitLinear):
+                assert module.quantize_activations is False
+        set_activation_quant(model, True)
+        for module in model.modules():
+            if isinstance(module, BitLinear):
+                assert module.quantize_activations is True
+
+
 class TestFreezeNonBitlinear:
     def test_only_bitlinear_shadows_trainable(self):
         model = _FakeASR()
@@ -127,6 +144,29 @@ class TestBuildOptimizer:
         optimizer = build_optimizer(model, lr=1e-3, use_8bit=False)
         params = [p for group in optimizer.param_groups for p in group["params"]]
         assert len(params) == 2  # first layer weight+bias only
+
+
+class TestGradDiagnostics:
+    def test_grad_norms_after_backward(self):
+        layer = nn.Linear(4, 3)
+        layer(torch.randn(2, 4)).sum().backward()
+        norms = grad_norms(layer)
+        assert "weight" in norms and "bias" in norms
+        assert all(norm >= 0 for norm in norms.values())
+
+    def test_check_finite_grads_raises_on_nan(self):
+        import pytest
+
+        layer = nn.Linear(4, 3)
+        layer(torch.randn(2, 4)).sum().backward()
+        layer.weight.grad[0, 0] = float("nan")
+        with pytest.raises(FloatingPointError):
+            check_finite_grads(layer)
+
+    def test_check_finite_grads_passes_normally(self):
+        layer = nn.Linear(4, 3)
+        layer(torch.randn(2, 4)).sum().backward()
+        check_finite_grads(layer)
 
 
 class TestTrainStep:

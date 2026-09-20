@@ -81,6 +81,20 @@ Collapsed summary of 17 `stage-0` checkpoints (individual commits/tags retained)
 - EXIT/INT/TERM trap collects artifacts on any outcome; token-scoped `--push`
   warns and skips when `GITHUB_TOKEN` is absent.
 
+## 0.2.1 – 0.2.10 — Stage 1 (BitLinear + QAT) work-in-progress
+
+Tags `0.2.1`–`0.2.10` on branch `stage-1` (off `main` `0.2.0`). Stage 1 is **not**
+complete; the gate is **not met** and `0.3.0` is intentionally untagged.
+
+- T1.1 `quant.py` (binary/ternary + group-wise), T1.2 `bitlinear.py` (fp32
+  shadow, STE, INT8 acts, progressive alpha), T1.3 `replace.py`
+  (`apply_layer_policy`), T1.4 `train/qat.py` + `scripts/run_stage1_qat.py`.
+- First QAT run **invalid** (post-QAT fp16 WER 256% — shadow corruption; see
+  `docs/LAB_NOTES.md` and `docs/stage1_results.md`).
+- Debug phase: STE correctness tests (overfit-one-batch at α=1), `grad_norms` /
+  `check_finite_grads` diagnostics, and a stabilized runner (fp32 AdamW, α=1,
+  no grad-ckpt/act-quant/autocast, QAT-only freeze). 171 tests pass.
+
 ## 0.1.1 — Stage 0 plan corrections
 
 - Locked the evaluation protocol (greedy, `language=None`, `max_new_tokens`

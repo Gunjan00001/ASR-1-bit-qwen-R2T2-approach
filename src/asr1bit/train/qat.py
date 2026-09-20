@@ -41,6 +41,16 @@ def set_qat_alpha(model: nn.Module, alpha: float) -> int:
     return count
 
 
+def set_activation_quant(model: nn.Module, enabled: bool) -> int:
+    """Enable/disable INT8 activation quantization on all BitLinear layers."""
+    count = 0
+    for module in model.modules():
+        if isinstance(module, BitLinear):
+            module.quantize_activations = bool(enabled)
+            count += 1
+    return count
+
+
 def non_bitlinear_linear_names(model: nn.Module) -> list[str]:
     """Names of ``nn.Linear`` modules that were *not* replaced by BitLinear."""
     return [
@@ -127,6 +137,22 @@ def build_optimizer(
         except Exception as exc:  # noqa: BLE001 - fall back to AdamW
             warnings.warn(f"bitsandbytes unavailable ({exc}); using AdamW", stacklevel=2)
     return torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
+
+
+def grad_norms(model: nn.Module) -> dict[str, float]:
+    """Per-parameter gradient L2 norms (only params that have a gradient)."""
+    norms: dict[str, float] = {}
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            norms[name] = float(param.grad.detach().norm())
+    return norms
+
+
+def check_finite_grads(model: nn.Module) -> None:
+    """Raise ``FloatingPointError`` if any gradient is non-finite."""
+    for name, param in model.named_parameters():
+        if param.grad is not None and not torch.isfinite(param.grad).all():
+            raise FloatingPointError(f"non-finite gradient in parameter: {name}")
 
 
 def train_step(
