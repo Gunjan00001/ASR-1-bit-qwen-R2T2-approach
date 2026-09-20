@@ -198,6 +198,13 @@ def main() -> int:
     results["qat_seconds"] = time.perf_counter() - started
 
     print("=== ablations (offline WER) ===", flush=True)
+    # Restore fast inference: grad checkpointing off + KV cache on.
+    disable = getattr(model, "gradient_checkpointing_disable", None)
+    if callable(disable):
+        disable()
+    config_obj = getattr(model, "config", None)
+    if config_obj is not None and hasattr(config_obj, "use_cache"):
+        config_obj.use_cache = True
     model.eval()
     with torch.no_grad():
         set_precision(model, 1.0, 0.0)
