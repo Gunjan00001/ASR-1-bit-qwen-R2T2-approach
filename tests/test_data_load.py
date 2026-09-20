@@ -92,6 +92,12 @@ class _StubDataset:
     def __iter__(self):
         return iter(self._records)
 
+    def __len__(self):
+        return len(self._records)
+
+    def select(self, indices):
+        return _StubDataset([self._records[i] for i in indices])
+
 
 def _hf_record(uid, text, sr=16000, seconds=1.0):
     audio = np.zeros(int(sr * seconds), dtype=np.float32)
@@ -117,6 +123,20 @@ class TestIterLibrispeech:
         dataset = _StubDataset([_hf_record(str(i), "hi") for i in range(10)])
         utterances = list(iter_librispeech("clean", "test", dataset=dataset, limit=3))
         assert len(utterances) == 3
+
+    def test_indices_selects_rows(self):
+        dataset = _StubDataset([_hf_record(str(i), "hi") for i in range(10)])
+        utterances = list(iter_librispeech("clean", "test", dataset=dataset, indices=[0, 3, 5]))
+        assert [u.id for u in utterances] == ["0", "3", "5"]
+
+    def test_sample_n_is_deterministic(self):
+        def fresh():
+            return _StubDataset([_hf_record(str(i), "hi") for i in range(100)])
+
+        first = list(iter_librispeech("clean", "test", dataset=fresh(), sample_n=5, sample_seed=1))
+        second = list(iter_librispeech("clean", "test", dataset=fresh(), sample_n=5, sample_seed=1))
+        assert [u.id for u in first] == [u.id for u in second]
+        assert len(first) == 5
 
 
 class TestSelectSubsample:

@@ -49,6 +49,32 @@ compute capability) and non-empty offline + streaming text at `chunk_size_sec`
 Copy the whole output block back — the environment lines are recorded with the
 Stage 0 results, and the 0.32 run previews the low-latency chunk path.
 
+## Cell 4 — Stage 0 baseline matrix
+
+After the spike passes, run the matrix (offline full clean/other; streaming
+2.0 s on full test-clean; streaming 2.0 s + 320 ms on a fixed 500-utterance
+test-other subsample):
+
+```python
+!python scripts/run_stage0.py --backend vllm
+```
+
+Preview the plan without loading models:
+
+```python
+!python scripts/run_stage0.py --backend vllm --dry-run
+```
+
+Outputs land in `outputs/stage0/`: a `<run>.jsonl` per-utterance file (reused on
+re-run, so a killed session resumes) plus `reports.json` / `reports.csv` and a
+printed summary. Copy the summary table and `environment` block back for the
+gate.
+
+If the vLLM backend is unusable but the transformers backend loads, the
+portable path can be exercised with `--backend transformers` (streaming uses our
+:class:`~asr1bit.qwen.stream.ChunkedStreamer`); the vLLM run remains the
+reference for the published-number reproduction.
+
 ## If the spike fails
 
 In order:

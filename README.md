@@ -14,8 +14,10 @@ published streaming quality on CPU/edge.
 
 ## Status
 
-Stage 0 (baselines & harness) in progress. See [`docs/PLANNING.md`](docs/PLANNING.md)
-for the stage plan, pinned evaluation protocol, and gate.
+Stage 0 (baselines & harness) code complete; awaiting the GPU gate run.
+See [`docs/PLANNING.md`](docs/PLANNING.md) for the stage plan, pinned evaluation
+protocol, and gate, and [`docs/kaggle_stage0.md`](docs/kaggle_stage0.md) to run
+the T0.0 spike and the baseline matrix on Kaggle.
 
 ## Development
 

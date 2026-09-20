@@ -118,6 +118,7 @@ Qwen3-ForcedAligner-0.6B  -> word/token timestamps
 ## 8. File structure
 
 ```
+src/asr1bit/text.py          # shared text normalization (lowercase/strip punctuation)
 src/asr1bit/quant.py          # binary/ternary quantizers, STE, absmean, RoundClip
 src/asr1bit/bitlinear.py      # BitLinear drop-in for nn.Linear; bit-width switch
 src/asr1bit/replace.py        # layer policy: which linears become BitLinear
@@ -125,6 +126,7 @@ src/asr1bit/data/load.py      # LibriSpeech/CommonVoice manifests -> 16k mono
 src/asr1bit/data/align.py     # Qwen3-ForcedAligner -> word/token timestamps
 src/asr1bit/data/prefix.py    # stable-prefix + chunk/lookahead targets
 src/asr1bit/qwen/stream.py    # incremental chunked decoding + LSP emission
+src/asr1bit/qwen/backends.py  # qwen-asr adapter (vLLM official / transformers portable)
 src/asr1bit/train/qat.py      # progressive QAT loop
 src/asr1bit/train/opd.py      # on-policy distillation from fp teacher
 src/asr1bit/train/cotrain.py  # multi-precision co-training / stochastic precision
