@@ -15,9 +15,14 @@ quantization:
 streaming:
   chunk_ms: 320
   lookahead_ms: 0
+  # NOTE: our model config intentionally differs from the official Qwen
+  # baseline (which uses unfixed_chunk_num=2, unfixed_token_num=5,
+  # chunk_size_sec=2.0). This is not a bug.
   unfixed_token_num: 1
 
 eval:
   datasets: [librispeech_test_clean, librispeech_test_other]
   chunk_sizes_ms: [160, 320, 1000]
-  language: English
+  # Official published numbers use language=None (no language parameter).
+  # Set to "English" only when forcing language for our model.
+  language: null

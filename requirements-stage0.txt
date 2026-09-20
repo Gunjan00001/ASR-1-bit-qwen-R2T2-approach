@@ -1,0 +1,19 @@
+# Stage 0 runtime for Kaggle T4 / Colab (Linux + CUDA).
+#
+# Versions are recorded per-run by the harness (`asr1bit.eval.harness.environment_report`);
+# lock them to exact pins here once the T0.0 spike confirms a working combination.
+#
+# Install:
+#   pip install -r requirements-stage0.txt
+#   pip install -e . --no-deps
+#
+torch
+transformers
+datasets
+qwen-asr[vllm]
+vllm
+soundfile
+soxr
+jiwer
+pandas
+pyyaml

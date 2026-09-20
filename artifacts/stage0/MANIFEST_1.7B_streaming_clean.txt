@@ -1,0 +1,10 @@
+# Stage 0 gate manifest
+stage=matrix
+commit=d34b19f
+date=2026-09-20T12:16:02Z
+artifacts_dir=/kaggle/working/artifacts/stage0
+
+## files
+- environment.txt (408 bytes)
+- reports.csv (524 bytes)
+- reports.json (686 bytes)

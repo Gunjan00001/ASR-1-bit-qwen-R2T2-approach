@@ -1,0 +1,54 @@
+[
+  {
+    "model_id": "Qwen/Qwen3-ASR-1.7B",
+    "mode": "streaming",
+    "chunk_ms": 2000,
+    "n_utterances": 500,
+    "wer": 3.4694100908394443,
+    "cer": 1.2498432470843959,
+    "rtf": 0.23929598771257476,
+    "mean_latency_sec": 1.6242430831499937,
+    "retrospective_latency_sec": 3.6242430831499934,
+    "subsampled": true,
+    "dataset": "openslr/librispeech_asr",
+    "config": "other",
+    "split": "test",
+    "versions": {
+      "python": "3.12.13",
+      "torch": "2.9.1+cu128",
+      "transformers": "4.57.6",
+      "vllm": "0.14.0",
+      "qwen_asr": "unknown",
+      "cuda_available": true,
+      "cuda": "12.8",
+      "device": "Tesla T4"
+    },
+    "notes": ""
+  },
+  {
+    "model_id": "Qwen/Qwen3-ASR-1.7B",
+    "mode": "streaming",
+    "chunk_ms": 320,
+    "n_utterances": 500,
+    "wer": 4.607639268906643,
+    "cer": 2.643899176524683,
+    "rtf": 0.7275415843631253,
+    "mean_latency_sec": 4.938254073550003,
+    "retrospective_latency_sec": 5.258254073550003,
+    "subsampled": true,
+    "dataset": "openslr/librispeech_asr",
+    "config": "other",
+    "split": "test",
+    "versions": {
+      "python": "3.12.13",
+      "torch": "2.9.1+cu128",
+      "transformers": "4.57.6",
+      "vllm": "0.14.0",
+      "qwen_asr": "unknown",
+      "cuda_available": true,
+      "cuda": "12.8",
+      "device": "Tesla T4"
+    },
+    "notes": ""
+  }
+]

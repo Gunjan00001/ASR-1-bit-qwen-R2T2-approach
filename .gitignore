@@ -6,6 +6,7 @@ __pycache__/
 build/
 dist/
 .venv/
+.venv*/
 venv/
 .env
 
@@ -15,10 +16,10 @@ venv/
 .mypy_cache/
 .ipynb_checkpoints/
 
-# Models / data / checkpoints
-checkpoints/
-outputs/
-data/
+# Models / data / checkpoints (root-level only; do NOT ignore src/asr1bit/data)
+/checkpoints/
+/outputs/
+/data/
 *.safetensors
 *.gguf
 *.bin

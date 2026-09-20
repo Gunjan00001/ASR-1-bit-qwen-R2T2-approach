@@ -1,0 +1,38 @@
+# Stage 0 baseline matrix (see docs/PLANNING.md §9, docs/kaggle_stage0.md).
+#
+# Pinned official protocol: bfloat16, greedy, language=None,
+# max_new_tokens = 1024 (offline) / 32 (streaming), vLLM backend.
+# Published LibriSpeech clean|other: 0.6B 2.54|6.27, 1.7B 1.95|4.51.
+
+models:
+  - Qwen/Qwen3-ASR-0.6B
+  - Qwen/Qwen3-ASR-1.7B
+
+backend: vllm
+
+streaming:
+  baseline_chunk_ms: 2000            # official published chunk size
+  extra_chunk_ms: [320]              # locked comparison chunk sizes
+  step_ms: 500
+  unfixed_chunk_num: 2
+  unfixed_token_num: 5
+  language: null                     # official protocol uses no language param
+
+offline:
+  max_new_tokens: 1024
+  language: null
+
+subsample:
+  n: 500                             # fixed test-other subsample
+  seed: 0
+
+datasets:
+  - {config: clean, split: test}
+  - {config: other, split: test}
+
+# Full = offline clean/other, streaming clean @2.0s.
+# Subsampled = streaming other @2.0s and @320ms (identical utterances).
+feasibility:
+  offline: full
+  streaming_full: [clean@2000]
+  streaming_subsampled: [other@2000, other@320]

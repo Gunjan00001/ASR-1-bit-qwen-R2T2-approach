@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Qwen-only 1-bit streaming ASR targeting R2T2-class quality on CPU/edge."
 readme = "README.md"
 requires-python = ">=3.10"
+# Dev is pinned to 3.12 via .python-version; >=3.10 keeps Kaggle/Colab installable.
 license = { text = "Apache-2.0" }
 authors = [{ name = "Gunjan00001" }]
 keywords = [
@@ -34,19 +35,32 @@ classifiers = [
 ]
 
 dependencies = [
-    "torch",
-    "transformers",
-    "qwen-asr",
-    "librosa",
-    "soundfile",
-    "jiwer",
-    "pyyaml",
+    "numpy>=1.26",
+    "torch>=2.2",
+    "transformers>=4.52",
+    "datasets>=2.20",
+    "soundfile>=0.12",
+    "soxr>=0.3",
+    "jiwer>=3.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
-train = ["bitsandbytes", "peft", "datasets", "accelerate"]
-dev = ["pytest>=7", "ruff>=0.5"]
-all = ["bitsandbytes", "peft", "datasets", "accelerate", "pytest>=7", "ruff>=0.5"]
+# Official Qwen3-ASR inference toolkit (transformers backend).
+runtime = ["qwen-asr"]
+# Official vLLM backend; required for Qwen3-ASR streaming. Linux + CUDA only.
+vllm = ["qwen-asr[vllm]", "vllm"]
+train = ["bitsandbytes", "peft", "accelerate"]
+dev = ["pytest>=7", "ruff>=0.5", "pandas>=2.0"]
+all = [
+    "qwen-asr",
+    "bitsandbytes",
+    "peft",
+    "accelerate",
+    "pytest>=7",
+    "ruff>=0.5",
+    "pandas>=2.0",
+]
 
 [project.urls]
 Repository = "https://github.com/Gunjan00001/ASR-1-bit-qwen-R2T2-approach"
