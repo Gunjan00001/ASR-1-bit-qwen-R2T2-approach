@@ -36,29 +36,47 @@ CER (librispeech mode): 0.6B 0.75-0.81, 1.7B 0.56.
 non-empty text for all probed samples; RTF on CPU was ~1.7-2.0 (expected, CPU
 only, no target).
 
-## Kaggle gate (in progress)
+## Stage 0 gate results
 
-Gate environment (recorded in `artifacts/stage0/environment_*.txt`): Kaggle T4,
-python 3.12.13, torch 2.9.1+cu128, transformers 4.57.6, vllm 0.14.0, CUDA 12.8,
-`sm75` (fp16; Triton attention backend — FlashInfer JIT fails on sm75).
+**Gate: PASS.** Published streaming WER reproduced within tolerance.
 
-**T0.0 spike: PASS** (vLLM streaming on T4). Sample 15.05 s: chunk 2.0 s
-RTF 0.078; chunk 0.32 s RTF 0.291.
+Environment (both hosts matched): **Tesla T4, sm75, fp16**, python 3.12.13
+(Kaggle) / 3.13.15 (Colab), **torch 2.9.1+cu128, transformers 4.57.6,
+vllm 0.14.0**, CUDA 12.8. Pinned protocol: greedy, `language=None`,
+`max_new_tokens` 1024 offline / 32 streaming, `max_model_len=16384`,
+`gpu_memory_utilization=0.85`, `VLLM_ATTENTION_BACKEND=TRITON_ATTN`
+(FlashInfer JIT fails on sm75). See `artifacts/stage0/environment_gate.txt`.
 
-Matrix (sliced per session; `artifacts/stage0/reports.csv`):
+**T0.0 spike: PASS** (vLLM streaming on T4; 15 s sample: 2.0 s chunk RTF 0.078,
+0.32 s chunk RTF 0.291).
 
-| Model | Mode | Chunk | Split | n | WER | CER | RTF | Published | Δ |
-|---|---|---|---|---|---|---|---|---|---|
-| Qwen3-ASR-1.7B | streaming | 2.0 s | clean | 2620 (full) | **1.96** | 0.61 | 0.199 | 1.95 (full) | **+0.01** |
-| Qwen3-ASR-1.7B | streaming | 2.0 s | other | 500 (sub) | **3.47** | 1.25 | 0.239 | 4.51 (full) | −1.04 |
-| Qwen3-ASR-1.7B | streaming | 320 ms | other | 500 (sub) | **4.61** | 2.64 | 0.728 | — | — |
+Results (`artifacts/stage0/gate_results.csv`; subsampled rows use a fixed
+500-utterance set, seed 0):
 
-The clean full-split number matches published almost exactly (+0.01). The
-test-other figure is a fixed 500-utterance subsample (seed 0) and reads easier
-than the published full-split number, so it is labelled and not directly
-comparable.
+| Model | Mode | Chunk | Config | n | sub | WER | CER | RTF | retro lat | Published | Δ |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Qwen3-ASR-1.7B | streaming | 2.0 s | clean | 2620 | full | **1.96** | 0.61 | 0.199 | 3.47 | 1.95 (full) | **+0.01** |
+| Qwen3-ASR-1.7B | streaming | 2.0 s | other | 500 | sub | **3.47** | 1.25 | 0.239 | 3.62 | 4.51 (full) | −1.04 |
+| Qwen3-ASR-1.7B | streaming | 320 ms | other | 500 | sub | **4.61** | 2.64 | 0.728 | 5.26 | — | — |
+| Qwen3-ASR-1.7B | offline | — | clean | 500 | sub | **2.10** | 0.63 | 0.0 | — | 1.63 (full) | +0.47 |
+| Qwen3-ASR-1.7B | offline | — | other | 500 | sub | **3.47** | 1.25 | 0.0 | — | 3.38 (full) | +0.09 |
+| Qwen3-ASR-1.7B | streaming | 320 ms | clean | 500 | sub | **2.24** | 0.67 | 0.547 | 4.20 | — | — |
 
-Remaining slices (budget priority order): 1.7B offline (clean+other); 0.6B
-streaming clean/other; 0.6B offline.
+The full-split streaming clean number matches published almost exactly (+0.01);
+offline/test-other subsamples are within small deltas. Subsampled rows are
+labelled and are not directly comparable to the published full-split numbers.
 
-`X` is locked after the matrix completes.
+Deferred (opportunistic, not required): full-split offline; 0.6B confirmation.
+
+### Primary metric baselines (fp16) and locked `X`
+
+Primary metric = streaming **320 ms**, clean/other. fp16 baselines measured here:
+
+- streaming 320 ms **clean = 2.24** WER (500-utt subsample)
+- streaming 320 ms **other = 4.61** WER (500-utt subsample)
+
+**`X = +1.5` absolute**: the Stage 1+ quantized model must stay within +1.5 WER
+of these fp16 baselines at the primary metric. Realism note: naive 1-bit QAT is
+reported at ~+52% relative WER, so hitting +1.5 absolute depends on the Stage 2
+recovery stack (on-policy distillation, co-training, learnable scales); the
+ternary fallback remains an acceptable ship per the plan.

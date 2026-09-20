@@ -1,0 +1,31 @@
+Stage 0 gate environment
+========================
+
+Hosts: Kaggle T4 and Colab T4 (Tesla T4, sm75, 15360 MiB)
+Stack (matched across both hosts):
+  python      3.12.13 (Kaggle) / 3.13.15 (Colab)
+  torch       2.9.1+cu128
+  transformers 4.57.6
+  vllm        0.14.0
+  cuda        12.8
+  dtype       float16 (T4 has no bf16)
+  attention   VLLM_ATTENTION_BACKEND=TRITON_ATTN (FlashInfer JIT fails on sm75)
+  vllm args   max_model_len=16384, gpu_memory_utilization=0.85
+  protocol    greedy, language=None, max_new_tokens 1024 offline / 32 streaming
+
+Colab preflight (raw)
+---------------------
+{
+  "python": "3.13.15",
+  "torch": "2.9.1+cu128",
+  "transformers": "4.57.6",
+  "vllm": "0.14.0",
+  "qwen_asr": "unknown",
+  "cuda_available": true,
+  "cuda": "12.8",
+  "device": "Tesla T4",
+  "capability": "sm75"
+}
+
+Kaggle preflight (post-setup) was identical: python 3.12.13, torch 2.9.1+cu128,
+transformers 4.57.6, vllm 0.14.0, T4 sm75.

@@ -14,10 +14,10 @@ published streaming quality on CPU/edge.
 
 ## Status
 
-Stage 0 (baselines & harness) code complete; awaiting the GPU gate run.
-See [`docs/PLANNING.md`](docs/PLANNING.md) for the stage plan, pinned evaluation
-protocol, and gate, and [`docs/kaggle_stage0.md`](docs/kaggle_stage0.md) to run
-the T0.0 spike and the baseline matrix on Kaggle.
+**Stage 0 gate PASSED (`0.2.0`)** — fp16 baselines reproduced on T4; primary
+metric fp16 anchors locked (streaming 320 ms clean `2.24` / other `4.61`) and
+`X = +1.5` absolute. See [`docs/stage0_results.md`](docs/stage0_results.md).
+Next: Stage 1 (BitLinear + QAT on 0.6B).
 
 ## Development
 

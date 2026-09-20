@@ -1,0 +1,7 @@
+model,mode,chunk_ms,config,split,n,subsampled,wer,cer,rtf,retrospective_latency_sec,host,torch,vllm,source
+Qwen/Qwen3-ASR-1.7B,streaming,2000,clean,test,2620,False,1.9629,0.6050,0.1985,3.474,Kaggle T4,2.9.1+cu128,0.14.0,reports.json
+Qwen/Qwen3-ASR-1.7B,streaming,2000,other,test,500,True,3.4694,1.2498,0.2393,3.624,Kaggle T4,2.9.1+cu128,0.14.0,reports_1.7B_streaming_other.csv
+Qwen/Qwen3-ASR-1.7B,streaming,320,other,test,500,True,4.6076,2.6439,0.7275,5.258,Kaggle T4,2.9.1+cu128,0.14.0,reports_1.7B_streaming_other.csv
+Qwen/Qwen3-ASR-1.7B,offline,2000,clean,test,500,True,2.0951,0.6253,0.0,0.0,Colab T4,2.9.1+cu128,0.14.0,reports_offline_1.7B.csv
+Qwen/Qwen3-ASR-1.7B,offline,2000,other,test,500,True,3.4694,1.2519,0.0,0.0,Colab T4,2.9.1+cu128,0.14.0,reports_offline_1.7B.csv
+Qwen/Qwen3-ASR-1.7B,streaming,320,clean,test,500,True,2.2410,0.6720,0.5468,4.202,Colab T4,2.9.1+cu128,0.14.0,reports.csv
