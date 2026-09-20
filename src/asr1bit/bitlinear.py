@@ -45,6 +45,8 @@ class BitLinear(nn.Module):
         self.bit_width = bit_width
         self.quantize_activations = quantize_activations
         self.group_size = group_size
+        # Progressive QAT ramp: 0 = full precision, 1 = fully quantized.
+        self.alpha = 1.0
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         if bias:
             self.bias = nn.Parameter(torch.zeros(out_features))
@@ -58,8 +60,10 @@ class BitLinear(nn.Module):
         else:
             qw, scale = quantize_binary(self.weight, self.group_size)
         dequantized = dequantize_weights(qw, scale, self.group_size)
-        # STE: forward uses the quantized value, gradient flows to the shadow.
-        return self.weight + (dequantized - self.weight).detach()
+        # Progressive ramp: alpha=0 is full precision, alpha=1 fully quantized.
+        blended = (1.0 - self.alpha) * self.weight + self.alpha * dequantized
+        # STE: forward uses the blended value, gradient flows to the shadow.
+        return self.weight + (blended - self.weight).detach()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.quantize_activations:

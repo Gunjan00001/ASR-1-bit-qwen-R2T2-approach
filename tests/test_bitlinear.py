@@ -1,6 +1,7 @@
 """Tests for BitLinear (Stage 1, T1.2)."""
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 from asr1bit.bitlinear import BitLinear, absmax_quantize_activations
@@ -91,3 +92,28 @@ class TestGroupSize:
     def test_groupwise_forward_runs(self):
         layer = BitLinear(8, 4, group_size=4)
         assert layer(torch.randn(2, 8)).shape == (2, 4)
+
+
+class TestProgressiveAlpha:
+    def test_default_alpha_is_one(self):
+        assert BitLinear(4, 4).alpha == 1.0
+
+    def test_alpha_zero_matches_full_precision_linear(self):
+        linear = nn.Linear(8, 4)
+        layer = BitLinear.from_linear(linear, quantize_activations=False)
+        layer.alpha = 0.0
+        x = torch.randn(3, 8)
+        assert torch.allclose(layer(x), F.linear(x, linear.weight, linear.bias), atol=1e-6)
+
+    def test_alpha_one_is_quantized(self):
+        linear = nn.Linear(8, 4)
+        layer = BitLinear.from_linear(linear, quantize_activations=False)
+        layer.alpha = 1.0
+        x = torch.randn(3, 8)
+        assert not torch.allclose(layer(x), F.linear(x, linear.weight, linear.bias))
+
+    def test_alpha_grad_flows(self):
+        layer = BitLinear(8, 4, quantize_activations=False)
+        layer.alpha = 0.5
+        layer(torch.randn(2, 8)).sum().backward()
+        assert layer.weight.grad.abs().sum() > 0
