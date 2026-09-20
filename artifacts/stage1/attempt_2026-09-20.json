@@ -1,0 +1,56 @@
+{
+  "status": "INVALID / gate not met",
+  "host": "Colab Tesla T4 (sm75)",
+  "env": {
+    "python": "3.13.15",
+    "torch": "2.9.1+cu128",
+    "transformers": "4.57.6",
+    "vllm": "0.14.0",
+    "peft": "0.20.0",
+    "bitsandbytes": "0.50.2",
+    "torchao": "0.10.0 (too old for peft LoRA; needs >0.16)"
+  },
+  "model": "Qwen/Qwen3-ASR-0.6B",
+  "policy": "decoder_attn",
+  "bit_width": 1.0,
+  "group_size": null,
+  "bitlinear_replaced": 112,
+  "used_lora": false,
+  "trainable_params_after_freeze": 176160768,
+  "steps": 30,
+  "train_n": 48,
+  "eval_n": 15,
+  "max_new_tokens": 256,
+  "lr": 0.0001,
+  "optimizer": "bitsandbytes Adam8bit",
+  "gradient_checkpointing": true,
+  "loss_history": [
+    {"step": 1, "alpha": 0.0, "loss": 3.637},
+    {"step": 5, "alpha": 0.4444, "loss": 1.919},
+    {"step": 10, "alpha": 1.0, "loss": 15.062},
+    {"step": 15, "alpha": 1.0, "loss": 6.813},
+    {"step": 20, "alpha": 1.0, "loss": 7.384},
+    {"step": 25, "alpha": 1.0, "loss": 6.838},
+    {"step": 30, "alpha": 1.0, "loss": 7.203}
+  ],
+  "offline_wer": {
+    "pretrained": {"n": 15, "wer": 2.6515, "cer": 0.7555},
+    "fp16_after_qat": {"n": 15, "wer": 256.06, "cer": 201.17},
+    "binary_after_qat": {"n": 15, "wer": 100.0, "cer": 100.0},
+    "ternary_after_qat": {"n": 15, "wer": 98.48, "cer": 90.66}
+  },
+  "diagnosis": [
+    "Pretrained baseline reproduced (2.65 WER on the fixed 15-utt subset), so the eval harness is sound.",
+    "QAT loss drops to 1.92 during the alpha ramp, then spikes to 15.06 at alpha=1 and settles ~7 -> quantization transition is not being trained stably.",
+    "Post-training fp16 (alpha=0) WER 256% means the shadow weights themselves were corrupted, not just the quantized readout.",
+    "LoRA was unavailable (torchao too old), so the fallback trained BitLinear shadows; the corruption persists.",
+    "Suspects: (a) gradient checkpointing interacting with the custom STE/patched forward, (b) lr too high for full shadow updates, (c) tiny 48-example train set overfitting, (d) Adam8bit state."
+  ],
+  "next_steps": [
+    "Add grad-norm/NaN diagnostics to the QAT loop; assert finite grads before optimizer.step().",
+    "TDD an 'overfit a single batch' test for BitLinear at alpha=1 to prove STE correctness.",
+    "Fix LoRA: pin/upgrade torchao>=0.16 (or vendored LoRA) so only adapters + shadows train.",
+    "Use bf16/fp16 autocast, lower lr, longer warmup, and a larger labelled subset.",
+    "Then re-run the fp16/binary/ternary WER table."
+  ]
+}
