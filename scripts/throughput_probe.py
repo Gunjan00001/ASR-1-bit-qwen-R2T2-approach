@@ -81,6 +81,8 @@ def main() -> int:
     summary = {
         "model": args.model,
         "backend": args.backend,
+        "config": args.config,
+        "split": args.split,
         "chunk_ms": args.chunk_ms,
         "n_probed": len(utterances),
         "mean_wall_sec_per_utt": mean_wall,
@@ -103,7 +105,10 @@ def main() -> int:
 
     out_dir = Path(args.results)
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"throughput_{args.model.split('/')[-1]}_{args.backend}_{args.chunk_ms}ms.json"
+    out_path = (
+        out_dir
+        / f"throughput_{args.model.split('/')[-1]}_{args.backend}_{args.config}_{args.chunk_ms}ms.json"
+    )
     out_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(f"wrote {out_path}")
     return 0

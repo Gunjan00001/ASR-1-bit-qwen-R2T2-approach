@@ -13,6 +13,48 @@ produced here.
 - Sessions cap at ~12 h and Kaggle gives ~30 GPU h/week, so the harness
   persists per-utterance results and can resume (see T0.3).
 
+## Automated gate (recommended)
+
+`scripts/run_kaggle_gate.sh` runs the whole Stage 0 gate with fail-fast guards.
+After **Cell 1** (clone) and **Cell 2** (install), one command does the rest:
+
+```bash
+!bash scripts/run_kaggle_gate.sh --stage all
+# or per stage:
+!bash scripts/run_kaggle_gate.sh --stage setup
+!bash scripts/run_kaggle_gate.sh --stage spike
+!bash scripts/run_kaggle_gate.sh --stage probe
+!bash scripts/run_kaggle_gate.sh --stage matrix
+```
+
+- **Preflight** asserts CUDA (`sm70+`; T4=`sm75`, P100 rejected) and records
+  python/torch/vllm/qwen-asr versions to `artifacts/stage0/environment.txt`.
+- **setup** installs nightly cu129 vLLM + extras + `pip install -e . --no-deps`;
+  aborts on any failure.
+- **spike** tees T0.0 to `artifacts/stage0/spike.log`. On non-zero it prints the
+  fallback order (Colab Pro → Docker) and **stops — probe/matrix never run**.
+- **probe** runs clean + other throughput probes and saves their JSON.
+- **matrix** runs `run_stage0.py --backend vllm`, is re-runnable, and resumes
+  from the per-utterance `.jsonl` files.
+- At the end it writes `MANIFEST.txt` and commits the **small** artifacts
+  (`reports.csv/json`, `throughput_*.json`, `spike.log`, `environment.txt`);
+  the per-utterance `.jsonl` stay on Kaggle.
+
+Useful flags: `--models <path>...` for cached weights (sets `HF_HUB_OFFLINE=1`;
+`--no-offline` to override), `--dry-run` (prints the plan, passes `--dry-run` to
+the matrix), `--push` (push the artifact commit; needs git credentials),
+`--artifacts DIR`, `--budget-hours H`, `--probe-n N`.
+
+```bash
+# cached weights + push artifacts for review:
+!GATE_PUSH=1 bash scripts/run_kaggle_gate.sh --stage all \
+  --models /kaggle/input/qwen3-asr-weights/0.6B /kaggle/input/qwen3-asr-weights/1.7B
+# preview without touching the GPU:
+!bash scripts/run_kaggle_gate.sh --stage all --dry-run
+```
+
+The manual cells below are the same steps, for reference / debugging.
+
 ## Cell 1 — get the code
 
 ```python
