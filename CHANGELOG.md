@@ -21,6 +21,7 @@ committed on a per-stage branch and tagged there first.
 | `0.1.4` | 2026-09-20 | `stage-0` | Gate runner fix: install `qwen-asr[vllm]` from PyPI; nightly fallback without `--index-strategy` | — |
 | `0.1.5` | 2026-09-20 | `stage-0` | Cap vLLM `max_model_len` to fit the T4 KV cache | — |
 | `0.1.6` | 2026-09-20 | `stage-0` | Force Triton attention backend (FlashInfer JIT fails on sm75) | — |
+| `0.1.7` | 2026-09-20 | `stage-0` | Put `src` on `PYTHONPATH` so `asr1bit` imports without relying on the editable install | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -30,6 +31,16 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.7 — import-path fix + first spike PASS
+
+- `run_kaggle_gate.sh` prepends `$REPO_ROOT/src` to `PYTHONPATH` and logs an
+  import check after the editable install, so `asr1bit.*` resolves even when the
+  editable install does not expose subpackages.
+- Found by Kaggle run v5: **T0.0 spike PASSED** (vLLM streaming works on T4),
+  then the probe failed with `No module named 'asr1bit.data'`.
+- First working T0.0 numbers (Qwen3-ASR-0.6B, 15 s sample, greedy):
+  chunk 2.0 s RTF **0.083**; chunk 0.32 s RTF **0.313**.
 
 ## 0.1.6 — T4 attention backend fix
 

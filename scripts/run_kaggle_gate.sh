@@ -22,6 +22,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+# Ensure `asr1bit` is importable regardless of editable-install behaviour.
+export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
 STAGE="all"
 MODELS=()
@@ -166,6 +168,11 @@ stage_setup() {
   "$PYTHON" -m pip install -q jiwer soundfile soxr pandas pyyaml \
     || die "runtime extras install failed"
   "$PYTHON" -m pip install -q -e . --no-deps || die "editable install failed"
+  if "$PYTHON" -c "import asr1bit, asr1bit.data, asr1bit.eval.harness" 2>/dev/null; then
+    log "import check OK (asr1bit)"
+  else
+    log "import check via editable failed; relying on PYTHONPATH=$REPO_ROOT/src"
+  fi
   record_environment "post-setup"
   log "setup OK"
 }
