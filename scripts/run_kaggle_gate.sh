@@ -148,13 +148,17 @@ stage_setup() {
     echo "[dry-run] pip install -e . --no-deps"
     return 0
   fi
-  # Kaggle's preinstalled pip is too old for --index-strategy; upgrade first.
-  "$PYTHON" -m pip install -q -U pip || die "pip self-upgrade failed"
-  "$PYTHON" -m pip install -q -U vllm --pre \
-    --extra-index-url https://wheels.vllm.ai/nightly/cu129 \
-    --extra-index-url https://download.pytorch.org/whl/cu129 \
-    --index-strategy unsafe-best-match || die "vLLM nightly install failed"
-  "$PYTHON" -m pip install -q "vllm[audio]" qwen-asr jiwer soundfile soxr pandas pyyaml \
+  # Kaggle's preinstalled pip is too old for --index-strategy; upgrade best-effort.
+  "$PYTHON" -m pip install -q -U pip setuptools wheel || log "WARNING: pip upgrade failed (continuing)"
+  # Preferred: let qwen-asr pin a compatible vLLM from PyPI (no special index).
+  if ! "$PYTHON" -m pip install -q -U "qwen-asr[vllm]"; then
+    log "qwen-asr[vllm] install failed; falling back to vLLM nightly (cu129)"
+    "$PYTHON" -m pip install -q -U vllm --pre \
+      --extra-index-url https://wheels.vllm.ai/nightly/cu129 \
+      --extra-index-url https://download.pytorch.org/whl/cu129 \
+      || die "vLLM install failed (PyPI and nightly)"
+  fi
+  "$PYTHON" -m pip install -q jiwer soundfile soxr pandas pyyaml \
     || die "runtime extras install failed"
   "$PYTHON" -m pip install -q -e . --no-deps || die "editable install failed"
   record_environment "post-setup"
