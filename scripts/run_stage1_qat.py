@@ -117,6 +117,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--eval-n", type=int, default=100)
     p.add_argument("--lr", type=float, default=2e-4)
     p.add_argument("--batch-size", type=int, default=1)
+    p.add_argument("--max-new-tokens", type=int, default=256, help="Cap generation (bounds degenerate outputs).")
     p.add_argument("--use-lora", type=int, default=1)
     p.add_argument("--use-8bit", type=int, default=1)
     p.add_argument("--out", default="artifacts/stage1")
@@ -129,7 +130,10 @@ def main() -> int:
     print("=== environment ===")
     print(json.dumps(backends.environment_report(), indent=2), flush=True)
 
-    wrapper = backends.load_model(args.model, backend="transformers", dtype=torch.float32, device="cuda:0")
+    wrapper = backends.load_model(
+        args.model, backend="transformers", dtype=torch.float32, device="cuda:0",
+        max_new_tokens=args.max_new_tokens,
+    )
     model = wrapper.model
     processor = wrapper.processor
     patch_outer_forward(model)
