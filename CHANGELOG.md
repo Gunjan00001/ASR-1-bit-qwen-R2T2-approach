@@ -25,6 +25,7 @@ committed on a per-stage branch and tagged there first.
 | `0.1.8` | 2026-09-20 | `stage-0` | Fix `.gitignore` (`data/` → `/data/`); commit `src/asr1bit/data/` package | — |
 | `0.1.9` | 2026-09-20 | `stage-0` | Slice the matrix (`--only-mode`) so gate sessions fit; probe uses `MODELS[0]` | — |
 | `0.1.10` | 2026-09-20 | `stage-0` | Add `--only-config` matrix slice | — |
+| `0.1.11` | 2026-09-20 | `stage-0` | Only set `HF_HUB_OFFLINE` for local weight dirs (not HF repo ids) | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -34,6 +35,14 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.11 — offline-mode fix
+
+- `run_kaggle_gate.sh` only sets `HF_HUB_OFFLINE=1` when every `--models` entry
+  is an existing local directory. HF repo ids keep the hub online.
+- Found by Kaggle run v8: vLLM raised `LocalEntryNotFoundError ... outgoing
+  traffic has been disabled` because `--models Qwen/Qwen3-ASR-1.7B` was treated
+  as a cached-weights signal.
 
 ## 0.1.10 — config slicing
 

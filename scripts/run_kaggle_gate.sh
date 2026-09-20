@@ -239,8 +239,18 @@ stage_matrix() {
     args+=(--dry-run)
   fi
   if [[ "$MODELS_EXPLICIT" == "1" && "$NO_OFFLINE" != "1" ]]; then
-    export HF_HUB_OFFLINE=1
-    log "HF_HUB_OFFLINE=1 (ensure LibriSpeech is cached; use --no-offline to override)"
+    # Only go offline when every --models entry is an existing local directory
+    # (cached weights). HF repo ids still need network for model download.
+    local all_local=1 model_path
+    for model_path in "${MODELS[@]}"; do
+      [[ -d "$model_path" ]] || all_local=0
+    done
+    if [[ "$all_local" == "1" ]]; then
+      export HF_HUB_OFFLINE=1
+      log "HF_HUB_OFFLINE=1 (local weight dirs; ensure LibriSpeech is cached)"
+    else
+      log "models include repo ids; keeping hub online"
+    fi
   fi
   "$PYTHON" scripts/run_stage0.py "${args[@]}" || die "matrix failed"
 }
