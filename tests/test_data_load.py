@@ -9,6 +9,7 @@ import soundfile as sf
 
 from asr1bit.data.load import (
     Utterance,
+    _librispeech_parquet_pattern,
     iter_librispeech,
     iter_utterances,
     load_audio,
@@ -110,6 +111,17 @@ def _hf_record_bytes(uid, text, sr=16000, seconds=0.5):
     buffer = io.BytesIO()
     sf.write(buffer, audio, sr, format="WAV")
     return {"id": uid, "text": text, "audio": {"bytes": buffer.getvalue(), "path": None}}
+
+
+class TestLibrispeechPattern:
+    def test_pattern_targets_only_requested_split(self):
+        pattern = _librispeech_parquet_pattern("clean", "test")
+        assert pattern == "hf://datasets/openslr/librispeech_asr/clean/test/*.parquet"
+
+    def test_pattern_for_other(self):
+        assert _librispeech_parquet_pattern("other", "test").endswith(
+            "openslr/librispeech_asr/other/test/*.parquet"
+        )
 
 
 class TestIterLibrispeech:

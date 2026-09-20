@@ -127,6 +127,11 @@ def _hf_audio(row: dict[str, Any]) -> tuple[np.ndarray, int]:
     raise ValueError(f"Unsupported audio field: {sorted(audio.keys())}")
 
 
+def _librispeech_parquet_pattern(config: str, split: str) -> str:
+    """Hugging Face glob for one config/split's parquet shard(s)."""
+    return f"hf://datasets/{LIBRISPEECH_DATASET}/{config}/{split}/*.parquet"
+
+
 def _select_rows(dataset: Any, indices: Sequence[int]) -> Any:
     if hasattr(dataset, "select"):
         return dataset.select(list(indices))
@@ -159,13 +164,14 @@ def iter_librispeech(
         sample_seed: Seed for ``sample_n`` selection.
     """
     if dataset is None:
-        from datasets import Audio, load_dataset
+        from datasets import load_dataset
 
-        dataset = load_dataset(LIBRISPEECH_DATASET, config, split=split)
-        # Decode audio ourselves (soundfile) instead of relying on the
-        # `torchcodec` backend that newer `datasets` versions require.
-        if hasattr(dataset, "cast_column"):
-            dataset = dataset.cast_column("audio", Audio(decode=False))
+        # Load only the requested split's parquet shard(s). Invoking the named
+        # builder with split=... materializes *every* split (including the ~104k
+        # example train.360), which is slow and can fail. Audio is stored as
+        # raw bytes; `_hf_audio` decodes it with soundfile (no torchcodec).
+        pattern = _librispeech_parquet_pattern(config, split)
+        dataset = load_dataset("parquet", data_files={split: pattern}, split=split)
 
     if indices is not None:
         dataset = _select_rows(dataset, indices)

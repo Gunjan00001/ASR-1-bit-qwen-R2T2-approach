@@ -29,6 +29,7 @@ committed on a per-stage branch and tagged there first.
 | `0.1.12` | 2026-09-20 | `stage-0` | Skip artifact commit when `--artifacts` is outside the repo; record 1.7B result | — |
 | `0.1.13` | 2026-09-20 | `stage-0` | Labelled offline subsample (`--offline-sample-n`) | — |
 | `0.1.14` | 2026-09-20 | `stage-0` | 320 ms clean run in the plan + `--only-chunk-ms` slice | — |
+| `0.1.15` | 2026-09-20 | `stage-0` | Load only the requested LibriSpeech split parquet (avoid generating all splits) | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -38,6 +39,16 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.15 — split-only parquet loading
+
+- `iter_librispeech` now loads the requested split via
+  `load_dataset("parquet", data_files={split: "hf://.../<config>/<split>/*.parquet"})`
+  instead of the named builder. The named builder materialized *all* splits,
+  including the ~104k-example `train.360`, and failed with
+  `DatasetGenerationError` on the Colab runtime.
+- Audio arrives as raw bytes and is decoded by `_hf_audio` (soundfile), so no
+  `torchcodec` dependency.
 
 ## 0.1.14 — 320 ms clean + chunk slicing
 
