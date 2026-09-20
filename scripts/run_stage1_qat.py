@@ -148,6 +148,7 @@ def main() -> int:
     print(json.dumps(results["pretrained"]), flush=True)
 
     apply_layer_policy(model, args.policy, bit_width=args.bit_width, group_size=group_size)
+    model.to("cuda:0")
     replaced = getattr(model, "bitlinear_replaced", 0)
     results["bitlinear_replaced"] = replaced
     print(f"replaced {replaced} linears with BitLinear", flush=True)
@@ -158,6 +159,7 @@ def main() -> int:
             from asr1bit.train.qat import apply_lora
 
             model = apply_lora(model, target_modules=lora_targets(model))
+            model.to("cuda:0")
             wrapper.model = model
             used_lora = True
             patch_outer_forward(model)

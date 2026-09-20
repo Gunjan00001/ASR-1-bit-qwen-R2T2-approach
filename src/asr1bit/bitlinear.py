@@ -73,13 +73,13 @@ class BitLinear(nn.Module):
 
     @classmethod
     def from_linear(cls, linear: nn.Linear, **kwargs) -> BitLinear:
-        """Build a BitLinear copying ``linear``'s weights/bias."""
+        """Build a BitLinear copying ``linear``'s weights/bias on its device."""
         layer = cls(
             linear.in_features,
             linear.out_features,
             bias=linear.bias is not None,
             **kwargs,
-        )
+        ).to(device=linear.weight.device)
         return layer.load_from_linear(linear)
 
     def load_from_linear(self, linear: nn.Linear) -> BitLinear:

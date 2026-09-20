@@ -1,5 +1,6 @@
 """Tests for BitLinear (Stage 1, T1.2)."""
 
+import pytest
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -31,6 +32,12 @@ class TestLoadFromLinear:
         assert torch.equal(layer.weight, linear.weight.float())
         assert layer.in_features == 6
         assert layer.out_features == 5
+
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+    def test_from_linear_follows_source_device(self):
+        linear = nn.Linear(6, 5).cuda()
+        layer = BitLinear.from_linear(linear)
+        assert layer.weight.device == linear.weight.device
 
     def test_instance_method_copies_weights(self):
         linear = nn.Linear(6, 5)
