@@ -102,6 +102,18 @@ def set_precision(model, bit_width: float, alpha: float) -> None:
             module.alpha = alpha
 
 
+def evaluate_precisions(wrapper, model, utterances, n) -> dict:
+    """WER at alpha=1 for binary and ternary (used for periodic/zero-shot)."""
+    model.eval()
+    with torch.no_grad():
+        set_precision(model, 1.0, 1.0)
+        binary = evaluate(wrapper, utterances, n)
+        set_precision(model, 1.58, 1.0)
+        ternary = evaluate(wrapper, utterances, n)
+    model.train()
+    return {"binary": binary, "ternary": ternary}
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", default="Qwen/Qwen3-ASR-0.6B")
@@ -122,6 +134,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--alpha-ramp", type=int, default=0, help="1 = progressive alpha 0->1")
     p.add_argument("--alpha-warmup-frac", type=float, default=0.3)
     p.add_argument("--log-grad-norms", type=int, default=1)
+    p.add_argument("--zero-shot", type=int, default=0, help="Evaluate alpha=1 without training")
+    p.add_argument("--eval-every", type=int, default=0, help="WER eval interval during training (0=off)")
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
 
@@ -175,6 +189,21 @@ def main() -> int:
     results["trainable_params"] = trainable
     print(f"replaced={results['bitlinear_replaced']} trainable={trainable}", flush=True)
 
+    if args.zero_shot:
+        print("=== zero-shot naive (no training, alpha=1) ===", flush=True)
+        set_precision(model, 1.0, 0.0)
+        results["fp16"] = evaluate(wrapper, eval_utts, args.eval_n)
+        prec = evaluate_precisions(wrapper, model, eval_utts, args.eval_n)
+        results["binary"] = prec["binary"]
+        results["ternary"] = prec["ternary"]
+        print(json.dumps({k: results[k] for k in ("pretrained", "fp16", "binary", "ternary")}, indent=2), flush=True)
+        out_dir = Path(args.out)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        tag = f"zeroshot_{args.policy}_g{group_size}"
+        (out_dir / f"stage1_{tag}.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+        print("wrote", out_dir / f"stage1_{tag}.json", flush=True)
+        return 0
+
     optimizer = build_optimizer(model, lr=args.lr, use_8bit=(args.optimizer == "adam8bit"))
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer, lr_lambda=lambda step: min(1.0, (step + 1) / max(1, args.warmup_steps))
@@ -220,6 +249,13 @@ def main() -> int:
                       "lr": scheduler.get_last_lr()[0], "max_grad_norm": max_norm}
             history.append(record)
             print(json.dumps(record), flush=True)
+        if args.eval_every and (step + 1) % args.eval_every == 0:
+            prec = evaluate_precisions(wrapper, model, eval_utts, args.eval_n)
+            ev = {"step": step + 1, "alpha": alpha,
+                  "binary_wer": prec["binary"]["wer"], "ternary_wer": prec["ternary"]["wer"]}
+            history.append(ev)
+            print("EVAL " + json.dumps(ev), flush=True)
+            set_precision(model, args.bit_width, alpha)  # restore training precision
     results["history"] = history
     results["qat_seconds"] = time.perf_counter() - started
 
@@ -241,7 +277,10 @@ def main() -> int:
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    tag = f"{args.policy}_bw{args.bit_width}_g{group_size}_lr{args.lr}_{args.optimizer}"
+    tag = (
+        f"{args.policy}_bw{args.bit_width}_g{group_size}_lr{args.lr}_"
+        f"{args.optimizer}_ramp{args.alpha_ramp}_n{args.train_n}"
+    )
     (out_dir / f"stage1_{tag}.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     print("wrote", out_dir / f"stage1_{tag}.json", flush=True)
     return 0
