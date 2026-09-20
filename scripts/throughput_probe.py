@@ -17,7 +17,12 @@ import time
 from pathlib import Path
 
 from asr1bit.data.load import iter_librispeech
-from asr1bit.eval.latency import coverage_fraction, estimate_wall_seconds, rtf
+from asr1bit.eval.latency import (
+    coverage_fraction,
+    estimate_wall_seconds,
+    recommend_subsample,
+    rtf,
+)
 from asr1bit.qwen.backends import environment_report
 
 FULL_SPLIT_SIZES = {
@@ -90,7 +95,7 @@ def main() -> int:
     print("=== throughput ===")
     print(json.dumps(summary, indent=2))
     if not fits:
-        affordable = int(len(utterances) * coverage * 0.8)
+        affordable = recommend_subsample(full_n, coverage)
         print(
             f"WARNING: full {args.config}/{args.split} streaming will NOT fit "
             f"{args.budget_hours}h. Use a fixed subsample of ~{affordable} and label it."

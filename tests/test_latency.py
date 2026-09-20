@@ -6,6 +6,7 @@ from asr1bit.eval.latency import (
     chunk_latency_stats,
     coverage_fraction,
     estimate_wall_seconds,
+    recommend_subsample,
     rtf,
 )
 
@@ -50,3 +51,9 @@ class TestThroughput:
 
     def test_coverage_zero_budget(self):
         assert coverage_fraction(total_sec=10.0, budget_hours=0) == 0.0
+
+    def test_recommend_subsample_scales_with_full_size(self):
+        assert recommend_subsample(full_n=2620, coverage=0.807, safety=0.8) == int(2620 * 0.807 * 0.8)
+
+    def test_recommend_subsample_full_when_fits(self):
+        assert recommend_subsample(full_n=2620, coverage=1.0) == 2620

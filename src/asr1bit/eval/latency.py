@@ -31,6 +31,13 @@ def coverage_fraction(total_sec: float, budget_hours: float) -> float:
     return min(1.0, total_sec / (budget_hours * 3600.0))
 
 
+def recommend_subsample(full_n: int, coverage: float, safety: float = 0.8) -> int:
+    """Largest subsample (with a safety margin) that fits a session budget."""
+    if coverage >= 1.0 or full_n <= 0:
+        return full_n
+    return max(1, int(full_n * coverage * safety))
+
+
 def chunk_latency_stats(decode_secs: Sequence[float], chunk_size_sec: float) -> dict[str, float]:
     """Summarize per-chunk decode times.
 
