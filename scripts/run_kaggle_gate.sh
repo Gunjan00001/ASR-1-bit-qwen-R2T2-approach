@@ -34,6 +34,11 @@ DRY_RUN=0
 GATE_PUSH=0
 PYTHON="${PYTHON:-python}"
 
+# T4 is sm75: no FlashAttention-2, and vLLM's FlashInfer JIT build fails on it
+# (`ninja ... ld returned 1`). Force the self-contained Triton attention backend.
+export VLLM_ATTENTION_BACKEND="${VLLM_ATTENTION_BACKEND:-TRITON_ATTN}"
+export VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}"
+
 log() { printf '[gate] %s\n' "$*"; }
 die() { printf '[gate] ERROR: %s\n' "$*" >&2; exit 1; }
 begin_stage() { log "BEGIN stage=$1 artifacts=$ARTIFACTS"; }

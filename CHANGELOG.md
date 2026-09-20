@@ -20,6 +20,7 @@ committed on a per-stage branch and tagged there first.
 | `0.1.3` | 2026-09-20 | `stage-0` | Gate runner fix: upgrade pip before vLLM nightly install | — |
 | `0.1.4` | 2026-09-20 | `stage-0` | Gate runner fix: install `qwen-asr[vllm]` from PyPI; nightly fallback without `--index-strategy` | — |
 | `0.1.5` | 2026-09-20 | `stage-0` | Cap vLLM `max_model_len` to fit the T4 KV cache | — |
+| `0.1.6` | 2026-09-20 | `stage-0` | Force Triton attention backend (FlashInfer JIT fails on sm75) | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -29,6 +30,15 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.6 — T4 attention backend fix
+
+- `run_kaggle_gate.sh` exports `VLLM_ATTENTION_BACKEND=TRITON_ATTN` and
+  `VLLM_USE_FLASHINFER_SAMPLER=0` by default. T4 (`sm75`) has no FlashAttention-2,
+  and vLLM 0.14's FlashInfer JIT build fails on it
+  (`ninja ... collect2: error: ld returned 1 exit status`), aborting engine init.
+- Found by Kaggle run v4: KV cache now fit (7.21 GiB available, `max_model_len`
+  16384), then FlashInfer `batch_prefill` JIT compile failed.
 
 ## 0.1.5 — vLLM KV-cache sizing fix
 
