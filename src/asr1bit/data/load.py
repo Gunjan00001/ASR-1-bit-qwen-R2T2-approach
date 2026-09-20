@@ -164,14 +164,17 @@ def iter_librispeech(
         sample_seed: Seed for ``sample_n`` selection.
     """
     if dataset is None:
-        from datasets import load_dataset
+        from datasets import Audio, load_dataset
 
         # Load only the requested split's parquet shard(s). Invoking the named
         # builder with split=... materializes *every* split (including the ~104k
-        # example train.360), which is slow and can fail. Audio is stored as
-        # raw bytes; `_hf_audio` decodes it with soundfile (no torchcodec).
+        # example train.360), which is slow and can fail. The parquet retains an
+        # `Audio` feature, so disable its decoding to read raw bytes without a
+        # `torchcodec` dependency (`_hf_audio` decodes with soundfile instead).
         pattern = _librispeech_parquet_pattern(config, split)
         dataset = load_dataset("parquet", data_files={split: pattern}, split=split)
+        if hasattr(dataset, "cast_column"):
+            dataset = dataset.cast_column("audio", Audio(decode=False))
 
     if indices is not None:
         dataset = _select_rows(dataset, indices)
