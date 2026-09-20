@@ -148,6 +148,8 @@ stage_setup() {
     echo "[dry-run] pip install -e . --no-deps"
     return 0
   fi
+  # Kaggle's preinstalled pip is too old for --index-strategy; upgrade first.
+  "$PYTHON" -m pip install -q -U pip || die "pip self-upgrade failed"
   "$PYTHON" -m pip install -q -U vllm --pre \
     --extra-index-url https://wheels.vllm.ai/nightly/cu129 \
     --extra-index-url https://download.pytorch.org/whl/cu129 \

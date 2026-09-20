@@ -17,6 +17,7 @@ committed on a per-stage branch and tagged there first.
 | `0.1.0` | 2026-09-20 | `main` | Repo scaffold + project plan | — |
 | `0.1.1` | 2026-09-20 | `stage-0` | Stage 0 plan corrections (eval protocol, append-only scope, streaming feasibility) | — |
 | `0.1.2` | 2026-09-20 | `stage-0` | Stage 0 implementation + local normalizer validation + automated Kaggle gate | **pending** |
+| `0.1.3` | 2026-09-20 | `stage-0` | Gate runner fix: upgrade pip before vLLM nightly install | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -26,6 +27,16 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.3 — Gate runner pip compatibility fix
+
+- `scripts/run_kaggle_gate.sh` `stage_setup` now runs `pip install -U pip` before
+  the vLLM nightly install. Kaggle's preinstalled pip predates
+  `--index-strategy`, which the documented vLLM nightly command requires.
+- Found by the first Kaggle run (version 1): preflight passed
+  (`CUDA OK: Tesla T4 sm75`), setup stopped with
+  `no such option: --index-strategy`, and the EXIT trap collected
+  `environment.txt` + `MANIFEST.txt` — the fail-fast guard behaved as designed.
 
 ## 0.1.2 — Stage 0 implementation checkpoint (gate pending)
 
