@@ -122,3 +122,25 @@ we chose what we did**, **Future plans**. Failures are kept, not deleted.
 - **Next:** Isolate grad-ckpt next; then act-quant; then α-ramp. Separately,
   binary/ternary naive WER (~354–395%) is the Stage 2 recovery problem, not a
   harness bug. `0.3.0` stays untagged.
+
+---
+
+## 2026-09-20 — Colab GPU runtime lost (zero-shot run blocked)
+
+- **Did:** Launched the zero-shot α=1 baseline (binary/ternary floor, eval-n 100,
+  `--zero-shot 1`) on Colab T4, plus added `--zero-shot` and `--eval-every`
+  (periodic WER during training) to the runner (`2ab6a25`, tag `0.2.12`).
+- **Failed:** The Colab runtime was recycled to **CPU** mid-run
+  (`torch 2.11.0+cpu`, `cuda_avail False`, `nvidia-smi: command not found`);
+  `/content` was wiped (repo, logs, artifacts all gone). No zero-shot numbers.
+  Re-opening the browser connection did not restore a GPU runtime.
+- **Why:** Colab preempted/reset the GPU session; the MCP connection points at a
+  CPU runtime and there is no MCP tool to change the runtime type.
+- **Chose:** Stop instead of silently falling back to Kaggle: the
+  `gunjanpal/asr-1bit-qat-attn` kernel is still **RUNNING** (~15 h), so Kaggle T4
+  is contended and quota is under pressure — the user's fallback rule allows
+  Kaggle only when Colab blocks, but we should free/confirm Kaggle first.
+- **Next:** Reconnect a Colab **GPU** runtime (Runtime → Change runtime type →
+  T4) and re-run the zero-shot floor + the 1–2k-step QAT recovery curve; or stop
+  the Kaggle QAT kernel to free T4 for a Kaggle fallback. Code is safe on
+  `stage-1` @ `2ab6a25`; nothing was lost except this run.
