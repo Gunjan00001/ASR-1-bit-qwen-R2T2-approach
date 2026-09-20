@@ -10,6 +10,7 @@ from asr1bit.replace import apply_layer_policy
 from asr1bit.train.qat import (
     build_optimizer,
     enable_gradient_checkpointing,
+    freeze_non_bitlinear,
     non_bitlinear_linear_names,
     progressive_alpha,
     set_qat_alpha,
@@ -80,6 +81,28 @@ class TestNonBitlinearLinearNames:
         assert "model.layers.0.mlp.gate_proj" in names
         assert "audio_tower.layers.0.self_attn.q_proj" in names
         assert "lm_head" in names
+
+
+class TestFreezeNonBitlinear:
+    def test_only_bitlinear_shadows_trainable(self):
+        model = _FakeASR()
+        apply_layer_policy(model, "decoder_attn")
+        count = freeze_non_bitlinear(model)
+        assert count > 0
+        trainable = set()
+        for name, module in model.named_modules():
+            if isinstance(module, BitLinear):
+                trainable.add(f"{name}.weight")
+                if module.bias is not None:
+                    trainable.add(f"{name}.bias")
+        for name, param in model.named_parameters():
+            assert param.requires_grad == (name in trainable), name
+
+    def test_trainable_count_smaller_than_total(self):
+        model = _FakeASR()
+        apply_layer_policy(model, "decoder_attn")
+        total = sum(p.numel() for p in model.parameters())
+        assert freeze_non_bitlinear(model) < total
 
 
 class TestGradientCheckpointing:

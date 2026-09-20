@@ -92,6 +92,23 @@ def apply_lora(
     return get_peft_model(model, config)
 
 
+def freeze_non_bitlinear(model: nn.Module) -> int:
+    """Freeze every parameter except BitLinear shadow weights (QAT-only).
+
+    Used when LoRA is unavailable so a QAT run updates only the quantized
+    projections instead of the whole model (which diverges). Returns the number
+    of trainable parameters remaining.
+    """
+    for param in model.parameters():
+        param.requires_grad_(False)
+    for module in model.modules():
+        if isinstance(module, BitLinear):
+            module.weight.requires_grad_(True)
+            if module.bias is not None:
+                module.bias.requires_grad_(True)
+    return trainable_parameter_count(model)
+
+
 def build_optimizer(
     model: nn.Module,
     lr: float = 1e-4,

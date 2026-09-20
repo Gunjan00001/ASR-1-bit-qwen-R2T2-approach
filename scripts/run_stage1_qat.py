@@ -168,7 +168,11 @@ def main() -> int:
             used_lora = True
             patch_outer_forward(model)
         except Exception as exc:  # noqa: BLE001
-            print(f"WARNING: LoRA unavailable ({exc}); training all params", flush=True)
+            print(f"WARNING: LoRA unavailable ({exc}); freezing to BitLinear shadows", flush=True)
+    if not used_lora:
+        from asr1bit.train.qat import freeze_non_bitlinear
+
+        print(f"frozen to BitLinear shadows: {freeze_non_bitlinear(model)} trainable", flush=True)
     results["used_lora"] = used_lora
     enable_gradient_checkpointing(model)
     results["trainable_params"] = trainable_parameter_count(model)
