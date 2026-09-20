@@ -12,6 +12,7 @@
 #   --budget-hours H   per-session budget for the probe (default: 12)
 #   --probe-n N        utterances to probe (default: 50)
 #   --only-mode M      matrix slice: all | offline | streaming (default: all)
+#   --only-config C    matrix slice: all | clean | other (default: all)
 #   --no-offline       do NOT set HF_HUB_OFFLINE=1 for local --models
 #   --dry-run          print the plan; only the matrix runs (with --dry-run)
 #   --push             commit AND push the small artifacts (needs git credentials)
@@ -33,6 +34,7 @@ ARTIFACTS="${ARTIFACTS:-artifacts/stage0}"
 BUDGET_HOURS="12"
 PROBE_N="50"
 ONLY_MODE="all"
+ONLY_CONFIG="all"
 NO_OFFLINE=0
 DRY_RUN=0
 GATE_PUSH=0
@@ -75,6 +77,11 @@ parse_args() {
         [[ $# -ge 2 ]] || die "--only-mode needs a value"
         ONLY_MODE="$2"
         case "$ONLY_MODE" in all|offline|streaming) ;; *) die "--only-mode must be all|offline|streaming" ;; esac
+        shift 2 ;;
+      --only-config)
+        [[ $# -ge 2 ]] || die "--only-config needs a value"
+        ONLY_CONFIG="$2"
+        case "$ONLY_CONFIG" in all|clean|other) ;; *) die "--only-config must be all|clean|other" ;; esac
         shift 2 ;;
       --no-offline) NO_OFFLINE=1; shift ;;
       --dry-run) DRY_RUN=1; shift ;;
@@ -226,7 +233,8 @@ stage_probe() {
 stage_matrix() {
   begin_stage matrix
   log "matrix: run_stage0.py --backend vllm (re-runnable; resumes from existing .jsonl)"
-  local args=(--backend vllm --results-dir "$ARTIFACTS" --models "${MODELS[@]}" --only-mode "$ONLY_MODE")
+  local args=(--backend vllm --results-dir "$ARTIFACTS" --models "${MODELS[@]}" \
+    --only-mode "$ONLY_MODE" --only-config "$ONLY_CONFIG")
   if [[ "$DRY_RUN" == "1" ]]; then
     args+=(--dry-run)
   fi

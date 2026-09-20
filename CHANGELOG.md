@@ -24,6 +24,7 @@ committed on a per-stage branch and tagged there first.
 | `0.1.7` | 2026-09-20 | `stage-0` | Put `src` on `PYTHONPATH` so `asr1bit` imports without relying on the editable install | — |
 | `0.1.8` | 2026-09-20 | `stage-0` | Fix `.gitignore` (`data/` → `/data/`); commit `src/asr1bit/data/` package | — |
 | `0.1.9` | 2026-09-20 | `stage-0` | Slice the matrix (`--only-mode`) so gate sessions fit; probe uses `MODELS[0]` | — |
+| `0.1.10` | 2026-09-20 | `stage-0` | Add `--only-config` matrix slice | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -33,6 +34,11 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.10 — config slicing
+
+- Added `--only-config {all,clean,other}` alongside `--only-mode` so a single
+  run (e.g. 1.7B streaming clean) can be executed and downloaded per session.
 
 ## 0.1.9 — matrix slicing
 

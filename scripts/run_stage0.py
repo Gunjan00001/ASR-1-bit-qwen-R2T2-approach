@@ -45,6 +45,12 @@ def parse_args() -> argparse.Namespace:
         default="all",
         help="Run only this mode (slice the matrix so sessions fit).",
     )
+    parser.add_argument(
+        "--only-config",
+        choices=["all", "clean", "other"],
+        default="all",
+        help="Run only this LibriSpeech config (slice the matrix).",
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -86,9 +92,13 @@ def main() -> int:
         baseline_chunk_ms=args.baseline_chunk_ms,
         extra_chunk_ms=args.extra_chunk_ms,
     )
-    if args.only_mode != "all":
-        runs = filter_runs(runs, mode=args.only_mode)
-        print(f"filtered to mode={args.only_mode}: {len(runs)} runs")
+    if args.only_mode != "all" or args.only_config != "all":
+        runs = filter_runs(
+            runs,
+            mode=None if args.only_mode == "all" else args.only_mode,
+            config=None if args.only_config == "all" else args.only_config,
+        )
+        print(f"filtered to mode={args.only_mode} config={args.only_config}: {len(runs)} runs")
 
     print("=== environment ===")
     print(json.dumps(environment_report(), indent=2))
