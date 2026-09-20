@@ -73,3 +73,52 @@ we chose what we did**, **Future plans**. Failures are kept, not deleted.
 - **Next:** Run on Colab T4 (~40 steps, eval-n 15); inspect the grad-norm log to
   locate the trigger; then re-enable features one at a time; then a larger
   (~500-utt) fp16/binary/ternary table. `0.3.0` stays untagged.
+
+---
+
+## 2026-09-20 — Stage 1 stabilized run (AdamW) — STABLE, but naive quant poor
+
+- **Did:** Colab T4, `decoder_attn` (112 BitLinear, 176.16M trainable shadows),
+  40 steps, train 48 / eval 15, lr 1e-5 + warmup, **fp32 AdamW**, constant α=1,
+  no grad-ckpt, no activation quant, no autocast. Grad-norm logging on.
+- **Result:**
+  - Grad-norm log (pre-clip, per step max): step1 **519.09** (v_proj) → 98.5 → 35.2
+    → 16.7 → 8.9 → … → 9.9. All finite (`check_finite_grads` passed every step).
+    Top-5 at step 1: v_proj 519, o_proj 505, k_proj 347, q_proj 296, k_proj 177.
+  - Loss: **18.26 → 6.94** (monotone-ish, no explosion).
+  - Offline WER (15-utt subset): pretrained **2.65**, post-QAT fp16 (α=0)
+    **2.65** (clean!), binary (α=1) **353.79**, ternary (α=1) **170.08**.
+- **What failed:** binary/ternary WER is catastrophic; loss floor ~6.9 (high).
+- **Why:** The stabilized config **fixed the shadow corruption** (fp16 ==
+  pretrained), so the earlier 256% was an optimizer/ramp interaction, not STE.
+  But 40 steps on 48 examples at lr 1e-5 with only attention projections
+  quantized does not recover naive 1-bit/ternary attention — this is the
+  accuracy-recovery problem Stage 2 targets (on-policy distillation,
+  co-training, learnable scales, more data/steps).
+- **Chose:** Keep the stabilized config as the baseline for feature re-enabling;
+  treat binary/ternary WER as the Stage 2 starting point, not a Stage 1 gate
+  failure of the harness.
+- **Next:** Toggle 8-bit Adam alone (constant α=1) to identify the trigger; then
+  grad-ckpt; then act-quant; then autocast. Then a ~500-utt table.
+
+---
+
+## 2026-09-20 — Trigger isolation: 8-bit Adam alone is NOT the trigger
+
+- **Did:** Same stabilized run but `--optimizer adam8bit` (constant α=1, no
+  grad-ckpt, no act-quant, no autocast, lr 1e-5).
+- **Result:** pretrained **2.65**; post-QAT fp16 (α=0) **2.65** (clean!); binary
+  **395.45**; ternary **179.92**. Grad norms: 519 → … → 62.7, all finite.
+- **What failed:** binary/ternary still catastrophic (expected — naive quant).
+- **Why (finding):** 8-bit Adam does **not** corrupt the shadows. Therefore the
+  original 256% corruption came from one of the remaining differences vs the
+  failing run: **α-ramp**, **gradient checkpointing**, **activation quant**, or
+  **lr 1e-4**. Leading suspect: the progressive α ramp interacting with our
+  identity-STE (forward blends, gradient is identity regardless of α), or
+  gradient checkpointing with the custom patched forward.
+- **Chose:** Stop here for review (the stabilized config fixed the corruption, so
+  per the ordered plan we stop at the first fix). The remaining toggles
+  (grad-ckpt → act-quant → α-ramp → lr) are queued for the next session.
+- **Next:** Isolate grad-ckpt next; then act-quant; then α-ramp. Separately,
+  binary/ternary naive WER (~354–395%) is the Stage 2 recovery problem, not a
+  harness bug. `0.3.0` stays untagged.

@@ -49,10 +49,38 @@ trained BitLinear shadows; corruption persists, so the issue is not LoRA scope.
 Suspects: gradient checkpointing vs the custom STE/patched forward, lr too high
 for full shadow updates, tiny 48-example train set, Adam8bit behaviour.
 
+## Debug phase (2026-09-20) — root cause narrowed
+
+- **STE correctness:** TDD "overfit one synthetic batch" at α=1 passes
+  (`tests/test_bitlinear.py::TestSteCapability`), and α=0 forward is *exactly*
+  `nn.Linear`. So STE gradients are correct and sufficient.
+- **Diagnostics:** `grad_norms` + `check_finite_grads` added and used every step.
+- **Stabilized config:** QAT-only freeze (176.16M shadow params), fp32 AdamW,
+  lr 1e-5 + warmup, constant α=1, no grad-ckpt, no activation quant, no autocast.
+
+| Run (40 steps, 48 train / 15 eval, α=1, lr 1e-5) | pretrained | fp16 (α=0) | binary (α=1) | ternary (α=1) |
+|---|---|---|---|---|
+| AdamW, no grad-ckpt, no act-quant | 2.65 | **2.65 (clean)** | 353.79 | 170.08 |
+| Adam8bit, no grad-ckpt, no act-quant | 2.65 | **2.65 (clean)** | 395.45 | 179.92 |
+
+Grad-norm log (AdamW run, pre-clip per-step max): 519.09 (v_proj) → 98.5 → 35.2
+→ 16.7 → 8.9 → … → 9.9; all finite. Loss 18.26 → 6.94 (no explosion).
+
+**Findings:**
+- The stabilized config **fixes the shadow corruption** (post-QAT fp16 ==
+  pretrained, exactly).
+- **8-bit Adam is not the trigger** (clean fp16 with it).
+- The original 256% corruption came from one of the remaining differences vs the
+  failing run: **α-ramp**, **gradient checkpointing**, **activation quant**, or
+  **lr 1e-4** (leading suspect: α-ramp vs identity-STE, or grad-ckpt with the
+  patched forward).
+- Naive binary/ternary of decoder attention is catastrophic (~170–395% WER) even
+  when training is stable — that is the Stage 2 accuracy-recovery problem.
+
 ## Next steps
 
-1. Add grad-norm/NaN diagnostics; assert finite grads before `optimizer.step()`.
-2. TDD an "overfit one batch" BitLinear test at alpha=1 to prove STE correctness.
-3. Fix LoRA (torchao >= 0.16 or vendored LoRA) so only adapters + shadows train.
-4. bf16/fp16 autocast, lower lr, longer warmup, larger labelled subset.
-5. Re-run the fp16/binary/ternary WER table; then evaluate the Stage 1 gate.
+1. Isolate the corruption trigger: grad-ckpt → activation quant → α-ramp → lr.
+2. Stage 2 recovery for binary/ternary (on-policy distillation, co-training,
+   learnable scales, more data/steps) before expecting a usable WER table.
+3. Re-run the fp16/binary/ternary table on a larger (~500-utt) labelled subset.
+4. `0.3.0` stays untagged until the Stage 1 gate is genuinely met.
