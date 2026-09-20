@@ -10,8 +10,8 @@ Locked interface: ``BitLinear(in_dim, out_dim, bit_width, quantize_activations)`
 from __future__ import annotations
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from asr1bit.quant import dequantize_weights, quantize_binary, quantize_ternary
 
@@ -68,7 +68,7 @@ class BitLinear(nn.Module):
         return F.linear(x, self._quantized_weight(), self.bias)
 
     @classmethod
-    def from_linear(cls, linear: nn.Linear, **kwargs) -> "BitLinear":
+    def from_linear(cls, linear: nn.Linear, **kwargs) -> BitLinear:
         """Build a BitLinear copying ``linear``'s weights/bias."""
         layer = cls(
             linear.in_features,
@@ -78,7 +78,7 @@ class BitLinear(nn.Module):
         )
         return layer.load_from_linear(linear)
 
-    def load_from_linear(self, linear: nn.Linear) -> "BitLinear":
+    def load_from_linear(self, linear: nn.Linear) -> BitLinear:
         """Copy weights (and bias) from ``linear`` into this layer."""
         with torch.no_grad():
             self.weight.copy_(linear.weight.detach().float())

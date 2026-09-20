@@ -1,7 +1,7 @@
 """Tests for BitLinear (Stage 1, T1.2)."""
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from asr1bit.bitlinear import BitLinear, absmax_quantize_activations
 
