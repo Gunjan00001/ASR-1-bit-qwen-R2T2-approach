@@ -128,6 +128,13 @@ def run_streaming(asr, audio, chunk_size_sec: float, step_sec: float) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="Qwen/Qwen3-ASR-0.6B")
+    parser.add_argument("--gpu-memory-utilization", type=float, default=0.85)
+    parser.add_argument(
+        "--max-model-len",
+        type=int,
+        default=16384,
+        help="Cap KV cache; the 65536 default does not fit a T4 (~7 GiB).",
+    )
     parser.add_argument("--sample-url", default=SAMPLE_URL)
     parser.add_argument("--max-seconds", type=float, default=20.0)
     parser.add_argument("--step-sec", type=float, default=0.5)
@@ -158,8 +165,9 @@ def main() -> int:
 
         asr = Qwen3ASRModel.LLM(
             model=args.model,
-            gpu_memory_utilization=0.7,
+            gpu_memory_utilization=args.gpu_memory_utilization,
             max_new_tokens=32,
+            max_model_len=args.max_model_len,
         )
     except Exception as exc:  # noqa: BLE001 - spike must surface the reason
         import traceback

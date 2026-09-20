@@ -6,6 +6,7 @@ building, timing) is verified without a GPU.
 """
 
 import types
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -16,6 +17,7 @@ from asr1bit.qwen.backends import (
     TokenizerCodec,
     build_transformers_decode_fn,
     environment_report,
+    load_model,
     stream_transcribe,
     stream_transcribe_official,
 )
@@ -126,6 +128,51 @@ class TestEnvironmentReport:
         report = environment_report()
         assert report["torch"] is not None
         assert "cuda_available" in report
+
+
+class _FakeQwen3ASRModel:
+    calls: ClassVar[list] = []
+
+    @classmethod
+    def LLM(cls, **kwargs):
+        cls.calls.append(kwargs)
+        return {"kwargs": kwargs}
+
+    @classmethod
+    def from_pretrained(cls, model_id, **kwargs):
+        cls.calls.append({"model_id": model_id, **kwargs})
+        return {"kwargs": kwargs}
+
+
+class TestLoadModel:
+    def test_vllm_forwards_memory_config(self, monkeypatch):
+        import sys
+        import types
+
+        fake = types.ModuleType("qwen_asr")
+        fake.Qwen3ASRModel = _FakeQwen3ASRModel
+        _FakeQwen3ASRModel.calls = []
+        monkeypatch.setitem(sys.modules, "qwen_asr", fake)
+
+        load_model("m", backend="vllm", gpu_memory_utilization=0.9, max_model_len=8192)
+        call = _FakeQwen3ASRModel.calls[-1]
+        assert call["gpu_memory_utilization"] == 0.9
+        assert call["max_model_len"] == 8192
+
+    def test_transformers_passes_dtype_and_device(self, monkeypatch):
+        import sys
+        import types
+
+        fake = types.ModuleType("qwen_asr")
+        fake.Qwen3ASRModel = _FakeQwen3ASRModel
+        _FakeQwen3ASRModel.calls = []
+        monkeypatch.setitem(sys.modules, "qwen_asr", fake)
+
+        load_model("m", backend="transformers", dtype="float32", device="cpu")
+        call = _FakeQwen3ASRModel.calls[-1]
+        assert call["model_id"] == "m"
+        assert call["dtype"] == "float32"
+        assert call["device_map"] == "cpu"
 
 
 class TestTokenizerCodec:

@@ -19,6 +19,7 @@ committed on a per-stage branch and tagged there first.
 | `0.1.2` | 2026-09-20 | `stage-0` | Stage 0 implementation + local normalizer validation + automated Kaggle gate | **pending** |
 | `0.1.3` | 2026-09-20 | `stage-0` | Gate runner fix: upgrade pip before vLLM nightly install | — |
 | `0.1.4` | 2026-09-20 | `stage-0` | Gate runner fix: install `qwen-asr[vllm]` from PyPI; nightly fallback without `--index-strategy` | — |
+| `0.1.5` | 2026-09-20 | `stage-0` | Cap vLLM `max_model_len` to fit the T4 KV cache | — |
 | `0.2.0` | — | `stage-0` → `main` | Stage 0 gate passed (published streaming WER reproduced, `X` locked) | **not yet** |
 
 ## Unreleased
@@ -28,6 +29,16 @@ committed on a per-stage branch and tagged there first.
 - Reproduce published streaming WER vs LibriSpeech `clean|other`
   (0.6B `2.54|6.27`, 1.7B `1.95|4.51`); lock `X`.
 - Fill `docs/stage0_results.md`; merge `stage-0` → `main`; tag `0.2.0`.
+
+## 0.1.5 — vLLM KV-cache sizing fix
+
+- `spike_vllm_streaming.py` and `backends.load_model` now pass
+  `max_model_len=16384` and `gpu_memory_utilization=0.85` to vLLM. The model
+  default (`max_seq_len=65536`) needs ~7 GiB of KV cache, exceeding the ~5 GiB
+  available on a T4 at utilization 0.7.
+- Found by Kaggle run v3: install and model resolution succeeded
+  (torch 2.9.1+cu128, vllm 0.14.0, Tesla T4 sm75, fp16 fallback), then
+  `ValueError: ... 7.0 GiB KV cache is needed ... available (5.02 GiB)`.
 
 ## 0.1.4 — Gate runner vLLM install fix
 

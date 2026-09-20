@@ -99,9 +99,14 @@ def load_model(
     dtype: Any = None,
     device: str | None = None,
     max_new_tokens: int = 1024,
-    gpu_memory_utilization: float = 0.7,
+    gpu_memory_utilization: float = 0.85,
+    max_model_len: int = 16384,
 ):
-    """Load a Qwen3-ASR model with the requested backend."""
+    """Load a Qwen3-ASR model with the requested backend.
+
+    ``max_model_len`` caps the KV cache: the model default (65536) needs ~7 GiB
+    of KV on a T4, which does not fit. 16384 is ample for utterance-length ASR.
+    """
     from qwen_asr import Qwen3ASRModel
 
     if backend == "vllm":
@@ -109,6 +114,7 @@ def load_model(
             model=model_id,
             gpu_memory_utilization=gpu_memory_utilization,
             max_new_tokens=32,
+            max_model_len=max_model_len,
         )
 
     kwargs: dict[str, Any] = {}
