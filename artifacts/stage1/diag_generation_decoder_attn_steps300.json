@@ -1,0 +1,52 @@
+{
+  "utterance_id": "2277-149896-0004",
+  "label": "HOW WOULD THE PAPERS TALK ABOUT IT",
+  "conditions": [
+    {
+      "condition": "fp16_control",
+      "bit_width": 1.0,
+      "alpha": 0.0,
+      "quantized_effective_weight_changed": false,
+      "loss": 3.6713,
+      "token_accuracy": 0.75,
+      "teacher_forced_text": "language wouldOULD THE PAPERS TALK ABOUT IT?",
+      "greedy_text": "How would the papers talk about it?"
+    },
+    {
+      "condition": "binary_naive",
+      "bit_width": 1.0,
+      "alpha": 1.0,
+      "quantized_effective_weight_changed": true,
+      "weight_norms_shadow_effective_delta": [[39.1814, 29.4797, 25.8094], [26.9923, 20.5713, 17.4759], [23.5977, 18.4988, 14.6509]],
+      "loss": 18.2594,
+      "token_accuracy": 0.0,
+      "teacher_forced_text": "\u793a\u793aIDEIDE\u5229\u793a\u793a\u793a\u793a\u793a\u793a\u793a",
+      "greedy_text": "\u793a\u793a\u793a\u793a\u793a\u540c\u793a\u793a\u7684\u58f0\u793a\u5e03\u540c..."
+    },
+    {
+      "condition": "binary_trained_300_steps",
+      "bit_width": 1.0,
+      "alpha": 1.0,
+      "quantized_effective_weight_changed": true,
+      "weight_norms_shadow_effective_delta": [[39.1809, 29.4792, 25.8093], [26.9920, 20.5710, 17.4758], [23.5978, 18.4988, 14.6511]],
+      "loss": 4.4786,
+      "token_accuracy": 0.1667,
+      "teacher_forced_text": "WE IOULD ITINGEREHE",
+      "greedy_text": "WE IS I WOULD IT W"
+    }
+  ],
+  "findings": [
+    "Q(W) assertion PASSES: at alpha=1 the effective weight differs from the shadow (e.g. 39.18 -> 29.48, delta 25.81); at alpha=0 it is unchanged. The loss forward does use Q(W).",
+    "fp16 control: teacher-forced loss 3.67 / token-acc 0.75; greedy correct.",
+    "binary naive: loss 18.26 / token-acc 0.0; BOTH teacher-forced and greedy are garbage (Chinese token collapse).",
+    "binary after 300 steps: loss 4.48 / token-acc 0.167; BOTH teacher-forced and greedy are garbage (Latin-ish).",
+    "Per the agreed criterion (both bad) this is NOT a KV-cache/decode-only bug: the quantized forward/objective is broken. Binarizing all decoder attention q/k/v/o destroys the model; 300 steps at lr 1e-5 does not recover it.",
+    "Weight norms barely moved (39.1814 -> 39.1809) yet loss fell 18.26 -> 4.48: binary quantization is extremely sign-sensitive.",
+    "Suspicious: the fp16 control teacher-forced text shows prefix leakage ('language would' before the label), so the label masking/prefix-length alignment may be off, corrupting the training objective."
+  ],
+  "next_steps": [
+    "Verify/fix label masking (prefix length alignment between prefix_inputs and full_inputs).",
+    "Test the quantized forward on a single layer vs all layers to localize which projection binarization destroys.",
+    "Re-run QAT with quantization-delay alpha and the >=100-utt eval set."
+  ]
+}

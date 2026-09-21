@@ -102,13 +102,39 @@ trigger.
 
 Artifact: `artifacts/stage1/recovery_2026-09-20.json`.
 
+## Instrumented generation test (2026-09-20) — forward/objective bug
+
+`scripts/diag_generation.py`, one training utterance, α=1:
+
+| condition | loss | token acc | teacher-forced text | greedy text |
+|---|---|---|---|---|
+| fp16 control (α=0) | 3.67 | 0.75 | "language wouldOULD THE PAPERS TALK ABOUT IT?" | "How would the papers talk about it?" |
+| binary naive (α=1) | 18.26 | 0.00 | Chinese-token collapse | Chinese-token collapse |
+| binary trained 300 steps | 4.48 | 0.17 | "WE IOULD ITINGEREHE" | "WE IS I WOULD IT W" |
+
+- **Q(W) assertion PASSES:** at α=1 the effective weight differs from the shadow
+  (39.18 → 29.48, delta 25.81); at α=0 unchanged. The loss forward uses Q(W).
+- **Both teacher-forced and greedy are bad** ⇒ not a KV-cache/decode-only bug;
+  the **quantized forward/objective is broken** (binarizing all decoder attention
+  q/k/v/o collapses the model; 300 steps at lr 1e-5 does not recover).
+- Flagged: the fp16 control shows **prefix leakage** in the teacher-forced text →
+  label masking / prefix-length alignment may be off.
+
+Artifact: `artifacts/stage1/diag_generation_decoder_attn_steps300.json`.
+
+## Decisions
+
+- **Drop the blended α-ramp** (confirmed corruption trigger; identity-STE does
+  not match a blended forward). Replace with **quantization delay** (pure fp, then
+  constant α=1) — `quantization_delay_alpha`, default `--alpha-mode delay`.
+- Use a fixed **≥100-utterance** eval set for the floor and every checkpoint.
+- Do **not** pursue group-wise scales / attention exclusion yet: this is a
+  broken-forward signature, not a scale-granularity one.
+
 ## Next steps
 
-1. **Decisive generation test:** after QAT, greedily generate on a *training*
-   utterance; if it does not reproduce the label, it is a quantized-forward /
-   generation bug.
-2. Compare teacher-forced logits vs generated tokens to locate the divergence.
-3. Finish trigger isolation: grad-ckpt → activation quant (α-ramp confirmed).
-4. Revisit per-layer scale handling (per-tensor centered-sign may be too coarse
-   for attention); try group-wise scales or exclude attention.
-5. `0.3.0` stays untagged until the Stage 1 gate is genuinely met.
+1. Verify/fix label masking (prefix length alignment).
+2. Localize which projection binarization destroys (single layer vs all).
+3. Re-run with quantization delay + ≥100-utt eval; then trigger isolation
+   (grad-ckpt → activation quant).
+4. `0.3.0` stays untagged until the Stage 1 gate is genuinely met.

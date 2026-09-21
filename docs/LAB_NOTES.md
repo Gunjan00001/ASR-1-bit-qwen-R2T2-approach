@@ -182,3 +182,41 @@ off.
   be too coarse for attention) and consider excluding attention or group-wise
   scales. `0.3.0` stays untagged.
 - **Artifact:** `artifacts/stage1/recovery_2026-09-20.json`.
+
+---
+
+## 2026-09-20 — Instrumented generation test: forward/objective, not decode path
+
+- **Did:** `scripts/diag_generation.py` on one training utterance
+  (`2277-149896-0004`, label "HOW WOULD THE PAPERS TALK ABOUT IT"): teacher-forced
+  loss + token accuracy + argmax text vs greedy generation, at α=0 (control),
+  α=1 naive, and α=1 after 300 steps (constant α=1, lr 1e-5). Instrumented
+  `BitLinear._quantized_weight` to assert the effective weight is Q(W).
+- **Q(W) assertion: PASSES.** At α=1 the effective weight differs from the shadow
+  (norm 39.18 → 29.48, delta 25.81; several layers); at α=0 it is unchanged. The
+  loss forward uses Q(W), not W.
+- **Teacher-forced vs greedy:**
+  | condition | loss | token acc | teacher-forced text | greedy text |
+  |---|---|---|---|---|
+  | fp16 control (α=0) | 3.67 | 0.75 | "language wouldOULD THE PAPERS TALK ABOUT IT?" | "How would the papers talk about it?" |
+  | binary naive (α=1) | 18.26 | 0.00 | Chinese-token collapse (示示IDE…) | Chinese-token collapse |
+  | binary trained 300 steps | 4.48 | 0.17 | "WE IOULD ITINGEREHE" | "WE IS I WOULD IT W" |
+- **What failed:** After training, **both** teacher-forced and greedy are garbage.
+- **Why (root cause per criterion):** Both paths bad ⇒ **not** a KV-cache /
+  incremental-decode bug — the **quantized forward/objective is broken**.
+  Binarizing all decoder attention q/k/v/o collapses the model (loss 18 → 4.5
+  after 300 steps, token acc 0.17). Weight norms barely moved (39.1814 → 39.1809)
+  yet loss fell sharply: binary weights are extremely sign-sensitive. The earlier
+  α-ramp "loss 1.02" was a blend pathology (fp16 readout corrupted), not a real
+  teacher-forced success.
+- **Also flagged:** the fp16 control teacher-forced text shows **prefix leakage**
+  ("language would" before the label) — the label masking / prefix-length
+  alignment may be off, which would corrupt the training objective.
+- **Chose:** Replace the unsafe blended α-ramp with **quantization delay**
+  (pure fp then constant α=1); keep the ≥100-utt fixed eval set. Do **not** jump
+  to group-wise scales yet.
+- **Next:** (a) verify/fix label masking (prefix length alignment); (b) localize
+  which projection binarization destroys (single-layer vs all); (c) re-run with
+  quantization delay + ≥100-utt eval; (d) then trigger isolation (grad-ckpt →
+  act-quant).
+- **Artifact:** `artifacts/stage1/diag_generation_decoder_attn_steps300.json`.
