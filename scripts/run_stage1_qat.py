@@ -31,6 +31,7 @@ from asr1bit.train.qat import (
     check_finite_grads,
     grad_norms,
     progressive_alpha,
+    quantization_delay_alpha,
     set_activation_quant,
     set_qat_alpha,
 )
@@ -122,7 +123,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--group-size", type=int, default=0, help="0 = per-tensor")
     p.add_argument("--steps", type=int, default=60)
     p.add_argument("--train-n", type=int, default=64)
-    p.add_argument("--eval-n", type=int, default=15)
+    p.add_argument("--eval-n", type=int, default=100, help="Fixed eval set; same for floor and every checkpoint.")
     p.add_argument("--lr", type=float, default=1e-5)
     p.add_argument("--warmup-steps", type=int, default=5)
     p.add_argument("--batch-size", type=int, default=1)
@@ -131,8 +132,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--grad-checkpointing", type=int, default=0)
     p.add_argument("--activation-quant", type=int, default=0)
     p.add_argument("--autocast", type=int, default=0)
-    p.add_argument("--alpha-ramp", type=int, default=0, help="1 = progressive alpha 0->1")
-    p.add_argument("--alpha-warmup-frac", type=float, default=0.3)
+    p.add_argument(
+        "--alpha-mode", choices=["constant", "delay", "ramp"], default="delay",
+        help="delay = fp warmup then constant alpha=1 (safe); ramp = blended (unsafe, see LAB_NOTES).",
+    )
+    p.add_argument("--alpha-warmup-frac", type=float, default=0.3, help="Delay fraction before alpha=1.")
     p.add_argument("--log-grad-norms", type=int, default=1)
     p.add_argument("--zero-shot", type=int, default=0, help="Evaluate alpha=1 without training")
     p.add_argument("--eval-every", type=int, default=0, help="WER eval interval during training (0=off)")
@@ -217,7 +221,12 @@ def main() -> int:
     print("=== QAT ===", flush=True)
     started = time.perf_counter()
     for step in range(args.steps):
-        alpha = progressive_alpha(step, alpha_warmup) if args.alpha_ramp else 1.0
+        if args.alpha_mode == "ramp":
+            alpha = progressive_alpha(step, alpha_warmup)
+        elif args.alpha_mode == "delay":
+            alpha = quantization_delay_alpha(step, alpha_warmup)
+        else:
+            alpha = 1.0
         set_qat_alpha(model, alpha)
         batch = {k: (v.cuda() if torch.is_tensor(v) else v) for k, v in batches[step % len(batches)].items()}
         optimizer.zero_grad()
@@ -279,7 +288,7 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     tag = (
         f"{args.policy}_bw{args.bit_width}_g{group_size}_lr{args.lr}_"
-        f"{args.optimizer}_ramp{args.alpha_ramp}_n{args.train_n}"
+        f"{args.optimizer}_{args.alpha_mode}_n{args.train_n}"
     )
     (out_dir / f"stage1_{tag}.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     print("wrote", out_dir / f"stage1_{tag}.json", flush=True)

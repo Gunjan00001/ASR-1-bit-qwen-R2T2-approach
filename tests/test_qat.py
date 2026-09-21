@@ -15,6 +15,7 @@ from asr1bit.train.qat import (
     grad_norms,
     non_bitlinear_linear_names,
     progressive_alpha,
+    quantization_delay_alpha,
     set_activation_quant,
     set_qat_alpha,
     train_step,
@@ -62,6 +63,19 @@ class TestProgressiveAlpha:
     def test_monotonic(self):
         values = [progressive_alpha(step, 10) for step in range(11)]
         assert values == sorted(values)
+
+
+class TestQuantizationDelay:
+    def test_pure_fp_during_delay(self):
+        assert quantization_delay_alpha(0, 10) == 0.0
+        assert quantization_delay_alpha(9, 10) == 0.0
+
+    def test_quantized_after_delay(self):
+        assert quantization_delay_alpha(10, 10) == 1.0
+        assert quantization_delay_alpha(100, 10) == 1.0
+
+    def test_zero_delay_is_immediate(self):
+        assert quantization_delay_alpha(0, 0) == 1.0
 
 
 class TestSetQatAlpha:

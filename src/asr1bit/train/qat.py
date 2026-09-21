@@ -31,6 +31,16 @@ def progressive_alpha(
     return float(start + (end - start) * fraction)
 
 
+def quantization_delay_alpha(step: int, delay_steps: int) -> float:
+    """Quantization delay: pure fp (alpha=0) for ``delay_steps``, then alpha=1.
+
+    Safer than the blended ramp: with an identity-STE, blending in the forward
+    pass does not match the gradient and is a confirmed corruption trigger
+    (see docs/LAB_NOTES.md). Delaying avoids any intermediate blend.
+    """
+    return 0.0 if step < delay_steps else 1.0
+
+
 def set_qat_alpha(model: nn.Module, alpha: float) -> int:
     """Set the progressive alpha on every :class:`BitLinear`; returns the count."""
     count = 0
