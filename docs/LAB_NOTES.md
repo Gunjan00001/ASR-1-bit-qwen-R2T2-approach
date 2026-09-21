@@ -144,3 +144,41 @@ we chose what we did**, **Future plans**. Failures are kept, not deleted.
   T4) and re-run the zero-shot floor + the 1–2k-step QAT recovery curve; or stop
   the Kaggle QAT kernel to free T4 for a Kaggle fallback. Code is safe on
   `stage-1` @ `2ab6a25`; nothing was lost except this run.
+
+---
+
+## 2026-09-20 — Decisive recovery measurement: NOT a clean recovery (bug)
+
+Colab T4 restored (fresh runtime; torch 2.11.0+cu128, transformers 4.57.6,
+peft 0.20.0, bnb 0.50.2). `decoder_attn` (112 BitLinear), QAT-only freeze
+(176.16M shadows), fp32 AdamW, lr 1e-5 + 50 warmup, grad-ckpt/act-quant/autocast
+off.
+
+- **Did (1) zero-shot floor** (α=1, no training, eval-n 100): pretrained/fp16
+  **2.93**, binary **100.0**, ternary **140.8** WER.
+- **Did (2) 1k-step QAT, train 200 / eval 30, periodic α=1 WER:**
+  - Constant α=1: binary 434.21 → 99.13 → 104.01 → **191.27**; ternary 116.40 →
+    100.17 → 101.57 → 130.02. Loss 18 → 5.42. Final fp16 readout **2.62 (clean)**.
+  - α-ramp (0.3 warmup): binary 130.19 → 182.90 → 107.16 → **70.51**; ternary
+    163.53 → 199.83 → 195.64 → 250.09. Loss → **1.02**. Final fp16 readout
+    **10.30 (CORRUPTED)**.
+- **What failed:** No monotone recovery. Constant-α binary ends **worse** than the
+  zero-shot floor (191 vs 100) while fp16 stays clean; ramp improves binary
+  (100 → 70.5) but corrupts the fp16 readout (10.3) and ternary is erratic.
+- **Why (hypothesis):** A ramp loss of **1.02** (below the full-precision ~3.6)
+  with ~100% generation WER means the failure is not a simple recovery gap: the
+  teacher-forced objective and autoregressive generation disagree. Likely a
+  train/eval (teacher-forced vs generation) mismatch and/or binarizing decoder
+  attention fundamentally breaks generation. The α-ramp is a confirmed corruption
+  trigger (fp16 10.3 vs 2.62).
+- **Why we chose this:** This was the pre-agreed decisive test — flat/worse WER
+  from the naive floor ⇒ treat as a bug, not Stage 2 recovery. That is what we
+  observe.
+- **Next:** (a) **decisive generation test** — after QAT, greedily generate on a
+  *training* utterance and check it reproduces the label (if not ⇒
+  quantized-forward/generation bug); (b) compare teacher-forced logits vs
+  generated tokens; (c) finish trigger isolation (grad-ckpt → act-quant; α-ramp
+  confirmed); (d) revisit per-layer scale handling (per-tensor centered-sign may
+  be too coarse for attention) and consider excluding attention or group-wise
+  scales. `0.3.0` stays untagged.
+- **Artifact:** `artifacts/stage1/recovery_2026-09-20.json`.

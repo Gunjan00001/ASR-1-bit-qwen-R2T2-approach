@@ -77,10 +77,38 @@ Grad-norm log (AdamW run, pre-clip per-step max): 519.09 (v_proj) → 98.5 → 3
 - Naive binary/ternary of decoder attention is catastrophic (~170–395% WER) even
   when training is stable — that is the Stage 2 accuracy-recovery problem.
 
+## Decisive recovery measurement (2026-09-20) — bug, not recovery
+
+Colab T4, `decoder_attn` (112 BitLinear), QAT-only freeze, fp32 AdamW, lr 1e-5.
+
+- **Zero-shot floor** (α=1, no training, eval-n 100): pretrained/fp16 **2.93**,
+  binary **100.0**, ternary **140.8** WER.
+- **1k-step QAT** (train 200, eval 30), periodic α=1 WER:
+
+| Run | step 250 | step 500 | step 750 | step 1000 | final fp16 | loss |
+|---|---|---|---|---|---|---|
+| constant α=1, binary | 434.2 | 99.1 | 104.0 | **191.3** | 2.62 (clean) | 5.42 |
+| constant α=1, ternary | 116.4 | 100.2 | 101.6 | 130.0 | 2.62 | 5.42 |
+| α-ramp, binary | 130.2 | 182.9 | 107.2 | **70.5** | **10.30 (corrupt)** | 1.02 |
+| α-ramp, ternary | 163.5 | 199.8 | 195.6 | 250.1 | 10.30 | 1.02 |
+
+**Verdict: not a clean recovery.** Constant-α binary ends *worse* than the floor
+(191 vs 100) with a clean fp16 readout; the ramp improves binary (→70.5) but
+corrupts fp16 (10.3). A ramp loss of **1.02** (below full precision ~3.6) with
+~100% generation WER indicates a **teacher-forced vs autoregressive mismatch**
+and/or that binarizing decoder attention fundamentally breaks generation — i.e.
+a bug, not merely a Stage 2 recovery gap. The α-ramp is a confirmed corruption
+trigger.
+
+Artifact: `artifacts/stage1/recovery_2026-09-20.json`.
+
 ## Next steps
 
-1. Isolate the corruption trigger: grad-ckpt → activation quant → α-ramp → lr.
-2. Stage 2 recovery for binary/ternary (on-policy distillation, co-training,
-   learnable scales, more data/steps) before expecting a usable WER table.
-3. Re-run the fp16/binary/ternary table on a larger (~500-utt) labelled subset.
-4. `0.3.0` stays untagged until the Stage 1 gate is genuinely met.
+1. **Decisive generation test:** after QAT, greedily generate on a *training*
+   utterance; if it does not reproduce the label, it is a quantized-forward /
+   generation bug.
+2. Compare teacher-forced logits vs generated tokens to locate the divergence.
+3. Finish trigger isolation: grad-ckpt → activation quant (α-ramp confirmed).
+4. Revisit per-layer scale handling (per-tensor centered-sign may be too coarse
+   for attention); try group-wise scales or exclude attention.
+5. `0.3.0` stays untagged until the Stage 1 gate is genuinely met.

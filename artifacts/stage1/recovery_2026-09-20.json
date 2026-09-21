@@ -1,0 +1,66 @@
+{
+  "date": "2026-09-20",
+  "host": "Colab Tesla T4 (sm75)",
+  "env": {
+    "python": "3.13",
+    "torch": "2.11.0+cu128",
+    "transformers": "4.57.6",
+    "peft": "0.20.0",
+    "bitsandbytes": "0.50.2"
+  },
+  "model": "Qwen/Qwen3-ASR-0.6B",
+  "policy": "decoder_attn",
+  "bitlinear_replaced": 112,
+  "trainable_params": 176160768,
+  "setup": "fp32 AdamW, lr 1e-5 + 50 warmup, grad-ckpt off, activation-quant off, no autocast, QAT-only freeze",
+
+  "zero_shot_floor": {
+    "eval_n": 100,
+    "pretrained_wer": 2.9298,
+    "fp16_wer": 2.9298,
+    "binary_wer": 100.0,
+    "ternary_wer": 140.7960
+  },
+
+  "qat_constant_alpha_1": {
+    "steps": 1000,
+    "train_n": 200,
+    "eval_n": 30,
+    "loss_step_1000": 5.42,
+    "periodic_alpha1_wer": [
+      {"step": 250, "binary": 434.21, "ternary": 116.40},
+      {"step": 500, "binary": 99.13, "ternary": 100.17},
+      {"step": 750, "binary": 104.01, "ternary": 101.57},
+      {"step": 1000, "binary": 191.27, "ternary": 130.02}
+    ],
+    "final": {"pretrained": 2.6178, "fp16": 2.6178, "binary": 191.27, "ternary": 130.02}
+  },
+
+  "qat_alpha_ramp": {
+    "steps": 1000,
+    "train_n": 200,
+    "eval_n": 30,
+    "loss_step_1000": 1.022,
+    "periodic_alpha1_wer": [
+      {"step": 250, "alpha": 0.83, "binary": 130.19, "ternary": 163.53},
+      {"step": 500, "alpha": 1.0, "binary": 182.90, "ternary": 199.83},
+      {"step": 750, "alpha": 1.0, "binary": 107.16, "ternary": 195.64}
+    ],
+    "final": {"pretrained": 2.6178, "fp16": 10.2967, "binary": 70.51, "ternary": 250.09}
+  },
+
+  "interpretation": [
+    "Zero-shot floor: binary 100.0, ternary 140.8 WER (naive binarize pretrained).",
+    "Constant alpha=1 QAT: binary WER non-monotone (434->99->104->191), ends WORSE than the floor; fp16 readout stays clean (2.62).",
+    "Alpha-ramp QAT: loss reaches 1.02 (lower than full precision ~3.6) yet alpha=1 WER stays ~70-250%; fp16 readout is CORRUPTED (10.30 vs 2.62).",
+    "Low teacher-forced loss with ~100% generation WER indicates the failure is NOT a simple recovery problem; likely a train/eval (teacher-forced vs autoregressive) mismatch and/or that binarizing decoder attention fundamentally breaks generation.",
+    "The alpha-ramp is confirmed as a corruption trigger (ramp fp16 10.30 vs constant fp16 2.62).",
+    "Per the agreed criterion (flat/worse WER), treat as a BUG, not recovery."
+  ],
+  "next_steps": [
+    "Decisive generation test: after QAT, greedily generate on a TRAINING utterance and check whether it reproduces the label; if not, it is a quantized-forward/generation bug.",
+    "Compare quantized forward logits (teacher-forced) vs generated tokens to locate the divergence.",
+    "Finish trigger isolation: gradient checkpointing, then activation quant (alpha-ramp already confirmed).",
+    "Investigate per-layer scale handling for attention projections in the full model (per-tensor centered-sign may be too coarse); try group-wise and/or exclude attention from binarization."
+  ]
+}
