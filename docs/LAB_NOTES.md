@@ -220,3 +220,45 @@ off.
   quantization delay + ≥100-utt eval; (d) then trigger isolation (grad-ckpt →
   act-quant).
 - **Artifact:** `artifacts/stage1/diag_generation_decoder_attn_steps300.json`.
+
+---
+
+## 2026-09-20 — Masking verified + per-projection sensitivity
+
+- **Did (1) masking:** mirrored Qwen's official convention (render the prefix
+  template with a **dummy audio placeholder**; mask the prompt out of labels via
+  `make_sft_labels`). Direct inspection of one utterance:
+  `PREFIX = '<|im_start|>system\n<|im_end|>\n<|im_start|>user\n<|audio_start|>…<|audio_end|><|im_end|>\n<|im_start|>assistant\n'`,
+  `LABEL = 'THE LADY IS NOT THE MOTHER OF THE BOYS BUT THEIR AUNT<|im_end|>'`
+  == the target, `prefix_len = 69`, `FULL[:69] == PREFIX_INPUTS`. **Labels contain
+  exactly the transcription tokens; no prompt/audio/language tokens leak.**
+- **What "0.75 token accuracy" actually was:** NOT misalignment. LibriSpeech refs
+  are uppercase without punctuation while the model emits cased/punctuated text
+  plus its natural `language …<asr_text>` tag, so exact-token teacher-forced
+  accuracy is < 1.0 even for the fp model (fp `none` row: WER 3.18, token acc
+  0.78). The earlier "prefix leakage" flag was the model's natural language-tag
+  output, not a masking bug.
+- **Did (2) per-projection sensitivity** (alpha=1 on exactly one projection;
+  greedy WER on a fixed 20-utt subset):
+
+  | binarized | loss | token acc | WER |
+  |---|---|---|---|
+  | none (fp) | 2.22 | 0.78 | **3.18** |
+  | q | 5.07 | 0.22 | 101.59 |
+  | k | 6.83 | 0.22 | 139.49 |
+  | v | 10.75 | 0.00 | 100.00 |
+  | o | 8.51 | 0.00 | 195.22 |
+  | all | 18.48 | 0.00 | 100.00 |
+
+- **What failed:** Binarizing **any single** attention projection is already
+  catastrophic — it is not a "too many layers" effect.
+- **Why (hypothesis):** The quantizer/scale scheme (per-tensor centered-sign) is
+  the leading suspect for the broken quantized forward, not attention breadth.
+- **Chose:** Record and refine the verdict — forward uses Q(W) (proven), labels
+  are correct (proven), yet single-projection binarization destroys the model, so
+  the quantization math/scale is the next target (after the QAT re-run).
+- **Next:** (3) re-run QAT with quantization delay, ≥100-utt eval, higher lr
+  (1e-4/2e-4) and more steps/data; then revisit the quantizer math (per-tensor
+  centered-sign, scale granularity).
+- **Artifacts:** `artifacts/stage1/diag_generation_decoder_attn_steps0.json`,
+  `artifacts/stage1/diag_projection_decoder_attn.json`.

@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-20",
+  "host": "Colab Tesla T4",
+  "model": "Qwen/Qwen3-ASR-0.6B",
+  "policy": "decoder_attn",
+  "bit_width": 1.0,
+  "activation_quant": false,
+  "eval_n": 20,
+  "note": "alpha=1 for exactly one projection at a time (others alpha=0). teacher-forced token accuracy on one validation utterance; greedy WER on the fixed 20-utt clean subset.",
+  "conditions": [
+    {"projection": "none", "loss": 2.2249, "token_accuracy": 0.7778, "wer": 3.1847},
+    {"projection": "q", "loss": 5.0717, "token_accuracy": 0.2222, "wer": 101.5924},
+    {"projection": "k", "loss": 6.8290, "token_accuracy": 0.2222, "wer": 139.4904},
+    {"projection": "v", "loss": 10.7546, "token_accuracy": 0.0000, "wer": 100.0},
+    {"projection": "o", "loss": 8.5113, "token_accuracy": 0.0000, "wer": 195.2229},
+    {"projection": "all", "loss": 18.4817, "token_accuracy": 0.0000, "wer": 100.0}
+  ],
+  "findings": [
+    "Binarizing a SINGLE attention projection (q, k, v, or o) is already catastrophic (WER ~100-195%); it is not a 'too many layers' effect.",
+    "v and o are worst (loss 10.75 / 8.51, token acc 0); q and k somewhat less bad but still ~100-140% WER.",
+    "The fp (none) row is WER 3.18 with token acc 0.778: the sub-1.0 token accuracy is a FORMAT artifact (LibriSpeech refs are uppercase; the model emits cased/punctuated text plus a language tag), not misalignment.",
+    "Conclusion: the quantizer/scale scheme (per-tensor centered-sign) is the leading suspect for the broken quantized forward, not attention breadth."
+  ]
+}

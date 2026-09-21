@@ -122,19 +122,48 @@ Artifact: `artifacts/stage1/recovery_2026-09-20.json`.
 
 Artifact: `artifacts/stage1/diag_generation_decoder_attn_steps300.json`.
 
+## Masking verified + per-projection sensitivity (2026-09-20)
+
+**Masking is correct** (mirrors Qwen's official `qwen3_asr_sft.py`: prefix
+template rendered with a dummy audio placeholder; `make_sft_labels` masks the
+prompt). Direct check: `LABEL == TARGET` exactly ("THE LADY IS NOT THE MOTHER OF
+THE BOYS BUT THEIR AUNT"), `FULL[:prefix_len] == PREFIX_INPUTS`. The earlier
+sub-1.0 teacher-forced token accuracy is a **format artifact** (uppercase
+LibriSpeech refs vs the model's cased/punctuated output + language tag), not
+misalignment — the fp row has WER 3.18 with token acc 0.78.
+
+**Per-projection sensitivity** (α=1 on one projection; 20-utt WER):
+
+| binarized | loss | token acc | WER |
+|---|---|---|---|
+| none (fp) | 2.22 | 0.78 | **3.18** |
+| q | 5.07 | 0.22 | 101.59 |
+| k | 6.83 | 0.22 | 139.49 |
+| v | 10.75 | 0.00 | 100.00 |
+| o | 8.51 | 0.00 | 195.22 |
+| all | 18.48 | 0.00 | 100.00 |
+
+**Binarizing any single attention projection is already catastrophic** — not a
+"too many layers" effect. Forward uses Q(W) (proven), labels are correct
+(proven); the leading suspect is now the **quantizer/scale math** (per-tensor
+centered-sign), not attention breadth.
+
+Artifacts: `artifacts/stage1/diag_generation_decoder_attn_steps0.json`,
+`artifacts/stage1/diag_projection_decoder_attn.json`.
+
 ## Decisions
 
-- **Drop the blended α-ramp** (confirmed corruption trigger; identity-STE does
-  not match a blended forward). Replace with **quantization delay** (pure fp, then
-  constant α=1) — `quantization_delay_alpha`, default `--alpha-mode delay`.
+- **Drop the blended α-ramp** (confirmed corruption trigger). Replace with
+  **quantization delay** (`quantization_delay_alpha`, `--alpha-mode delay`).
 - Use a fixed **≥100-utterance** eval set for the floor and every checkpoint.
-- Do **not** pursue group-wise scales / attention exclusion yet: this is a
-  broken-forward signature, not a scale-granularity one.
+- Label masking now matches Qwen's official convention (dummy-audio prefix).
+- Do **not** pursue attention exclusion yet; the per-projection table points at
+  the quantizer/scale, which is the next target after the QAT re-run.
 
 ## Next steps
 
-1. Verify/fix label masking (prefix length alignment).
-2. Localize which projection binarization destroys (single layer vs all).
-3. Re-run with quantization delay + ≥100-utt eval; then trigger isolation
-   (grad-ckpt → activation quant).
+1. Re-run QAT with quantization delay, ≥100-utt eval, higher lr (1e-4/2e-4),
+   more steps/data.
+2. Revisit the quantizer math (per-tensor centered-sign; scale granularity).
+3. Finish trigger isolation (grad-ckpt → activation quant).
 4. `0.3.0` stays untagged until the Stage 1 gate is genuinely met.
