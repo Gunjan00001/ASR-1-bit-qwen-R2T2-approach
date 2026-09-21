@@ -149,6 +149,24 @@ def build_optimizer(
     return torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
 
 
+def make_sft_labels(
+    input_ids: torch.Tensor,
+    prefix_lens: Sequence[int],
+    pad_token_id: int | None = None,
+) -> torch.Tensor:
+    """Mask the prompt (audio + ``language ...<asr_text>`` prefix) out of labels.
+
+    Labels are ``1`` (i.e. not ``-100``) only over the transcription tokens,
+    matching Qwen's official ``finetuning/qwen3_asr_sft.py`` convention.
+    """
+    labels = input_ids.clone()
+    for i, prefix_len in enumerate(prefix_lens):
+        labels[i, : int(prefix_len)] = -100
+    if pad_token_id is not None:
+        labels[labels == pad_token_id] = -100
+    return labels
+
+
 def grad_norms(model: nn.Module) -> dict[str, float]:
     """Per-parameter gradient L2 norms (only params that have a gradient)."""
     norms: dict[str, float] = {}

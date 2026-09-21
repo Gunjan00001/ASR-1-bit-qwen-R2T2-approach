@@ -30,6 +30,7 @@ from asr1bit.train.qat import (
     build_optimizer,
     check_finite_grads,
     grad_norms,
+    make_sft_labels,
     progressive_alpha,
     quantization_delay_alpha,
     set_activation_quant,
@@ -57,11 +58,18 @@ def patch_outer_forward(model) -> None:
 
 
 def build_examples(utterances, processor, prompt: str = "") -> list[dict]:
+    """Build (audio, prefix_text, target) triples.
+
+    Mirrors Qwen's official ``finetuning/qwen3_asr_sft.py``: the prefix template
+    is rendered with a *dummy* audio placeholder (``audio=None``); the real audio
+    is passed separately to the processor. Using the real audio here changes the
+    rendered prefix and misaligns the label mask.
+    """
     examples = []
     for utt in utterances:
         messages = [
             {"role": "system", "content": prompt or ""},
-            {"role": "user", "content": [{"type": "audio", "audio": utt.audio}]},
+            {"role": "user", "content": [{"type": "audio", "audio": None}]},
         ]
         prefix = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
         if isinstance(prefix, list):
@@ -78,13 +86,9 @@ def collate(examples: list[dict], processor) -> dict:
     full_inputs = processor(text=full, audio=audios, return_tensors="pt", padding=True, truncation=False)
     prefix_inputs = processor(text=prefixes, audio=audios, return_tensors="pt", padding=True, truncation=False)
     prefix_lens = prefix_inputs["attention_mask"].sum(dim=1).tolist()
-    labels = full_inputs["input_ids"].clone()
-    for i, plen in enumerate(prefix_lens):
-        labels[i, :plen] = -100
-    pad_id = processor.tokenizer.pad_token_id
-    if pad_id is not None:
-        labels[labels == pad_id] = -100
-    full_inputs["labels"] = labels
+    full_inputs["labels"] = make_sft_labels(
+        full_inputs["input_ids"], prefix_lens, processor.tokenizer.pad_token_id
+    )
     return full_inputs
 
 

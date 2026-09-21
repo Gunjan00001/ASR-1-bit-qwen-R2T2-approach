@@ -13,6 +13,7 @@ from asr1bit.train.qat import (
     enable_gradient_checkpointing,
     freeze_non_bitlinear,
     grad_norms,
+    make_sft_labels,
     non_bitlinear_linear_names,
     progressive_alpha,
     quantization_delay_alpha,
@@ -158,6 +159,28 @@ class TestBuildOptimizer:
         optimizer = build_optimizer(model, lr=1e-3, use_8bit=False)
         params = [p for group in optimizer.param_groups for p in group["params"]]
         assert len(params) == 2  # first layer weight+bias only
+
+
+class TestMakeSftLabels:
+    def test_masks_prefix_tokens(self):
+        input_ids = torch.tensor([[1, 2, 3, 4, 5]])
+        labels = make_sft_labels(input_ids, [2])
+        assert labels.tolist() == [[-100, -100, 3, 4, 5]]
+
+    def test_masks_pad_tokens(self):
+        input_ids = torch.tensor([[1, 2, 3, 0, 0]])
+        labels = make_sft_labels(input_ids, [1], pad_token_id=0)
+        assert labels.tolist() == [[-100, 2, 3, -100, -100]]
+
+    def test_batch_prefix_lens(self):
+        input_ids = torch.tensor([[1, 2, 3], [4, 5, 6]])
+        labels = make_sft_labels(input_ids, [1, 2])
+        assert labels.tolist() == [[-100, 2, 3], [-100, -100, 6]]
+
+    def test_only_transcription_tokens_unmasked(self):
+        input_ids = torch.tensor([[9, 9, 7, 8, 9]])
+        labels = make_sft_labels(input_ids, [2])
+        assert int((labels != -100).sum()) == 3
 
 
 class TestGradDiagnostics:
