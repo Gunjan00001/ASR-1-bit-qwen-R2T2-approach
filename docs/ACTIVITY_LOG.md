@@ -7,32 +7,33 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 08:30 IST)
+## Live status (updated 2026-10-11 09:10 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10811` | **Binary long2**: continuation from 12.9 (lr 1e-5, 8k, 4000 steps, GPU 2) | step ~700/4000 | — | **~1 h 15 m** |
-| `10795` | **Ternary long (aggressive)** | **done** | **11.4 final / 10.6 best**; fp16 50.7 | — |
-| `10798` | **Binary long** | **done** | **12.9 final**; fp16 37.2 | — |
-| `10799` | Ternary gentle hedge | killed | ~17 (losing to the aggressive path) | — |
+| `10813` | **Ternary long2**: continuation from 11.4 (lr 1e-5, 8k, 4000 steps, GPU 6) | starting | — | **~1 h 25 m** |
+| `10815` | **Binary long3**: continuation from 11.1 (lr 5e-6, 8k, 3000 steps, GPU 2) | starting | — | **~1 h 10 m** |
+| `10812` | persistent GPU session (new; old one hit 12 h walltime) | — | — | — |
 
-**Long-run trajectories:**
-- ternary: 24.8 → 24.5 → 19.4 → 15.9 → 14.9 → 12.2 → **10.6** → 11.4 (final);
-- binary: 23.3 → 19.9 → 16.5 → 13.2 → 13.1 → **12.9** (final).
-
-**New best results (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
+**Best results (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
 
 | Configuration | WER |
 |---|---|
-| Ternary, all 196 decoder projections (8k data) | **11.4** (best 10.6) |
-| Binary, all 196 decoder projections (8k data) | **12.9** |
+| **Binary, all 196 decoder projections (8k, long2)** | **11.1** |
+| Ternary, all 196 decoder projections (8k) | **11.4** (best 10.6) |
 | Previous best (4k data) | ternary 16.2 / 14.4; binary 17.5 |
 | FFN-only ternary | 25.7 best / 32.8 final |
 | Naive attn+FFN | ~98–108 |
 
-**Reading the long runs:** the fresh cosine cycle perturbs the checkpoint for
-the first ~2 000 steps (ternary went 16.2 → 24.5), then the descent continues
-past the previous best as the LR decays — do not panic at the transient.
+**Binary long2 trajectory:** 14.3 → 15.8 → 14.1 → 12.5 → 13.1 → 12.6 → 12.8 →
+**11.1** (final). Binary has now overtaken ternary.
+
+**Reading the continuations:** the fresh cosine cycle perturbs the checkpoint
+for the first ~2 000 steps, then descends past the previous best as the LR
+decays — do not panic at the transient.
+
+**GPU-switch rule (R1):** both new jobs raced onto GPU 6; the binary job was
+killed and resubmitted, picking GPU 2. No sharing/waiting.
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
@@ -470,3 +471,23 @@ restarts at 0).
 - **Evidence:** `stage1_decoder_attn_ffn_bw1.58_gNone_lr2.5e-05_..._n8000.json`,
   `stage1_decoder_attn_ffn_bw1.0_gNone_lr2e-05_..._n8000.json`,
   `docs/figures/wer_trajectories.png`.
+
+### 09:05 — Binary long2: 11.1 WER (binary overtakes ternary); next continuations launched
+
+- **Did:** collected the binary long2 final table and launched the next pair of
+  continuations.
+- **Result (50-utt test-clean):** pretrained 2.44; fp16 36.2; **binary 11.1**
+  (CER 4.6); ternary readout 23.6. Trajectory: 14.3 → 15.8 → 14.1 → 12.5 →
+  13.1 → 12.6 → 12.8 → **11.1**. Binary (11.1) has overtaken ternary
+  (11.4 final / 10.6 best).
+- **Launched:**
+  - `10813` **ternary long2**: from the 11.4/10.6 checkpoint, lr 1e-5, anchor
+    0.05, 4 000 steps (GPU 6);
+  - `10815` **binary long3**: from the 11.1 checkpoint, lr 5e-6, anchor 0.05,
+    3 000 steps (GPU 2).
+- **Failure:** both jobs raced onto GPU 6 again; the binary job was killed and
+  resubmitted → GPU 2 (rules R1).
+- **Note:** the 12 h GPU session ended; a new session (`10812`) is active and
+  `gpu-send` works with it.
+- **Evidence:** `stage1_decoder_attn_ffn_bw1.0_gNone_lr1e-05_..._n8000.json`,
+  `qat_ternary_long2.log`, `qat_binary_long3.log`.
