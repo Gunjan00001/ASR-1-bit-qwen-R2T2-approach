@@ -202,11 +202,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--zero-shot", type=int, default=0, help="Evaluate alpha=1 without training")
     p.add_argument("--eval-every", type=int, default=0, help="WER eval interval during training (0=off)")
     p.add_argument("--eval-both", type=int, default=1, help="1 = score binary and ternary at evals; 0 = training precision only.")
-    p.add_argument(
-        "--learnable-scale", type=int, default=0,
-        help="BitNet b1.58-style learnable per-tensor/group dequantization gain.",
-    )
+    p.add_argument("--learnable-scale", type=int, default=0,
+                   help="BitNet b1.58-style learnable per-tensor/group dequantization gain.")
     p.add_argument("--lr-schedule", choices=["const", "cosine"], default="const")
+    p.add_argument(
+        "--lazy-collate", type=int, default=0,
+        help="1 = tokenize/featurize batches on the fly (no upfront precompute of all batches).",
+    )
     p.add_argument(
         "--train-cache", default=None,
         help="Utterance .pt cache from scripts/build_qat_cache.py (fast multi-epoch QAT).",
@@ -292,8 +294,10 @@ def main() -> int:
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=build_lr_lambda(args))
     scaler = torch.amp.GradScaler("cuda") if args.autocast else None
 
-    batches = [collate(train_examples[i : i + args.batch_size], processor)
-               for i in range(0, len(train_examples), args.batch_size)]
+    batches = None
+    if not args.lazy_collate:
+        batches = [collate(train_examples[i : i + args.batch_size], processor)
+                   for i in range(0, len(train_examples), args.batch_size)]
     alpha_warmup = max(1, int(args.steps * args.alpha_warmup_frac))
     history = []
     start_step = 0
@@ -309,7 +313,15 @@ def main() -> int:
         else:
             alpha = 1.0
         set_qat_alpha(model, alpha)
-        batch = {k: (v.cuda() if torch.is_tensor(v) else v) for k, v in batches[step % len(batches)].items()}
+        if batches is None:
+            base = ((step - start_step) * args.batch_size) % len(train_examples)
+            chunk = train_examples[base : base + args.batch_size]
+            if len(chunk) < args.batch_size:  # wrap around the end of the epoch
+                chunk = chunk + train_examples[: args.batch_size - len(chunk)]
+            batch = collate(chunk, processor)
+        else:
+            batch = batches[step % len(batches)]
+        batch = {k: (v.cuda() if torch.is_tensor(v) else v) for k, v in batch.items()}
         optimizer.zero_grad()
         if scaler is not None:
             with torch.amp.autocast("cuda", dtype=torch.float16):
