@@ -1,0 +1,199 @@
+# Project status — ASR-1-bit-Qwen
+
+**Date:** 2026-10-11 · **Branch:** `stage-1` · **Base model:** `Qwen/Qwen3-ASR-0.6B`
+**Target:** English streaming ASR with near-binary weights, R2T2-class quality on CPU/edge.
+
+> This is the single-page status report. Protocol details: `docs/PLANNING.md`;
+> failure history: `docs/LAB_NOTES.md`; step-by-step work log:
+> `docs/ACTIVITY_LOG.md`; operating rules: `rules.md`.
+
+---
+
+## TL;DR
+
+- **Stage 0 gate passed** (`0.2.0`): fp16 streaming baselines reproduced on
+  T4 (1.7B full clean 1.96 vs published 1.95); `X = +1.5` locked.
+- **Stage 1 (BitLinear + QAT) machinery works**: ternary QAT can memorize a
+  single utterance exactly (loss 0.000); all quantizer/training code is tested
+  (203 tests).
+- **Naive QAT collapses** (~100 WER) — this is expected, not a bug (quantizer
+  audit: per-tensor binary error 0.648 ≈ the Gaussian closed form 0.60).
+- **A working recovery recipe was found (Stage 2a/2b):**
+  FFN warm start → attention rollout with a **frozen pretrained-teacher anchor**
+  → warm-restart cosine; binary via **progressive precision**.
+  - **Ternary, all 196 decoder projections: 14.4 best / 16.2 final WER**
+  - **Binary, all 196 decoder projections: 17.5 WER**
+  - (fp16 pretrained reference on the same 50-utt sample: **2.44**)
+
+---
+
+## WER report (fixed 50-utt `test-clean` subsample, seed 0, offline)
+
+Each row is a *trained* model evaluated at the stated precision. A "binary"
+number on a ternary-trained row is a readout only (not a trained binary model).
+
+| Configuration (trained) | Steps | fp16 readout | ternary | binary |
+|---|---|---:|---:|---:|
+| fp16 pretrained (no QAT) | — | **2.44** | — | — |
+| Naive attn+FFN ternary | 6 000 | 113.1 | 107.8 | 99.8 |
+| Self-distill attn+FFN ternary (w=0.5) | 4 000 | 108.3 | 98.1 | 118.3 |
+| FFN-only ternary | 3 000 | 226.5 | 32.8 (best 25.7) | 71.0 |
+| FFN-only binary | 3 000 | 223.9 | 106.8 | 97.9 |
+| **Stage 2a attn+FFN ternary** | 5 000 | 85.8 | **16.2 (best 14.4)** | 99.9 |
+| **Stage 2b attn+FFN binary** | 2 000 | 99.8 | 30.5 | **17.5** |
+| Zero-shot naive (no training) | 0 | — | ~100 | ~100 |
+
+*Primary metric note:* the Stage 0 gate is defined on **streaming 320 ms**
+clean/other (fp16: 2.24 / 4.61, `X = +1.5`). The numbers above are **offline**
+on a 50-utt clean subsample; the streaming evaluation of quantized models is a
+pending work package (vLLM cannot serve BitLinear; the portable transformers
+path is used).
+
+---
+
+## WER trajectories
+
+![WER trajectories](figures/wer_trajectories.png)
+
+Reading the chart (log scale):
+
+- **Naive attn+FFN (red)** starts at ~127 and stays ~100 — quantizing attention
+  naively destroys the model and training never recovers.
+- **FFN-only (orange)** recovers 118 → 84 → 42 → 25.7 in 2 000 steps: keeping
+  attention in fp preserves audio conditioning. (The dotted orange segment is
+  the resumed run, affected by the LR-restart bug — see `docs/ACTIVITY_LOG.md`.)
+- **Stage 2a (blue)** starts from the FFN-only checkpoint (25.7), pays +27
+  points when attention is quantized (52.8 @500), then recovers steadily to
+  **14.4** with the frozen-teacher anchor and a warm-restart cosine cycle.
+- **Stage 2b (green)** starts from the ternary checkpoint and switches to
+  binary: 51.5 → 38.1 → 25.4 → **17.5**.
+
+## Final WER by configuration
+
+![Final WER by configuration](figures/final_wer.png)
+
+## Shadow drift: the fp16 readout degrades during QAT
+
+![fp16 drift](figures/fp16_drift.png)
+
+At lr 2e-4 (long runs) the STE updates move the latent weights far from the
+pretrained basin: the fp16 readout rises to WER 80–230 even when the quantized
+readout recovers. The anchor (w=0.1) slows but does not prevent this drift. The
+**quantized model is the deliverable**; preserving the fp readout is an open
+work package (trust-region anchor).
+
+## Quantizer audit (why naive QAT is expected to fail)
+
+![Quantizer error](figures/quantizer_error.png)
+
+Per-tensor binary quantization of real decoder weights has relative Frobenius
+error **0.648** — essentially the Gaussian closed form (0.60). Group-wise
+scaling barely helps (sign pattern dominates). This is why naive 1-bit
+conversion collapses; recovery must come from training, not from the quantizer.
+
+## Roadmap status
+
+![Roadmap](figures/roadmap.png)
+
+| Stage | Status | Notes |
+|---|---|---|
+| 0 — baselines & harness | **gate passed** (`0.2.0`) | fp16 numbers reproduced on T4 |
+| 1 — BitLinear + QAT | **machinery done; gate open** | loss controllable; WER tables emitted; recovery delivered by Stage 2 recipe |
+| 2 — accuracy recovery | **in progress** | rollout + anchor + progressive precision → 14.4/16.2 ternary, 17.5 binary |
+| 3 — scale to 1.7B | not started | memory stack + checkpointing ready (`--resume`) |
+| 4 — streaming parity (LSP) | not started | aligner + stable-prefix targets |
+| 5 — edge deployment | not started | packing/GGUF/CPU kernels |
+| 6 — evaluation & writeup | not started | full matrix + report |
+
+---
+
+## The recipe that works
+
+1. **FFN warm start**: quantize `gate/up/down` only (84 layers) and train until
+   the loss recovers (WER ≈ 25.7). Attention stays fp → audio conditioning is
+   preserved.
+2. **Attention rollout with a small anchor**: quantize attention too (196
+   layers) and train with
+   `L = 0.9 · CE + 0.1 · KL(student ‖ frozen-pretrained fp teacher)`
+   at lr 5e-5, cosine. The anchor prevents the audio-conditioning collapse.
+3. **Warm-restart cosine**: a second cycle (lr 2.5e-5 over 5 000 steps) pushes
+   from 22.6 → 14.4.
+4. **Progressive precision for binary**: switch `bit_width=1.0` starting from
+   the ternary checkpoint (binary 17.5), instead of training binary from fp
+   (which stalls at ~98).
+
+Key infrastructure that made this possible: log-parameterized learnable scales
+(always positive), `--resume` with correct LR-schedule advance, `--init-from`
+for new phases, frozen-teacher distillation, and the cluster rules in
+`rules.md` (GPU switching instead of waiting).
+
+## What failed (kept for the record)
+
+| Attempt | Symptom | Root cause | Fix / lesson |
+|---|---|---|---|
+| Free-parameter learnable scale | gamma negative / 10× collapse | unconstrained additive parameter | log-parameterization (`gamma = exp(log_scale)`) |
+| Blended α-ramp | fp16 readout corruption | blend + identity-STE mismatch | use `--alpha-mode delay` |
+| Self-distillation (moving teacher) | WER 98–125, no recovery | teacher drifts with the student | use a **frozen** pretrained teacher |
+| Anchored KL w=0.5 from fp start | KL 11–15, WER 315 | KL gradient dominates | small weight (0.1) + FFN warm start |
+| Binary FFN-only | stuck ~92–98 | binary sign churn from fp start | progressive precision from ternary |
+| `--resume` before the fix | resumed run got fresh high LR, WER 25.7→42.8 | scheduler restarted at step 0 | `scheduler.last_epoch = start_step` |
+| Long runs at lr 2e-4 | fp16 readout destroyed | latent-weight drift | anchor + lower lr (open item) |
+
+## Reproduce
+
+```bash
+# 1. data cache (login node)
+python scripts/build_qat_cache.py --n 4000 --stream 1
+
+# 2. FFN warm start (ternary)
+qsub scripts/qat_ternary_ffn.pbs        # → 25.7 @2000
+
+# 3. attention rollout + frozen anchor
+qsub scripts/qat_attn_rollout.pbs       # → 22.6 @2000
+qsub scripts/qat_attn_rollout_ext.pbs   # warm restart
+qsub scripts/qat_attn_rollout_ext2.pbs  # GPU-switch resume if contended
+
+# 4. binary via progressive precision
+qsub scripts/qat_binary_rollout.pbs     # → 17.5 @2000
+
+# figures / tables
+python scripts/make_plots.py
+python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_ffn
+```
+
+---
+
+## Future plan
+
+**Stage 2 — finish accuracy recovery (immediate)**
+1. Longer runs on the 8k cache (`data/qat_clean_train.100_n8000.pt`, staged on
+   `/tmp/asr1bit`); the curves were still descending when the schedules ended.
+2. Anchor tuning: smaller KL weight (0.03–0.05) or a trust-region form to stop
+   the fp16 drift while keeping the ternary descent.
+3. Co-training / stochastic precision (alternate fp and quantized steps).
+4. Re-run the best recipe on `test-other` for a clean/other pair.
+
+**Streaming evaluation (unblocks the Stage 1 gate)**
+5. Evaluate quantized models with the portable `ChunkedStreamer` at 320 ms on
+   the fixed subsample; report WER vs the fp16 streaming baselines
+   (2.24 / 4.61) and the `+1.5` bar.
+
+**Stage 3 — scale to 1.7B**
+6. Memory stack (LoRA / partial QAT), checkpoint/resume (ready), run + eval.
+
+**Stage 4 — streaming parity (LSP)**
+7. Forced-aligner alignment builder → stable-prefix targets → streaming SFT →
+   append-only LSP emission policy → eval vs R2T2 published numbers.
+
+**Stage 5 — edge deployment**
+8. Pack 1-bit/2-bit weights, GGUF export, CPU SIMD kernels, RTF < 1 and
+   constant memory.
+
+**Stage 6 — final evaluation & writeup**
+9. Full matrix (chunk sizes 160/320/1000 ms, clean/other), tables/plots, report.
+
+**Known open risks**
+- Ternary at 14–16 offline is still far from the `+1.5` target (3.74); the
+  remaining gap needs longer training, more data, and the recovery stack.
+- Binary 17.5 is a strong result but needs the same hardening.
+- The fp16 readout drift must be solved for the plan's "co-train" story.

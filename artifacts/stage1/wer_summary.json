@@ -1,0 +1,223 @@
+{
+  "fp16_baseline": 2.4364406779661016,
+  "trajectories": {
+    "Naive attn+FFN (ternary)": {
+      "steps": [
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000
+      ],
+      "wer": [
+        127.01271186440677,
+        121.61016949152543,
+        96.5042372881356,
+        96.92796610169492,
+        103.4957627118644,
+        107.83898305084745
+      ]
+    },
+    "FFN-only (ternary)": {
+      "steps": [
+        500,
+        1000,
+        1500,
+        2000
+      ],
+      "wer": [
+        118.0084745762712,
+        84.32203389830508,
+        42.16101694915254,
+        25.741525423728813
+      ]
+    },
+    "Stage 2a attn+FFN rollout (ternary)": {
+      "steps": [
+        500,
+        1000,
+        1500,
+        2000,
+        2500,
+        3000,
+        3500,
+        4000,
+        4500,
+        5000
+      ],
+      "wer": [
+        52.7542372881356,
+        38.02966101694915,
+        23.093220338983052,
+        22.5635593220339,
+        21.504237288135595,
+        19.385593220338983,
+        17.478813559322035,
+        17.690677966101696,
+        14.40677966101695,
+        16.20762711864407
+      ]
+    },
+    "Stage 2b attn+FFN rollout (binary)": {
+      "steps": [
+        500,
+        1000,
+        1500,
+        2000
+      ],
+      "wer": [
+        51.483050847457626,
+        38.13559322033898,
+        25.423728813559322,
+        17.478813559322035
+      ]
+    },
+    "FFN-only resume (LR-restart artifact)": {
+      "steps": [
+        2500,
+        3000
+      ],
+      "wer": [
+        42.79661016949153,
+        32.83898305084746
+      ]
+    }
+  },
+  "final_wer": {
+    "Naive attn+FFN\n(ternary)": {
+      "ternary": 107.84,
+      "binary": 99.79
+    },
+    "Self-distill attn+FFN\n(ternary)": {
+      "ternary": 98.09,
+      "binary": 118.33
+    },
+    "FFN-only\n(ternary)": {
+      "ternary": 32.84,
+      "binary": 70.97
+    },
+    "FFN-only\n(binary)": {
+      "ternary": 106.78,
+      "binary": 97.88
+    },
+    "Stage 2a attn+FFN\n(ternary)": {
+      "ternary": 16.21,
+      "binary": 99.89
+    },
+    "Stage 2b attn+FFN\n(binary)": {
+      "ternary": 30.51,
+      "binary": 17.48
+    }
+  },
+  "quantizer_error": {
+    "names": [
+      "binary\ntensor",
+      "binary\ng64",
+      "binary\ng128",
+      "ternary\ntensor",
+      "ternary\ng64",
+      "ternary\ng128"
+    ],
+    "values": [
+      0.6482479563172983,
+      0.6155781377943195,
+      0.6143627510387071,
+      0.5654160842603567,
+      0.5189561187004557,
+      0.5219716119522951
+    ]
+  },
+  "fp16_drift": {
+    "Stage 2a (ternary rollout)": {
+      "steps": [
+        500,
+        1000,
+        1500,
+        2000
+      ],
+      "fp16_wer": [
+        132.6271186440678,
+        107.62711864406779,
+        81.46186440677965,
+        97.5635593220339
+      ]
+    },
+    "Stage 2a ext2": {
+      "steps": [
+        3000,
+        3500,
+        4000,
+        4500,
+        5000
+      ],
+      "fp16_wer": [
+        106.88559322033899,
+        91.41949152542372,
+        96.1864406779661,
+        90.14830508474576,
+        85.80508474576271
+      ]
+    },
+    "Stage 2b (binary rollout)": {
+      "steps": [
+        500,
+        1000,
+        1500,
+        2000
+      ],
+      "fp16_wer": [
+        86.33474576271186,
+        104.97881355932203,
+        80.29661016949152,
+        99.78813559322035
+      ]
+    }
+  },
+  "roadmap": {
+    "stages": [
+      [
+        "Stage 0: baselines & harness",
+        1.0,
+        "#2ca02c",
+        "gate passed 0.2.0"
+      ],
+      [
+        "Stage 1: BitLinear + QAT",
+        0.8,
+        "#1f77b4",
+        "loss controllable; tables emitted; recovery via Stage 2 recipe"
+      ],
+      [
+        "Stage 2: accuracy recovery",
+        0.6,
+        "#ff7f0e",
+        "rollout+anchor: ternary 14.4-16.2 / binary 17.5"
+      ],
+      [
+        "Stage 3: scale to 1.7B",
+        0.0,
+        "#bbbbbb",
+        "not started"
+      ],
+      [
+        "Stage 4: streaming parity (LSP)",
+        0.0,
+        "#bbbbbb",
+        "not started"
+      ],
+      [
+        "Stage 5: edge deployment",
+        0.0,
+        "#bbbbbb",
+        "not started"
+      ],
+      [
+        "Stage 6: evaluation & writeup",
+        0.0,
+        "#bbbbbb",
+        "not started"
+      ]
+    ]
+  }
+}

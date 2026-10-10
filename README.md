@@ -17,7 +17,23 @@ published streaming quality on CPU/edge.
 **Stage 0 gate PASSED (`0.2.0`)** — fp16 baselines reproduced on T4; primary
 metric fp16 anchors locked (streaming 320 ms clean `2.24` / other `4.61`) and
 `X = +1.5` absolute. See [`docs/stage0_results.md`](docs/stage0_results.md).
-Next: Stage 1 (BitLinear + QAT on 0.6B).
+
+**Stage 1/2 (in progress, branch `stage-1`)** — BitLinear + QAT machinery is
+implemented and tested (203 tests); loss controllability proven (ternary QAT
+memorizes exactly). A working recovery recipe was found on the A100 cluster:
+
+| Configuration (50-utt `test-clean`, offline) | WER |
+|---|---:|
+| fp16 pretrained reference | **2.44** |
+| Ternary, all 196 decoder projections | **16.2** (best 14.4) |
+| Binary, all 196 decoder projections | **17.5** |
+| Naive QAT (for comparison) | ~100 |
+
+![WER trajectories](docs/figures/wer_trajectories.png)
+
+Full report, graphs and the future plan: **[`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)**.
+Operating rules for agents/developers: [`rules.md`](rules.md); step-by-step work
+log: [`docs/ACTIVITY_LOG.md`](docs/ACTIVITY_LOG.md).
 
 ## Development
 
@@ -48,7 +64,9 @@ baselines run on GPU hosts, not on the local dev machine.
 src/asr1bit/   # package (quant, bitlinear, replace, data, qwen, train, eval, deploy)
 tests/         # unit tests
 configs/       # run configurations
-docs/          # planning and design docs
+docs/          # planning, design, status reports, figures
+scripts/       # run/launch/plot tooling (incl. PBS launchers)
+rules.md       # operating rules for agents/developers
 ```
 
 ## Versioning

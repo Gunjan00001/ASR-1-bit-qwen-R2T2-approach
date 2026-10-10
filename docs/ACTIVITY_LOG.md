@@ -401,3 +401,21 @@ restarts at 0).
   precision, then streaming (320 ms) evaluation.
 - **Evidence:**
   `artifacts/stage1/stage1_decoder_attn_ffn_bw1.0_gNone_lr5e-05_adamw_delay_ls1_n4000.json`.
+
+### 05:30 — Documentation pass: status report + figures
+
+- **Did:** wrote `scripts/make_plots.py` (reproducible figures from logs +
+  ablation JSONs) and generated five figures in `docs/figures/`:
+  - `wer_trajectories.png` — WER vs step for all main runs (log scale);
+  - `final_wer.png` — final WER per configuration (ternary/binary readouts);
+  - `fp16_drift.png` — fp16 readout degradation during QAT (shadow drift);
+  - `quantizer_error.png` — quantizer audit (binary/ternary, per-tensor/group);
+  - `roadmap.png` — stage-by-stage status.
+- **Also:** new consolidated report `docs/PROJECT_STATUS.md` (WER report,
+  recipe, failures table, reproduce commands, future plan); README status
+  updated with the headline results and the trajectory figure; figure pointers
+  added to `docs/stage1_results.md`; summary data written to
+  `artifacts/stage1/wer_summary.json`.
+- **No training was run in this pass** (documentation only, per request).
+- **Evidence:** `docs/PROJECT_STATUS.md`, `docs/figures/*.png`,
+  `artifacts/stage1/wer_summary.json`.
