@@ -7,36 +7,36 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 03:25 IST)
+## Live status (updated 2026-10-11 04:15 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10788` | **Stage 2a-ext2**: warm-restart, GPU 2, step 2500→5000 | step ~3900/5000 @ 80/min | **ternary 17.5 @3500** (52.8→38→23.1→22.6→21.5→19.4→17.5) | **~35–40 min** |
-| `10789` | **Stage 2b**: binary rollout from the ternary checkpoint | starting | init from ext2 step-3500 | **~40–50 min** |
-| `10780` | Stage 2a attention rollout | **done** | ternary 22.6, fp16 97.6, binary 99.5 | — |
-| `10771` | FFN-only ternary | **done** | ternary **32.8** | — |
-| `10764` | FFN-only binary | **done** | binary **97.9** | — |
-| login node | 8k-utterance cache build | running | — | ~5 min |
+| `10789` | **Stage 2b**: binary rollout from ternary (17.5) | step ~1500/2000 @ ~80/min | binary 51.5 @500 → **38.1 @1000** | **~25–30 min** |
+| `10788` | **Stage 2a-ext2** warm-restart | **done** | **ternary 16.2** (best 14.4 @4500), fp16 85.8 | — |
+| `10780` | Stage 2a attention rollout | **done** | ternary 22.6 | — |
+| `10771` | FFN-only ternary | **done** | ternary 32.8 | — |
+| `10764` | FFN-only binary | **done** | binary 97.9 | — |
+| login node | 8k cache | **done** | 6.6 GB, copied to `/tmp/asr1bit` | — |
 
-**Full attention+FFN ternary trajectory (best result):**
-52.8 → 38.0 → 23.1 → 22.6 → 21.5 → 19.4 → **17.5** at steps 500…3500.
-Recipe: FFN warm start (84 layers) → attention rollout with a frozen-pretrained
-teacher anchor (w=0.1, T=2), lr 5e-5 → warm-restart cosine cycle 2.
+**Headline result (Stage 2a, full attention+FFN ternary, 196 BitLinear):**
+ternary WER **16.2** final / **14.4** best (50-utt test-clean; fp16 baseline
+2.44; naive QAT ≈ 100). Trajectory: 52.8 → 38 → 23.1 → 22.6 → 21.5 → 19.4 →
+17.5 → 17.7 → **14.4** → 16.2 at steps 500…5000.
+Recipe: FFN warm start → attention rollout with a frozen-pretrained teacher
+anchor (w=0.1, T=2), lr 5e-5 → warm-restart cosine cycle 2.
 
-Next: binary rollout (Stage 2b, progressive precision from ternary); 8k cache
-for longer runs.
+**Binary (progressive precision from ternary):** 51.5 @500 → 38.1 @1000,
+still descending — already far better than binary FFN-only (91.9 best).
 
-**GPU-switch rule in action (R1, twice):** Stage 2a resumed from GPU 6
-(contended) to GPU 7 → 97 steps/min. The extension (`10785`, GPU 6) was resumed
-as `10788` on GPU 2 → 80 steps/min. Both slow originals were killed. The
-`--resume` LR fix is verified in both resumes (`lr schedule advanced to step …`).
+**GPU-switch rule (R1) exercised 3×:** all slow jobs were resumed on freer GPUs
+and killed instead of waiting (GPU 6→7, 6→2, 6→7). `--resume` LR fix verified.
 
-**Session-cgroup rule:** do not load model + checkpoint in the 32 GB interactive
-session; it OOM-kills silently (log just stops). Use batch jobs (rules.md R5).
+**Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
+session (OOM kills silently). Batch jobs only (rules.md R5).
 
 **Resume rule:** `--resume` continues the same run (advances the LR schedule and
 step counter); `--init-from` loads weights for a new phase (step counter
-restarts at 0). Never resume without the LR-schedule advance.
+restarts at 0).
 
 ---
 
@@ -362,3 +362,22 @@ restarts at 0). Never resume without the LR-schedule advance.
   17.5 is a strong start.
 - **Evidence:** `artifacts/stage1/qat_binary_rollout.log`,
   `artifacts/stage1/build_qat_cache_8k.log`.
+
+### 04:10 — Stage 2a complete: 16.2 WER full attention+FFN ternary (headline)
+
+- **Did:** finished ext2 (step 5000) and collected the final ablations.
+- **Result (50-utt test-clean):** pretrained 2.44; **fp16 85.8; binary 99.9;
+  ternary 16.2** (best 14.4 @4500; CER 8.4). Full trajectory:
+  52.8 → 38.0 → 23.1 → 22.6 → 21.5 → 19.4 → 17.5 → 17.7 → **14.4** → 16.2.
+- **Why it matters:** **all 196 decoder projections quantized to ternary** —
+  the exact configuration that collapsed to ~100 WER with naive QAT — now
+  reaches 14–16 WER. Recipe: FFN warm start → attention rollout with a
+  frozen-pretrained-teacher anchor (w=0.1, T=2) at lr 5e-5 → warm-restart
+  cosine cycle 2.
+- **Binary (Stage 2b, progressive precision from the ternary checkpoint):**
+  51.5 @500 → 38.1 @1000, still descending; far better than binary FFN-only
+  (best 91.9).
+- **8k cache ready:** `data/qat_clean_train.100_n8000.pt` (6.6 GB) + copy on
+  `/tmp/asr1bit` for longer runs.
+- **Evidence:**
+  `artifacts/stage1/stage1_decoder_attn_ffn_bw1.58_gNone_lr2.5e-05_adamw_delay_ls1_n4000.json`.
