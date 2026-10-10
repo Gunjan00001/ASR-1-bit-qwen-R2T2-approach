@@ -110,15 +110,22 @@ def set_precision(model, bit_width: float, alpha: float) -> None:
             module.alpha = alpha
 
 
-def evaluate_precisions(wrapper, model, utterances, n, *, bit_width: float = 1.0, both: bool = True) -> dict:
+def evaluate_precisions(
+    wrapper, model, utterances, n, *, bit_width: float = 1.0, both: bool = True,
+    include_fp16: bool = False,
+) -> dict:
     """WER at alpha=1 for binary and/or ternary (used for periodic/zero-shot).
 
     With ``both=False`` only the training precision (``bit_width``) is scored,
-    halving eval time on long runs.
+    halving eval time on long runs. ``include_fp16`` adds the alpha=0 readout,
+    which detects shadow drift during QAT.
     """
     model.eval()
     results: dict = {}
     with torch.no_grad():
+        if include_fp16:
+            set_precision(model, 1.0, 0.0)
+            results["fp16"] = evaluate(wrapper, utterances, n)
         if both or bit_width == 1.0:
             set_precision(model, 1.0, 1.0)
             results["binary"] = evaluate(wrapper, utterances, n)
@@ -209,6 +216,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--zero-shot", type=int, default=0, help="Evaluate alpha=1 without training")
     p.add_argument("--eval-every", type=int, default=0, help="WER eval interval during training (0=off)")
     p.add_argument("--eval-both", type=int, default=1, help="1 = score binary and ternary at evals; 0 = training precision only.")
+    p.add_argument("--eval-fp16", type=int, default=0, help="1 = also score the alpha=0 readout at periodic evals (shadow drift).")
     p.add_argument("--learnable-scale", type=int, default=0,
                    help="BitNet b1.58-style learnable per-tensor/group dequantization gain.")
     p.add_argument("--lr-schedule", choices=["const", "cosine"], default="const")
@@ -407,8 +415,10 @@ def main() -> int:
             prec = evaluate_precisions(
                 wrapper, model, eval_utts, args.eval_n,
                 bit_width=args.bit_width, both=bool(args.eval_both),
+                include_fp16=bool(args.eval_fp16),
             )
             ev = {"step": step + 1, "alpha": alpha,
+                  "fp16_wer": prec["fp16"]["wer"] if "fp16" in prec else None,
                   "binary_wer": prec["binary"]["wer"] if "binary" in prec else None,
                   "ternary_wer": prec["ternary"]["wer"] if "ternary" in prec else None}
             history.append(ev)
