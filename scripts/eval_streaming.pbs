@@ -1,0 +1,72 @@
+#!/bin/bash
+#PBS -N asr1bit-streaming-eval
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=48gb
+#PBS -l walltime=04:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/streaming_eval.out
+#
+# Stage 1 primary metric: streaming 320 ms evaluation of the best quantized
+# checkpoints (binary long2 11.1, ternary long 11.4), with the fp16 readout
+# measured on the same 50-utt sample for the exact +X comparison.
+# Submit: qsub scripts/eval_streaming.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage1/eval_streaming.log"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-0.6B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
+else
+  MODEL=Qwen/Qwen3-ASR-0.6B
+fi
+
+# Least-utilized GPU with >= ~25 GiB free (inference only).
+PICK=$(nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits \
+  | awk -F', ' '$2 < 55000 {print $3+0, $2+0, $1}' | sort -n | head -1 | awk '{print $3}')
+if [ -z "$PICK" ]; then
+  PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
+    | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
+fi
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+echo "=== binary long2 (11.1 WER) ===" | tee -a "$LOG"
+"$PY" scripts/eval_streaming.py \
+  --model "$MODEL" \
+  --checkpoint data/checkpoints/qat_binary_long2/last.pt \
+  --policy decoder_attn_ffn \
+  --bit-width 1.0 \
+  --chunk-ms 320 \
+  --n 50 \
+  --max-new-tokens 32 \
+  --out artifacts/stage1/streaming_binary_long2.json \
+  2>&1 | tee -a "$LOG"
+
+echo "=== ternary long (11.4 WER) ===" | tee -a "$LOG"
+"$PY" scripts/eval_streaming.py \
+  --model "$MODEL" \
+  --checkpoint data/checkpoints/qat_ternary_long/last.pt \
+  --policy decoder_attn_ffn \
+  --bit-width 1.58 \
+  --chunk-ms 320 \
+  --n 50 \
+  --max-new-tokens 32 \
+  --out artifacts/stage1/streaming_ternary_long.json \
+  2>&1 | tee -a "$LOG"
