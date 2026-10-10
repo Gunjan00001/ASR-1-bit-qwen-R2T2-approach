@@ -7,35 +7,38 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 04:45 IST)
+## Live status (updated 2026-10-11 05:20 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10813` | **Ternary long2**: from 11.4, lr 1e-5, 4000 steps (GPU 6) | step ~1000/4000 @ ~90/min | **11.1 @500** (no transient this time) | **~1 h 10 m** |
-| `10815` | **Binary long3**: from 11.1, lr 5e-6, 3000 steps (GPU 2) | step ~1000/3000 @ ~85/min | 12.2 @500 (fresh-cycle dip, expected) | **~55 m** |
-| `10816` | **Streaming 320 ms eval** (primary metric): binary long2 + ternary long checkpoints, fp16 + quantized (GPU 5) | running | first WER pending | **~30–90 m** |
+| `10813` | **Ternary long2**: from 11.4, lr 1e-5, 4000 steps (GPU 6) | step ~3500/4000 @ ~90/min | 10.4 @2000 → 9.7 @2500 → **9.6 @3000** | **~20 m** |
+| `10821` | **Streaming 320 ms eval** (primary metric, GPU 7 pinned) | running | first WER pending | **~1–2 h** |
+| `10815` | **Binary long3** | **done** | **10.7 final** (CER 4.6), fp16 31.7 | — |
 | `10812` | persistent GPU session (new) | — | — | — |
 
 **Best results (50-utt test-clean offline; fp16 baseline 2.44; naive ≈ 100):**
 
 | Configuration | WER |
 |---|---|
-| Binary, all 196 decoder projections (8k, long2) | **11.1** |
-| Ternary, all 196 decoder projections (8k) | **11.4** (best 10.6) |
+| Ternary, all 196 decoder projections (8k, long2) | **9.6** (in progress) |
+| Binary, all 196 decoder projections (8k, long3) | **10.7** |
+| Previous bests | ternary 10.6/11.4; binary 11.1 |
 | FFN-only ternary | 25.7 best / 32.8 final |
 | Naive attn+FFN | ~98–108 |
 
-**New:** `scripts/eval_streaming.py` evaluates the **streaming 320 ms** primary
-metric with the portable streamer (fp16 and quantized on the same 50 utts), so
-the `+X` comparison against the Stage 0 fp16 streaming baselines (2.24 / 4.61)
-is exact. Running as job `10816`.
+**Binary long3 trajectory:** 12.2 → 12.1 → 11.0 → 11.2 → 11.3 → 11.2 → **10.7**
+(final). The fp16 readout keeps improving with each continuation
+(99.8 → 37.2 → 36.2 → **31.7**) — shadow drift is being tamed.
+
+**New:** streaming 320 ms evaluation (`scripts/eval_streaming.py`, job `10821`)
+on the binary long2 and ternary long checkpoints; fp16 and quantized readouts on
+the same 50 utts → exact `+X` vs the Stage 0 fp16 streaming baselines
+(2.24 / 4.61). Pinned to GPU 7 via `EVAL_GPU` (the utilization-based picker is
+noisy; 3-sample averaging added).
 
 **Reading the continuations:** a fresh cosine cycle perturbs the checkpoint for
-the first ~2 000 steps, then descends past the previous best as the LR decays —
-do not panic at the transient. A gentler lr (1e-5) avoids most of the transient.
-
-**GPU-switch rule (R1):** raced jobs are killed and resubmitted until they land
-on distinct GPUs. No sharing/waiting.
+the first ~2 000 steps, then descends past the previous best as the LR decays.
+A gentler lr (1e-5) avoids most of the transient.
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
@@ -510,3 +513,16 @@ restarts at 0).
     expected to recover.
 - **Evidence:** `artifacts/stage1/eval_streaming.log`,
   `artifacts/stage1/qat_ternary_long2.log`, `qat_binary_long3.log`.
+
+### 05:20 — Binary long3 final 10.7; ternary long2 at 9.6 (best yet)
+
+- **Result (50-utt test-clean; pretrained 2.44):**
+  - binary long3 (from 11.1, lr 5e-6, 3 000 steps): **10.7 final**, CER 4.6,
+    fp16 readout 31.7 (drift keeps shrinking: 99.8 → 37.2 → 36.2 → 31.7);
+  - ternary long2 (in progress): 10.4 @2000 → 9.7 @2500 → **9.6 @3000**.
+- **New bests:** ternary **9.6** (was 10.6), binary **10.7** (was 11.1).
+- **Streaming eval:** first two attempts picked a noisy/busy GPU; added
+  3-sample utilization averaging and an `EVAL_GPU` override; pinned to GPU 7
+  (`10821`).
+- **Evidence:** `stage1_decoder_attn_ffn_bw1.0_gNone_lr5e-06_..._n8000.json`,
+  `qat_ternary_long2.log`.
