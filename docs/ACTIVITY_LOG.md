@@ -7,21 +7,21 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 06:15 IST)
+## Live status (updated 2026-10-11 07:05 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10795` | **Ternary long**: 8k cache, 8000 steps, anchor w=0.05 (GPU 6) | step ~1000/8000 @ ~90/min | first eval pending | **~2 h** |
-| `10798` | **Binary long**: 8k cache, 6000 steps, anchor w=0.05 (GPU 2) | step ~1000/6000 @ ~85/min | first eval pending | **~1 h 30 m** |
+| `10795` | **Ternary long (aggressive)**: 8k, 8000 steps, lr 2.5e-5, w=0.05 (GPU 6) | step ~2900/8000 @ ~90/min | 24.8 @1000 → 24.5 @2000 (transient, below 16.2 start — watching) | **~1 h 30 m** |
+| `10798` | **Binary long**: 8k, 6000 steps, lr 2e-5, w=0.05 (GPU 2) | step ~2700/6000 @ ~85/min | 23.3 @1000 → **19.9 @2000** (recovering from 17.5 start) | **~1 h** |
+| `10799` | **Ternary gentle hedge**: 8k, 4000 steps, lr 1e-5, w=0.1 (GPU 7) | starting | — | **~1 h 30 m** |
 | `10708` | persistent GPU session | — | — | ends ~07:15 IST |
 
-Both runs continue the best checkpoints (ternary 16.2/14.4 from step 5000;
-binary 17.5 from step 2000) on the 8k-utterance cache with a fresh long cosine
-cycle and a halved anchor (w=0.05).
-
-**GPU-switch rule (R1) exercised again:** both first submissions raced and
-picked GPU 6; the binary job was killed and resubmitted, picking GPU 2 — no
-waiting, no sharing.
+**Reading the long runs:** the aggressive ternary run's fresh cosine cycle
+(lr 2.5e-5) perturbed the 16.2 model; 2000 steps have not recovered it yet.
+The binary run dipped (17.5→23.3) and is recovering (19.9). The **gentle hedge**
+starts from the same 16.2 checkpoint with lr 1e-5 and the original anchor (0.1)
+to preserve/improve it in parallel. Nothing is lost: all previous best
+checkpoints remain on disk.
 
 **Headline results so far (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
 
@@ -435,3 +435,17 @@ restarts at 0).
 - **ETA:** ternary ~2 h; binary ~1 h 30 m.
 - **Evidence:** `artifacts/stage1/qat_ternary_long.log`,
   `artifacts/stage1/qat_binary_long.log`.
+
+### 07:00 — Long-run check-in + gentle ternary hedge
+
+- **Ternary long @2000:** 24.8 → 24.5 — the fresh lr 2.5e-5 cosine cycle
+  perturbed the 16.2 checkpoint and has not recovered after 2000 steps.
+  fp16 readout improved (56.7 → 46.4), i.e. much less shadow drift than the
+  earlier runs (85–100) — the lower lr/anchor helps the fp path.
+- **Binary long @2000:** 23.3 → **19.9** — recovering from the 17.5 start.
+- **Action (hedge):** launched `10799` **gentle ternary** (GPU 7): same ext2
+  checkpoint, lr 1e-5, anchor back to 0.1, 8k cache, 4 000 steps, eval every
+  500 — a parallel path that preserves/improves 16.2 without the aggressive
+  perturbation. All best checkpoints remain on disk, so nothing is at risk.
+- **Evidence:** eval lines in `qat_ternary_long.log`, `qat_binary_long.log`,
+  `qat_ternary_gentle.log`.
