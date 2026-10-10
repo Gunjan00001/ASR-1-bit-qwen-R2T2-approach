@@ -350,3 +350,42 @@ environmental, not model bugs):
   fixed 50-utt test-clean eval every 500 steps, shadow checkpoints every 500.
 - **Artifacts:** `artifacts/stage1/diag_generation_decoder_attn_bw1.0_steps600.json`,
   `..._bw1.58_steps600.json`, `artifacts/stage1/qat_ternary_attnffn_ls.log`.
+
+---
+
+## 2026-10-10 — Real-data QAT on A100: naive and distillation both fail to recover
+
+- **Did:** two full QAT runs on the 4k-utt `train.clean.100` cache, ternary,
+  `decoder_attn_ffn` (196 BitLinear), log-parameterized learnable scales,
+  lr 2e-4, 100-step warmup + cosine, 5 % fp warmup then α=1, fixed 50-utt
+  test-clean eval every 500–1000 steps:
+  (1) naive, 6 000 steps, batch 4;
+  (2) self-distillation (`--distill-weight 0.5`, T=2, teacher = same shadows at
+  α=0), 4 000 steps, batch 2.
+- **Result:**
+  - naive periodic ternary WER: 127 → 121.6 → **96.5** → 96.9 → 103.5;
+    final fp16 readout **113.1**, binary 99.8, ternary 107.8.
+  - distill periodic: 114.6 → 125.0 → 111.3 → **98.1**;
+    final fp16 readout **108.3**, binary 118.3, ternary 98.1.
+  - Reference: pretrained fp16 **2.44**; zero-shot naive ternary ≈ 100.
+  - Distillation KL to the fp teacher: ~0.4–0.6 (low) yet generation WER ~100
+    — the asymmetric KL is satisfied by a diffuse student; it does not imply
+    matching argmax trajectories.
+- **What failed:** no recovery (WER ≈ zero-shot), and the **fp16 readout
+  itself collapses** (2.44 → ~110) after 4–6 k steps at lr 2e-4. The earlier T4
+  runs at lr 1e-5 kept the fp readout clean, so this is a budget/lr effect, not
+  a harness bug.
+- **Why (leading explanation):** the per-tensor ternary sign bottleneck
+  (~52 % weight error) is too coarse for post-hoc conversion of a 0.6 B model
+  with 4 k utterances; the optimizer's only path is to drift the latent weights
+  into a degenerate basin (WER > 100 ⇒ repetitive/empty generations). A moving
+  self-teacher cannot prevent this because it drifts with the student.
+- **Chose:** Stage 2 needs an **anchored** recovery: KL to a *frozen* fp copy of
+  the pretrained model (not the moving self-teacher), co-training / stochastic
+  precision, lower shadow lr or an explicit drift penalty, and more data.
+  The FFN-only ablation (running) sizes the recoverable quantization surface.
+- **Next:** collect FFN-only results and checkpoint generations
+  (`scripts/inspect_checkpoint.py`); design the anchored-distillation run.
+- **Artifacts:** `artifacts/stage1/stage1_decoder_attn_ffn_*.json`,
+  `artifacts/stage1/qat_ternary_attnffn_ls2.log`,
+  `artifacts/stage1/qat_ternary_distill.log`.

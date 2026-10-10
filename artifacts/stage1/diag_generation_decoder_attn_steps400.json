@@ -1,0 +1,102 @@
+{
+  "utterance_id": "2277-149896-0004",
+  "label": "HOW WOULD THE PAPERS TALK ABOUT IT",
+  "conditions": [
+    {
+      "condition": "fp16_control",
+      "bit_width": 1.0,
+      "alpha": 0.0,
+      "quantized_effective_weight_changed": false,
+      "weight_norms": [],
+      "loss": 3.67126202583313,
+      "token_accuracy": 0.75,
+      "teacher_forced_text": "language wouldOULD THE PAPERS TALK ABOUT IT?",
+      "label_text": "HOW WOULD THE PAPERS TALK ABOUT IT",
+      "greedy_text": "How would the papers talk about it?"
+    },
+    {
+      "condition": "fp16_after_replace",
+      "bit_width": 1.0,
+      "alpha": 0.0,
+      "quantized_effective_weight_changed": false,
+      "weight_norms": [
+        [
+          39.181392669677734,
+          39.181392669677734,
+          0.0
+        ],
+        [
+          26.992324829101562,
+          26.992324829101562,
+          0.0
+        ],
+        [
+          23.59772300720215,
+          23.59772300720215,
+          0.0
+        ]
+      ],
+      "loss": 3.67126202583313,
+      "token_accuracy": 0.75,
+      "teacher_forced_text": "language wouldOULD THE PAPERS TALK ABOUT IT?",
+      "label_text": "HOW WOULD THE PAPERS TALK ABOUT IT",
+      "greedy_text": "How would the papers talk about it?"
+    },
+    {
+      "condition": "binary_naive",
+      "bit_width": 1.0,
+      "alpha": 1.0,
+      "quantized_effective_weight_changed": true,
+      "weight_norms": [
+        [
+          39.181392669677734,
+          29.479747772216797,
+          25.809436798095703
+        ],
+        [
+          26.992324829101562,
+          20.571325302124023,
+          17.47589111328125
+        ],
+        [
+          23.59772300720215,
+          18.498779296875,
+          14.650948524475098
+        ]
+      ],
+      "loss": 18.25965690612793,
+      "token_accuracy": 0.0,
+      "teacher_forced_text": "\u793a\u793aIDEIDE\u5229\u793a\u793a\u793a\u793a\u793a\u793a\u793a",
+      "label_text": "HOW WOULD THE PAPERS TALK ABOUT IT",
+      "greedy_text": "\u793a\u793a\u793a\u793a\u793a\u540c\u793a\u793a\u7684\u58f0\u793a\u5e03\u540c\u540c\u793a\u793a\u540c\u793a\u793a\u540c\u793a\u793a\u540c\u793a\u793a\u793a\u793a\u793a\u793a\u9634\u793a\u793a\u793a\u793a\u793a\u793a\u793a\u5408\u4f5c\u793a\u793a\u793a\u793a\u793a\u540c\u793a\u793a\u793a\u540c\u540c\u793a\u540c\u540c\u793a\u793a\u793a\u793a\u793a\u793a\u793a\u793a\u793a\u793a\u793a\u793a"
+    },
+    {
+      "condition": "binary_trained",
+      "bit_width": 1.0,
+      "alpha": 1.0,
+      "quantized_effective_weight_changed": true,
+      "weight_norms": [
+        [
+          39.193119049072266,
+          30.79986572265625,
+          25.83910369873047
+        ],
+        [
+          27.00258445739746,
+          19.09263801574707,
+          17.54256820678711
+        ],
+        [
+          23.611574172973633,
+          20.028526306152344,
+          14.734505653381348
+        ]
+      ],
+      "loss": 5.110095977783203,
+      "token_accuracy": 0.0833333358168602,
+      "teacher_forced_text": "EDEDEDEDEDEDED HERED",
+      "label_text": "HOW WOULD THE PAPERS TALK ABOUT IT",
+      "greedy_text": "EDED"
+    }
+  ]
+}

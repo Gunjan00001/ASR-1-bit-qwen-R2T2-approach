@@ -77,33 +77,33 @@
       "quantized_effective_weight_changed": true,
       "weight_norms": [
         [
-          41.79825210571289,
-          42.992652893066406,
-          29.183935165405273
+          40.39499282836914,
+          29.30333709716797,
+          26.317352294921875
         ],
         [
-          28.914630889892578,
-          31.915151596069336,
-          20.729639053344727
+          27.832015991210938,
+          20.447994232177734,
+          17.881887435913086
         ],
         [
-          26.455753326416016,
-          14.6502685546875,
-          17.343767166137695
+          24.693893432617188,
+          18.387771606445312,
+          15.245403289794922
         ]
       ],
-      "loss": 2.817671775817871,
+      "loss": 6.457459449768066,
       "token_accuracy": 0.1111111119389534,
-      "teacher_forced_text": " THE THE THE THE THE THE THE THE THE THE THE THE THE THE THE THE THE THE",
+      "teacher_forced_text": " THE THE THE THE THE THE THE THE THE THE THE THE THE THE BUT BUT BUTYS",
       "label_text": "THE LADY IS NOT THE MOTHER OF THE BOYS BUT THEIR AUNT",
-      "greedy_text": "THE THE"
+      "greedy_text": "THE THE THE THE THE THE THE THE THE THE THE THE THE THE BUT BUT BUTYS BUT BUT BUT BUT BUT BUT BUT BUT BUT BUTYSYSYS BUT BUT THEIR THE THE THE THE THE THE THE THE THE THE BUT THEIR THE THE THE THE BUT A A THEIR BUT BUT BUT BUT BUTYSYSYSYSYS"
     }
   ],
-  "total_sign_flips": 71329564,
+  "total_sign_flips": 32329465,
   "final_scale_stats": {
-    "scale_min": -0.019423814490437508,
-    "scale_mean": 0.018768969923257828,
-    "scale_max": 0.0568205751478672,
-    "shadow_abs_mean": 0.021146832033991814
+    "scale_min": 0.014440443366765976,
+    "scale_mean": 0.01770956441760063,
+    "scale_max": 0.02210088260471821,
+    "shadow_abs_mean": 0.018650835379958153
   }
 }

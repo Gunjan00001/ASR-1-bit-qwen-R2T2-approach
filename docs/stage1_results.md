@@ -167,3 +167,109 @@ Artifacts: `artifacts/stage1/diag_generation_decoder_attn_steps0.json`,
 2. Revisit the quantizer math (per-tensor centered-sign; scale granularity).
 3. Finish trigger isolation (grad-ckpt → activation quant).
 4. `0.3.0` stays untagged until the Stage 1 gate is genuinely met.
+
+---
+
+# Stage 1 results — A100 session (2026-10-10)
+
+Environment: JIIT cluster, `jiit-gpu01`, 8 × A100-80GB (shared, PBS `gpu`
+queue), python 3.13.12, **torch 2.11.0+cu126, transformers 4.57.6,
+qwen-asr 0.0.6**, numpy 2.5.3. Model fp32; all QAT-only (BitLinear shadows +
+learnable scales trainable, 440M params for `decoder_attn_ffn`).
+
+## Infrastructure fixes (see `docs/LAB_NOTES.md`)
+
+- **Fast tokenizer** (`scripts/install_fast_tokenizer.py`): checkpoints ship no
+  `tokenizer.json`; the slow Python tokenizer rebuild looked like a hang
+  (multi-minute stalls under cluster FS/CPU contention). 11.6 s full load after.
+- **Streaming data** (`scripts/build_qat_cache.py --stream 1`, run on the login
+  node): the non-streaming `datasets` load blew the 32 GB PBS cgroup
+  (`oom-kill` in dmesg). Cache: 4 000 utterances `train.clean.100`, 14.5 h
+  audio, mean 13.0 s/utt, 3.34 GB.
+- **Node-local staging** of conda/model/cache on `/tmp` for fast startup.
+
+## Quantizer audit (`scripts/diag_quant_error.py`)
+
+Relative Frobenius error `||Q(W)-W||/||W||` over all 196 decoder projections
+(released checkpoint, fp32):
+
+| config | avg | note |
+|---|---|---|
+| binary, per-tensor | **0.648** | closed form ≈ 0.60 for Gaussian weights |
+| ternary, per-tensor | 0.565 | |
+| binary, group 64/128 | 0.616 / 0.614 | sign pattern dominates |
+| ternary, group 64/128 | 0.519 / 0.522 | |
+
+**Verdict:** quantizer math is correct; the earlier single-projection collapse
+(WER 100) is inherent naive 1-bit behaviour, not a harness bug.
+
+## Loss controllability (single-utterance memorization, 600 steps, lr 1e-3)
+
+| condition | naive loss | trained loss | token acc | greedy |
+|---|---|---|---|---|
+| α=0 fp control | 2.225 | **0.000** (step 300) | 1.000 | exact |
+| binary α=1 | 18.49 | 2.818 (step 600) | 0.111 | "THE THE" |
+| ternary α=1 | 11.63 | **0.000** (step 300) | 1.000 | exact label |
+
+**Ternary QAT is fully controllable** — the quantized model can memorize
+through `Q(W)`. Binary lags (loss 2.8), consistent with the literature.
+
+## Real-data QAT runs (4 000 train.100 utts, fixed 50-utt test-clean eval)
+
+Config: ternary, `decoder_attn_ffn`, learnable **log-parameterized** scales
+(first run showed gamma collapsing to ~0 / going negative with a free
+parameter — fixed), lr 2e-4, 100-step warmup, cosine, batch 4 (distill: 2),
+5 % fp warmup then α=1, lazy collation, shadow checkpoints.
+
+| run | steps | periodic ternary WER | final fp16 readout | final binary | final ternary |
+|---|---|---|---|---|---|
+| naive (v1, free gamma) | 3 000 | 93.6 @500 → 232.9 @1000 (killed) | — | — | — |
+| naive (v2, log gamma) | 6 000 | 127 → 121.6 → **96.5** → 96.9 → 103.5 | **113.1** | 99.8 | 107.8 |
+| self-distillation (w=0.5, T=2) | 4 000 | 114.6 → 125.0 → 111.3 → **98.1** | **108.3** | 118.3 | 98.1 |
+| FFN-only (running) | 3 000 | see `qat_ternary_ffn.log` | — | — | — |
+
+Reference: pretrained fp16 = **2.44** WER (50-utt subsample); zero-shot naive
+ternary ≈ 100.
+
+## Findings (2026-10-10)
+
+1. **Naive and self-distillation QAT both fail to recover** at this scale/budget:
+   ternary WER plateaus at ~98–108, no better than zero-shot (~100), while the
+   teacher-forced loss descends (18.9 → ~4.5–6).
+2. **The fp16 readout degrades** (2.44 → ~108–113) after 4–6 k steps at
+   lr 2e-4 — the shadows drift far from the pretrained basin (unlike the
+   earlier T4 runs at lr 1e-5, which kept the fp readout clean). Training at
+   this lr is *destructive*: the optimizer follows the quantized loss into a
+   degenerate solution (periodic WER > 100 suggests repetitive/empty
+   generations; checkpoint inspection artifact pending).
+3. Self-distillation lowers the KL to the fp teacher (~0.4–0.6) and speeds the
+   CE descent, but the fp teacher is the same drifting shadows, so it does not
+   prevent the collapse.
+4. Learnable scales must be **positive by construction**: the first run showed
+   a layer's gamma at −0.004 and others collapsed ~10×; log-parameterization
+   (`gamma = exp(log_scale)`) fixed the pathology (gamma stays ~0.014–0.036).
+5. Gamma stats in the runner show the scales staying healthy in v2 — the
+   failure is not a scale collapse.
+
+## Interpretation
+
+Post-hoc ternary conversion of a 0.6 B ASR model by QAT on 4 k utterances is in
+the **destructive regime**: the sign bottleneck (per-tensor ternary, ~52 %
+weight error) is too coarse for this model size, and the optimizer's only
+escape is to drift the latent weights into a degenerate basin. This matches the
+plan's premise: naive QAT is not enough; the Stage 2 recovery stack (on-policy
+distillation with a *fixed* fp teacher, co-training/stochastic precision,
+trust-region anchoring, more data) is required. The FFN-only ablation tests
+whether keeping attention fp is a viable shortcut.
+
+## Next steps (Stage 2 priorities)
+
+1. **Anchor training to the pretrained model** (KL to a frozen fp copy / low lr
+   for shadows / per-step drift penalty) so the fp readout cannot collapse.
+2. **FFN-only vs attn+ffn**: pick the largest recoverable quantization surface
+   from the running ablation.
+3. **Co-training / stochastic precision**: alternate fp and quantized steps so
+   the fp path remains strong.
+4. Only then extend training time and data.
+5. `0.3.0` stays untagged: the gate's "WER table emitted" is satisfied, but
+   the recovery evidence is negative; keep Stage 1 open.
