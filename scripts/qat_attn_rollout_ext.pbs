@@ -1,0 +1,82 @@
+#!/bin/bash
+#PBS -N asr1bit-qat-rollout-ext
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=48gb
+#PBS -l walltime=04:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/qat_rollout_ext.out
+#
+# Stage 2a extension — warm restart from the step-2000 rollout checkpoint with a
+# second cosine cycle (lr 2.5e-5 -> 0 over 5000 steps). The first cycle
+# plateaued at ternary 22.6 as the LR reached 0; this continues the descent.
+# Submit: qsub scripts/qat_attn_rollout_ext.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage1/qat_attn_rollout_ext.log"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-0.6B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
+else
+  MODEL=Qwen/Qwen3-ASR-0.6B
+fi
+if [ -f /tmp/asr1bit/qat_clean_train.100_n4000.pt ]; then
+  CACHE=/tmp/asr1bit/qat_clean_train.100_n4000.pt
+else
+  CACHE="$ROOT/data/qat_clean_train.100_n4000.pt"
+fi
+
+# Least-utilized GPU with >= ~35 GiB free (student + frozen teacher).
+PICK=$(nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits \
+  | awk -F', ' '$2 < 45000 {print $3+0, $2+0, $1}' | sort -n | head -1 | awk '{print $3}')
+if [ -z "$PICK" ]; then
+  PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
+    | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
+fi
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+"$PY" scripts/run_stage1_qat.py \
+  --model "$MODEL" \
+  --policy decoder_attn_ffn \
+  --bit-width 1.58 \
+  --learnable-scale 1 \
+  --resume data/checkpoints/qat_attn_rollout_g7/last.pt \
+  --steps 5000 \
+  --train-cache "$CACHE" \
+  --train-n 4000 \
+  --eval-n 50 \
+  --eval-every 500 \
+  --eval-both 0 \
+  --eval-fp16 1 \
+  --lr 2.5e-5 \
+  --warmup-steps 100 \
+  --lr-schedule cosine \
+  --batch-size 2 \
+  --max-new-tokens 128 \
+  --alpha-mode delay \
+  --alpha-warmup-frac 0.05 \
+  --distill-weight 0.1 \
+  --distill-temp 2.0 \
+  --frozen-teacher 1 \
+  --lazy-collate 1 \
+  --save-dir data/checkpoints/qat_attn_rollout_ext \
+  --save-every 500 \
+  --out artifacts/stage1 \
+  2>&1 | tee -a "$LOG"
