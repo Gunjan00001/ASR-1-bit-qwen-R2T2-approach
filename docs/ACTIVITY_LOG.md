@@ -7,12 +7,12 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-10 23:30 IST)
+## Live status (updated 2026-10-10 23:45 IST)
 
 | Job | What | Progress | Result so far | ETA |
 |---|---|---|---|---|
-| `10771` | FFN-only **ternary** QAT resumed from step 2000 (4 cpus, best GPU) | starting | WER 118 → 84 → 42 → **25.7** (step 2000) | **~35–45 min** |
-| `10764` | FFN-only **binary** QAT (3 000 steps) | step ~1550/3000 | 97.0 @500 → 387.3 @1000 → **100.6 @1500** (transient regression, recovering) | **~40–50 min** |
+| `10771` | FFN-only **ternary** QAT resumed from step 2000 (4 cpus, GPU 5) | step ~2470/3000 @ ~80 steps/min | WER 118 → 84 → 42 → **25.7** (step 2000) | **~25–30 min** (2 evals + final ablations) |
+| `10764` | FFN-only **binary** QAT (3 000 steps) | step ~2100/3000 @ ~117 steps/min | 97.0 @500 → 387.3 @1000 → 100.6 @1500 | **~30–35 min** (2 evals + final ablations) |
 | `10708` | persistent GPU session (`gpu-send`) | — | — | ends ~04:00 IST (12 h walltime) |
 
 Next queued after these: Stage 2 design — add attention back incrementally with
