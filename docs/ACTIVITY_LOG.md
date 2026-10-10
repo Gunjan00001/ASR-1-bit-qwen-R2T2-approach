@@ -7,21 +7,25 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-10 23:45 IST)
+## Live status (updated 2026-10-11 00:05 IST)
 
 | Job | What | Progress | Result so far | ETA |
 |---|---|---|---|---|
-| `10771` | FFN-only **ternary** QAT resumed from step 2000 (4 cpus, GPU 5) | step ~2470/3000 @ ~80 steps/min | WER 118 → 84 → 42 → **25.7** (step 2000) | **~25–30 min** (2 evals + final ablations) |
-| `10764` | FFN-only **binary** QAT (3 000 steps) | step ~2100/3000 @ ~117 steps/min | 97.0 @500 → 387.3 @1000 → 100.6 @1500 | **~30–35 min** (2 evals + final ablations) |
-| `10708` | persistent GPU session (`gpu-send`) | — | — | ends ~04:00 IST (12 h walltime) |
+| `10771` | FFN-only **ternary** resume (2000→3000) | step ~2900/3000 @ 80/min | 25.7 @2000 → 42.8 @2500 (LR-restart artifact) | **~15 min** (final eval + ablations) |
+| `10764` | FFN-only **binary** (3000 steps) | step ~2600/3000 @ 117/min | 97.0 → 387 → 100.6 → 93.9 → 91.9 | **~15–20 min** |
+| `10776` | **Stage 2a**: attention rollout + frozen anchor w=0.1 | queued | — | starts when a slot frees; run **~50–70 min** |
+| `10708` | persistent GPU session | — | — | ends ~04:00 IST |
 
-Next queued after these: Stage 2 design — add attention back incrementally with
-a small anchored KL (≤0.1) or per-layer rollout, co-training/stochastic
-precision.
+Next queued after these: co-training / stochastic precision if the small anchor
+is not enough.
 
 **Session-cgroup rule (learned the hard way):** do not load model + checkpoint
 in the 32 GB interactive session; it OOM-kills silently (log just stops). Use
 batch jobs for anything heavier than a small probe. See `rules.md` R5.
+
+**Resume rule:** `--resume` continues the same run (advances the LR schedule and
+step counter); `--init-from` loads weights for a new phase (step counter
+restarts at 0). Never resume without the LR-schedule advance.
 
 ---
 
@@ -233,3 +237,32 @@ batch jobs for anything heavier than a small probe. See `rules.md` R5.
   picks the least-utilized GPU. Rule recorded: heavy loads never run in the
   interactive session (rules.md R5).
 - **Evidence:** `dmesg` OOM record; job `10771`; `qat_ternary_ffn_resume.log`.
+
+### 23:50 — Resume LR-schedule bug found and fixed
+
+- **Failure:** the resumed run's step-2500 eval gave ternary WER **42.8** vs
+  **25.7** at step 2000 (the checkpoint it resumed from) — the resume made the
+  model *worse*.
+- **Cause:** `scheduler.step()` restarts from 0 in the new process, so the
+  cosine schedule re-applied a **fresh high LR (~1.9e-4)** to a converged
+  checkpoint instead of the decaying tail (~1.4e-5). The high LR disturbed the
+  adapted shadows.
+- **Fix:** on `--resume`, set `scheduler.last_epoch = start_step` so the
+  schedule continues at the right position. Also added `--init-from <ckpt>` to
+  load shadows for a **new phase** without advancing the step counter (needed
+  for Stage 2 rollouts).
+- **Evidence:** `qat_ternary_ffn_resume.log` (lr column), commit
+  `fix(T1.4): advance LR schedule on --resume; add --init-from for new phases`.
+
+### 23:55 — Stage 2a designed and queued: attention rollout + small anchor
+
+- **Plan:** init from the FFN-only ternary checkpoint (step 2000, WER 25.7),
+  switch policy to `decoder_attn_ffn` (attention quantized too), add a **small
+  KL anchor (w=0.1, T=2) to a frozen pretrained fp teacher**, low lr 5e-5,
+  2 000 steps, batch 2, 5 % fp warmup, eval every 500 with fp16 readout.
+- **Rationale:** the flat w=0.5 anchor exploded (KL 11–15, WER 315); the FFN
+  warm start plus a small anchor should let attention adapt without losing
+  audio conditioning.
+- **Launcher:** `scripts/qat_attn_rollout.pbs` (job `10776`, queued behind the
+  per-user ncpus quota; starts when the binary/ternary runs end).
+- **Evidence:** `artifacts/stage1/qat_attn_rollout.log` (once running).
