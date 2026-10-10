@@ -65,6 +65,8 @@ def fig_wer_trajectories() -> dict:
             "ternary_wer", "#1f77b4", "-",
         ),
         "Stage 2b attn+FFN rollout (binary)": ("qat_binary_rollout", "binary_wer", "#2ca02c", "-"),
+        "Ternary long (8k data, 8000 steps)": ("qat_ternary_long", "ternary_wer", "#9467bd", "-"),
+        "Binary long (8k data, 6000 steps)": ("qat_binary_long", "binary_wer", "#8c564b", "-"),
     }
     ffn_resume = ("qat_ternary_ffn_resume", "ternary_wer", "#ff7f0e")
 
@@ -111,8 +113,10 @@ def fig_final_wer() -> dict:
         "Self-distill attn+FFN\n(ternary)": {"ternary": 98.09, "binary": 118.33},
         "FFN-only\n(ternary)": {"ternary": 32.84, "binary": 70.97},
         "FFN-only\n(binary)": {"ternary": 106.78, "binary": 97.88},
-        "Stage 2a attn+FFN\n(ternary)": {"ternary": 16.21, "binary": 99.89},
-        "Stage 2b attn+FFN\n(binary)": {"ternary": 30.51, "binary": 17.48},
+        "Stage 2a attn+FFN\n(ternary, 4k)": {"ternary": 16.21, "binary": 99.89},
+        "Stage 2b attn+FFN\n(binary, 4k)": {"ternary": 30.51, "binary": 17.48},
+        "Ternary long\n(8k, 8000 steps)": {"ternary": 11.44, "binary": 100.0},
+        "Binary long\n(8k, 6000 steps)": {"ternary": 21.29, "binary": 12.92},
     }
     labels = list(finals)
     ternary = [finals[k].get("ternary", 0) for k in labels]
@@ -173,6 +177,8 @@ def fig_fp16_drift() -> dict:
         ("Stage 2a (ternary rollout)", "qat_attn_rollout_resume", "#1f77b4"),
         ("Stage 2a ext2", "qat_attn_rollout_ext2", "#17becf"),
         ("Stage 2b (binary rollout)", "qat_binary_rollout", "#2ca02c"),
+        ("Ternary long (8k)", "qat_ternary_long", "#9467bd"),
+        ("Binary long (8k)", "qat_binary_long", "#8c564b"),
     ):
         records = parse_evals(name)
         steps, values = series(records, "fp16_wer")

@@ -7,31 +7,32 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 07:05 IST)
+## Live status (updated 2026-10-11 08:30 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10795` | **Ternary long (aggressive)**: 8k, 8000 steps, lr 2.5e-5, w=0.05 (GPU 6) | step ~2900/8000 @ ~90/min | 24.8 @1000 → 24.5 @2000 (transient, below 16.2 start — watching) | **~1 h 30 m** |
-| `10798` | **Binary long**: 8k, 6000 steps, lr 2e-5, w=0.05 (GPU 2) | step ~2700/6000 @ ~85/min | 23.3 @1000 → **19.9 @2000** (recovering from 17.5 start) | **~1 h** |
-| `10799` | **Ternary gentle hedge**: 8k, 4000 steps, lr 1e-5, w=0.1 (GPU 7) | starting | — | **~1 h 30 m** |
-| `10708` | persistent GPU session | — | — | ends ~07:15 IST |
+| `10811` | **Binary long2**: continuation from 12.9 (lr 1e-5, 8k, 4000 steps, GPU 2) | step ~700/4000 | — | **~1 h 15 m** |
+| `10795` | **Ternary long (aggressive)** | **done** | **11.4 final / 10.6 best**; fp16 50.7 | — |
+| `10798` | **Binary long** | **done** | **12.9 final**; fp16 37.2 | — |
+| `10799` | Ternary gentle hedge | killed | ~17 (losing to the aggressive path) | — |
 
-**Reading the long runs:** the aggressive ternary run's fresh cosine cycle
-(lr 2.5e-5) perturbed the 16.2 model; 2000 steps have not recovered it yet.
-The binary run dipped (17.5→23.3) and is recovering (19.9). The **gentle hedge**
-starts from the same 16.2 checkpoint with lr 1e-5 and the original anchor (0.1)
-to preserve/improve it in parallel. Nothing is lost: all previous best
-checkpoints remain on disk.
+**Long-run trajectories:**
+- ternary: 24.8 → 24.5 → 19.4 → 15.9 → 14.9 → 12.2 → **10.6** → 11.4 (final);
+- binary: 23.3 → 19.9 → 16.5 → 13.2 → 13.1 → **12.9** (final).
 
-**Headline results so far (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
+**New best results (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
 
 | Configuration | WER |
 |---|---|
-| Ternary, all 196 decoder projections | **16.2** final / **14.4** best |
-| Binary, all 196 decoder projections | **17.5** |
+| Ternary, all 196 decoder projections (8k data) | **11.4** (best 10.6) |
+| Binary, all 196 decoder projections (8k data) | **12.9** |
+| Previous best (4k data) | ternary 16.2 / 14.4; binary 17.5 |
 | FFN-only ternary | 25.7 best / 32.8 final |
-| FFN-only binary | 97.9 |
 | Naive attn+FFN | ~98–108 |
+
+**Reading the long runs:** the fresh cosine cycle perturbs the checkpoint for
+the first ~2 000 steps (ternary went 16.2 → 24.5), then the descent continues
+past the previous best as the LR decays — do not panic at the transient.
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
@@ -449,3 +450,23 @@ restarts at 0).
   perturbation. All best checkpoints remain on disk, so nothing is at risk.
 - **Evidence:** eval lines in `qat_ternary_long.log`, `qat_binary_long.log`,
   `qat_ternary_gentle.log`.
+
+### 08:20 — Long runs deliver new bests: ternary 11.4 (best 10.6), binary 12.9
+
+- **Did:** collected the final tables for both long runs.
+- **Result (50-utt test-clean; pretrained 2.44):**
+  - ternary long (8k data, 8 000 steps): **11.4 final / 10.6 best**, CER 5.2,
+    fp16 50.7;
+  - binary long (8k data, 6 000 steps): **12.9 final**, CER 6.7, fp16 37.2.
+- **Why it worked:** the fresh long cosine cycle first perturbs the checkpoint
+  (ternary 16.2 → 24.5 by step 2000) but then descends past the previous best as
+  the LR decays (24.5 → 19.4 → 15.9 → 14.9 → 12.2 → 10.6). Lower lr + anchor
+  also cut the fp16 drift (37–65 vs 85–230 before).
+- **Decision:** killed the gentle hedge (`10799`, ~17 WER) — the aggressive path
+  won. Launched `10811` **binary long2** (continuation from 12.9, lr 1e-5,
+  4 000 steps) on GPU 2.
+- **Docs:** figures regenerated (`make_plots.py` now includes both long runs);
+  `docs/PROJECT_STATUS.md`, README headline table and this log updated.
+- **Evidence:** `stage1_decoder_attn_ffn_bw1.58_gNone_lr2.5e-05_..._n8000.json`,
+  `stage1_decoder_attn_ffn_bw1.0_gNone_lr2e-05_..._n8000.json`,
+  `docs/figures/wer_trajectories.png`.

@@ -20,13 +20,14 @@ metric fp16 anchors locked (streaming 320 ms clean `2.24` / other `4.61`) and
 
 **Stage 1/2 (in progress, branch `stage-1`)** — BitLinear + QAT machinery is
 implemented and tested (203 tests); loss controllability proven (ternary QAT
-memorizes exactly). A working recovery recipe was found on the A100 cluster:
+memorizes exactly). A working recovery recipe was found and scaled up on the
+A100 cluster:
 
 | Configuration (50-utt `test-clean`, offline) | WER |
 |---|---:|
 | fp16 pretrained reference | **2.44** |
-| Ternary, all 196 decoder projections | **16.2** (best 14.4) |
-| Binary, all 196 decoder projections | **17.5** |
+| Ternary, all 196 decoder projections (8k data) | **11.4** (best 10.6) |
+| Binary, all 196 decoder projections (8k data) | **12.9** |
 | Naive QAT (for comparison) | ~100 |
 
 ![WER trajectories](docs/figures/wer_trajectories.png)

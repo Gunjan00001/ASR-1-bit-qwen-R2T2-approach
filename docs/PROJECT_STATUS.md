@@ -18,12 +18,13 @@
   (203 tests).
 - **Naive QAT collapses** (~100 WER) — this is expected, not a bug (quantizer
   audit: per-tensor binary error 0.648 ≈ the Gaussian closed form 0.60).
-- **A working recovery recipe was found (Stage 2a/2b):**
+- **A working recovery recipe was found (Stage 2a/2b) and scaled up on 8k data:**
   FFN warm start → attention rollout with a **frozen pretrained-teacher anchor**
   → warm-restart cosine; binary via **progressive precision**.
-  - **Ternary, all 196 decoder projections: 14.4 best / 16.2 final WER**
-  - **Binary, all 196 decoder projections: 17.5 WER**
+  - **Ternary, all 196 decoder projections: 11.4 final / 10.6 best WER**
+  - **Binary, all 196 decoder projections: 12.9 WER**
   - (fp16 pretrained reference on the same 50-utt sample: **2.44**)
+  - The binary long run is being continued (from 12.9) to push lower.
 
 ---
 
@@ -39,8 +40,10 @@ number on a ternary-trained row is a readout only (not a trained binary model).
 | Self-distill attn+FFN ternary (w=0.5) | 4 000 | 108.3 | 98.1 | 118.3 |
 | FFN-only ternary | 3 000 | 226.5 | 32.8 (best 25.7) | 71.0 |
 | FFN-only binary | 3 000 | 223.9 | 106.8 | 97.9 |
-| **Stage 2a attn+FFN ternary** | 5 000 | 85.8 | **16.2 (best 14.4)** | 99.9 |
-| **Stage 2b attn+FFN binary** | 2 000 | 99.8 | 30.5 | **17.5** |
+| Stage 2a attn+FFN ternary (4k data) | 5 000 | 85.8 | 16.2 (best 14.4) | 99.9 |
+| Stage 2b attn+FFN binary (4k data) | 2 000 | 99.8 | 30.5 | 17.5 |
+| **Ternary long (8k data)** | 8 000 | 50.7 | **11.4 (best 10.6)** | 100.0 |
+| **Binary long (8k data)** | 6 000 | 37.2 | 21.3 | **12.9** |
 | Zero-shot naive (no training) | 0 | — | ~100 | ~100 |
 
 *Primary metric note:* the Stage 0 gate is defined on **streaming 320 ms**
@@ -67,6 +70,12 @@ Reading the chart (log scale):
   **14.4** with the frozen-teacher anchor and a warm-restart cosine cycle.
 - **Stage 2b (green)** starts from the ternary checkpoint and switches to
   binary: 51.5 → 38.1 → 25.4 → **17.5**.
+- **Long runs on 8k data (purple/brown)** continue the best checkpoints with a
+  fresh long cycle (ternary lr 2.5e-5, 8 000 steps; binary lr 2e-5, 6 000
+  steps). Ternary: 24.8 → … → **10.6 @7000 → 11.4 final**. Binary:
+  23.3 → … → **12.9 final**. The fresh LR cycle causes a transient (the model
+  is perturbed first), then the descent continues past the previous best as the
+  cosine decays.
 
 ## Final WER by configuration
 
@@ -116,11 +125,16 @@ conversion collapses; recovery must come from training, not from the quantizer.
    layers) and train with
    `L = 0.9 · CE + 0.1 · KL(student ‖ frozen-pretrained fp teacher)`
    at lr 5e-5, cosine. The anchor prevents the audio-conditioning collapse.
-3. **Warm-restart cosine**: a second cycle (lr 2.5e-5 over 5 000 steps) pushes
-   from 22.6 → 14.4.
+3. **Warm restarts on more data**: a fresh cosine cycle (lr 2.5e-5, 8 000
+   steps, 8k-utterance cache, anchor 0.05) takes ternary from 16.2 → **11.4**
+   (best 10.6). The fresh cycle perturbs the model for the first ~2 000 steps,
+   then the descent continues past the previous best as the LR decays — do not
+   panic at the transient.
 4. **Progressive precision for binary**: switch `bit_width=1.0` starting from
-   the ternary checkpoint (binary 17.5), instead of training binary from fp
-   (which stalls at ~98).
+   the ternary checkpoint (binary 17.5 at 4k data), then a long continuation
+   (lr 2e-5, 6 000 steps, 8k data) reaches **12.9**.
+5. **Shadow-drift control**: lower lr + anchor reduce the fp16 readout drift
+   (from 85–230 down to ~37–65), though it is not eliminated.
 
 Key infrastructure that made this possible: log-parameterized learnable scales
 (always positive), `--resume` with correct LR-schedule advance, `--init-from`
@@ -166,12 +180,13 @@ python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_f
 ## Future plan
 
 **Stage 2 — finish accuracy recovery (immediate)**
-1. Longer runs on the 8k cache (`data/qat_clean_train.100_n8000.pt`, staged on
-   `/tmp/asr1bit`); the curves were still descending when the schedules ended.
-2. Anchor tuning: smaller KL weight (0.03–0.05) or a trust-region form to stop
-   the fp16 drift while keeping the ternary descent.
-3. Co-training / stochastic precision (alternate fp and quantized steps).
-4. Re-run the best recipe on `test-other` for a clean/other pair.
+1. ~~Longer runs on the 8k cache~~ **done**: ternary 11.4 (best 10.6), binary
+   12.9. A second binary continuation (from 12.9, lr 1e-5, 4 000 steps) is
+   running; same for ternary is the next candidate.
+2. **Anchor tuning**: w=0.05 already cut fp16 drift (readout 37–65 vs 85–230);
+   a trust-region form is still open for preserving the fp path fully.
+3. **Co-training / stochastic precision** (alternate fp and quantized steps).
+4. **Re-run the best recipe on `test-other`** for a clean/other pair.
 
 **Streaming evaluation (unblocks the Stage 1 gate)**
 5. Evaluate quantized models with the portable `ChunkedStreamer` at 320 ms on
@@ -193,7 +208,11 @@ python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_f
 9. Full matrix (chunk sizes 160/320/1000 ms, clean/other), tables/plots, report.
 
 **Known open risks**
-- Ternary at 14–16 offline is still far from the `+1.5` target (3.74); the
-  remaining gap needs longer training, more data, and the recovery stack.
-- Binary 17.5 is a strong result but needs the same hardening.
-- The fp16 readout drift must be solved for the plan's "co-train" story.
+- Ternary 11.4 / binary 12.9 offline is a ~6–8× improvement over naive QAT, but
+  still ~8 points from the `+1.5` target (3.74 on streaming 320 ms). Closing it
+  needs the remaining recovery stack (co-training, trust region) plus the
+  streaming evaluation.
+- The fp16 readout still drifts (37–65); must be solved for the plan's
+  "co-train" story.
+- Binary long2 and future restarts must avoid regressing the 12.9 checkpoint —
+  all checkpoints are kept on disk for safety.
