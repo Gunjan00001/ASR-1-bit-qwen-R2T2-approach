@@ -99,6 +99,8 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", default="Qwen/Qwen3-ASR-0.6B")
     p.add_argument("--policy", default="decoder_attn")
+    p.add_argument("--learnable-scale", type=int, default=0)
+    p.add_argument("--group-size", type=int, default=0, help="0 = per-tensor")
     p.add_argument("--train-steps", type=int, default=0)
     p.add_argument("--train-n", type=int, default=64)
     p.add_argument("--lr", type=float, default=1e-5)
@@ -126,17 +128,28 @@ def main() -> int:
     # Control: full precision (alpha=0), before binarization.
     results["conditions"].append(run_condition(model, wrapper, batch, utterance, processor, 1.0, 0.0, "fp16_control"))
 
-    apply_layer_policy(model, args.policy, bit_width=1.0, group_size=None)
+    group_size = args.group_size or None
+    apply_layer_policy(
+        model,
+        args.policy,
+        bit_width=1.0,
+        group_size=group_size,
+        learnable_scale=bool(args.learnable_scale),
+    )
     model.to("cuda:0")
     for param in model.parameters():
         param.requires_grad_(False)
     for module in model.modules():
         if isinstance(module, BitLinear):
-            module.weight.requires_grad_(True)
-            if module.bias is not None:
-                module.bias.requires_grad_(True)
+            for param in (module.weight, module.bias, module.weight_scale):
+                if param is not None:
+                    param.requires_grad_(True)
     set_activation_quant(model, False)
 
+    # alpha=0 with replaced layers must reproduce the control exactly.
+    results["conditions"].append(
+        run_condition(model, wrapper, batch, utterance, processor, 1.0, 0.0, "fp16_after_replace")
+    )
     results["conditions"].append(run_condition(model, wrapper, batch, utterance, processor, 1.0, 1.0, "binary_naive"))
 
     if args.train_steps > 0:

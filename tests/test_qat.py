@@ -136,6 +136,21 @@ class TestFreezeNonBitlinear:
         total = sum(p.numel() for p in model.parameters())
         assert freeze_non_bitlinear(model) < total
 
+    def test_learnable_scales_stay_trainable(self):
+        model = _FakeASR()
+        apply_layer_policy(model, "decoder_attn", learnable_scale=True)
+        freeze_non_bitlinear(model)
+        trainable = set()
+        for module_name, module in model.named_modules():
+            if isinstance(module, BitLinear):
+                trainable.add(f"{module_name}.weight")
+                trainable.add(f"{module_name}.weight_scale")
+                if module.bias is not None:
+                    trainable.add(f"{module_name}.bias")
+        assert sum(1 for name in trainable if name.endswith("weight_scale")) == 8
+        for name, param in model.named_parameters():
+            assert param.requires_grad == (name in trainable), name
+
 
 class TestGradientCheckpointing:
     def test_enables_and_disables_cache(self):
