@@ -228,6 +228,8 @@ parameter — fixed), lr 2e-4, 100-step warmup, cosine, batch 4 (distill: 2),
 | self-distillation (w=0.5, T=2) | 4 000 | 114.6 → 125.0 → 111.3 → **98.1** | **108.3** | 118.3 | 98.1 |
 | **FFN-only ternary** | 3 000 | 118.0 → 84.3 → 42.2 → 25.7 → 32.8* | 226.5 | 71.0 | **32.8** |
 | FFN-only binary | 3 000 | (binary) 97.0 → 387.3 → 100.6 → 93.9 → 91.9 → 97.9 | 223.9 | **97.9** | 106.8 |
+| **Stage 2a: attn+FFN ternary, FFN-warm-start + anchor w=0.1** | 2 000 | 52.8 → 38.0 → 23.1 → **22.6** | 97.6 | 99.5 | **22.6** |
+| Stage 2a-ext (warm restart, lr 2.5e-5, 5000) | running | — | — | — | — |
 | anchored distillation (frozen teacher, w=0.5, lr 5e-5) | 4 000 | **315.4 @1000**, fp16 427 (killed) | — | — | — |
 
 \* the 25.7 @2000 is the best FFN checkpoint; the resumed run (fresh
@@ -235,6 +237,13 @@ optimizer, LR schedule restarted before the fix) reached 32.8 @3000.
 
 Reference: pretrained fp16 = **2.44** WER (50-utt subsample); zero-shot naive
 ternary ≈ 100.
+
+**Stage 2a is the best full-quantization result:** all 196 decoder projections
+(attention + FFN) ternary at **22.6 WER** — the configuration that collapses to
+~100 with naive QAT. Recipe: train FFN-only first (84 layers, recovers to
+25.7), then quantize attention with a **frozen-pretrained-teacher anchor
+(w=0.1, T=2)** at lr 5e-5. Trajectory 52.8 → 38.0 → 23.1 → 22.6 (plateau as
+LR→0); a warm-restart extension is running to push below 20.
 
 **Shadow-drift pattern (all long runs at lr 2e-4):** the fp16 readout of the
 trained shadows degrades to WER ~110–230 even when the quantized readout

@@ -7,23 +7,24 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 01:35 IST)
+## Live status (updated 2026-10-11 02:30 IST)
 
-| Job | What | Progress | Result so far | ETA |
+| Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10780` | **Stage 2a** attention rollout + anchor w=0.1 (GPU 7) | step ~1350/2000 @ 97/min | ternary 52.8 @500 → **38.0 @1000**; fp16 107.6 | **~25–30 min** |
+| `10785` | **Stage 2a-ext**: warm-restart (lr 2.5e-5 → 0 over 5000) | starting (resumed step 2000, GPU 6) | 22.6 @2000 at start | **~60–70 min** (3000 steps @ ~90/min + evals) |
+| `10780` | **Stage 2a** attention rollout + anchor w=0.1 | **done** | **ternary 22.6**, fp16 97.6, binary 99.5 | — |
 | `10771` | FFN-only ternary | **done** | final: ternary **32.8**, binary 71.0, fp16 226.5 | — |
 | `10764` | FFN-only binary | **done** | final: binary **97.9**, ternary 106.8, fp16 223.9 | — |
 | `10708` | persistent GPU session | — | — | ends ~04:00 IST |
 
-Stage 2a trajectory (full attention+FFN ternary): starts from the FFN-adapted
-checkpoint (25.7) → 52.8 after attention quantization @500 → **38.0 @1000**,
-CE 1.34, KL 4.08. If the FFN-only trend repeats, expect ~20–25 @1500 and
-~15–20 @2000 — i.e. full decoder quantization recovering toward the FFN-only
-level.
+**Stage 2a trajectory (full attention+FFN ternary, 196 BitLinear):** starts from
+the FFN-adapted checkpoint (25.7) → 52.8 after attention quantization @500 →
+38.0 @1000 → 23.1 @1500 → **22.6 @2000** (plateau as LR→0). Recipe: FFN warm
+start + frozen-pretrained-teacher anchor (w=0.1, T=2) + lr 5e-5 cosine.
+The extension continues with a second cosine cycle to push below 20.
 
-Next: if Stage 2a lands ≤25, extend the rollout / add co-training; if it stalls,
-reduce the anchor weight further or freeze FFN during the attention phase.
+Next: if the extension lands ≤15, run the same recipe for **binary**; then
+consider co-training/stochastic precision and more data.
 
 **GPU-switch rule in action (R1):** Stage 2a's original job landed on GPU 6,
 which later became contended (100 % util, 5 steps/min). It was resumed on GPU 7
@@ -317,3 +318,18 @@ restarts at 0). Never resume without the LR-schedule advance.
   **full decoder ternary quantization approaching the FFN-only level (25.7)**.
 - **Rate after GPU switch:** 97.5 steps/min (ETA ~25–30 min to finish).
 - **Evidence:** `artifacts/stage1/qat_attn_rollout_resume.log`.
+
+### 02:20 — Stage 2a final: full attention+FFN ternary at 22.6 WER (best yet)
+
+- **Did:** finished the rollout (step 2000) and ran the final ablations.
+- **Result (50-utt test-clean):** pretrained 2.44; **fp16 97.6; binary 99.5;
+  ternary 22.6** (CER 13.9). Trajectory: 52.8 @500 → 38.0 @1000 → 23.1 @1500 →
+  **22.6 @2000** (plateau as LR→0).
+- **Why it matters:** this quantizes **all 196 decoder projections** (attention
+  + FFN) at ternary — the configuration that collapsed to ~100 WER with naive
+  QAT. The recipe (FFN warm start → attention rollout with a frozen-pretrained
+  teacher anchor w=0.1, T=2, lr 5e-5) recovers it to 22.6, better than the
+  FFN-only final (32.8) and close to the FFN-only best (25.7).
+- **Next:** warm-restart extension (`10785`, cosine cycle 2, lr 2.5e-5 over
+  5000 steps) to push below 20; then the same recipe for binary.
+- **Evidence:** `artifacts/stage1/stage1_decoder_attn_ffn_bw1.58_gNone_lr5e-05_adamw_delay_ls1_n4000.json`.
