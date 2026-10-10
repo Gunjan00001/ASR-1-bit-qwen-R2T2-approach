@@ -92,6 +92,20 @@ class TestOtherPolicies:
         assert isinstance(model.model.layers[0].mlp.gate_proj, BitLinear)
         assert count_bitlinear(model) == 8 + 6
 
+    def test_decoder_ffn_only(self):
+        model = _FakeASR()
+        apply_layer_policy(model, "decoder_ffn")
+        bitlinear = _names(model, BitLinear)
+        assert bitlinear == {
+            "model.layers.0.mlp.gate_proj",
+            "model.layers.0.mlp.up_proj",
+            "model.layers.0.mlp.down_proj",
+            "model.layers.1.mlp.gate_proj",
+            "model.layers.1.mlp.up_proj",
+            "model.layers.1.mlp.down_proj",
+        }
+        assert type(model.model.layers[0].self_attn.q_proj) is nn.Linear
+
     def test_none_policy_replaces_nothing(self):
         model = _FakeASR()
         apply_layer_policy(model, "none")

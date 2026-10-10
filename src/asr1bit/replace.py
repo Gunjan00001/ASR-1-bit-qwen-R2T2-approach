@@ -30,6 +30,10 @@ def _decoder_attn(name: str) -> bool:
     return bool(_ATTN.search(name)) and not _is_encoder(name)
 
 
+def _decoder_ffn(name: str) -> bool:
+    return bool(_FFN.search(name)) and not _is_encoder(name)
+
+
 def _decoder_attn_ffn(name: str) -> bool:
     return bool(_ATTN.search(name) or _FFN.search(name)) and not _is_encoder(name)
 
@@ -37,6 +41,7 @@ def _decoder_attn_ffn(name: str) -> bool:
 POLICIES: dict[str, Callable[[str], bool]] = {
     "none": lambda name: False,
     "decoder_attn": _decoder_attn,
+    "decoder_ffn": _decoder_ffn,
     "decoder_attn_ffn": _decoder_attn_ffn,
 }
 
