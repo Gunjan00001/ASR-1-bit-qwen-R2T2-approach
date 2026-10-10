@@ -44,6 +44,8 @@ if [ -z "$PICK" ]; then
   PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
     | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
 fi
+# Explicit override for this job: qsub -v EVAL_GPU=<index>
+PICK="${EVAL_GPU:-$PICK}"
 export CUDA_VISIBLE_DEVICES="$PICK"
 
 {
