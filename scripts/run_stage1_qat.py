@@ -203,6 +203,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--distill-weight", type=float, default=0.0,
                    help="Weight of self-distillation KL (teacher = same shadows at alpha=0).")
     p.add_argument("--distill-temp", type=float, default=2.0, help="Distillation temperature.")
+    p.add_argument("--frozen-teacher", type=int, default=0,
+                   help="1 = distillation teacher is a frozen fp copy of the pretrained model.")
     p.add_argument("--log-grad-norms", type=int, default=1)
     p.add_argument("--zero-shot", type=int, default=0, help="Evaluate alpha=1 without training")
     p.add_argument("--eval-every", type=int, default=0, help="WER eval interval during training (0=off)")
@@ -242,12 +244,27 @@ def main() -> int:
     processor = wrapper.processor
     patch_outer_forward(model)
 
+    teacher = None
+    if args.frozen_teacher:
+        if not args.distill_weight:
+            raise ValueError("--frozen-teacher requires --distill-weight > 0")
+        teacher_wrapper = backends.load_model(
+            args.model, backend="transformers", dtype=torch.float32, device="cuda:0",
+            max_new_tokens=8,
+        )
+        teacher = teacher_wrapper.model
+        patch_outer_forward(teacher)
+        teacher.eval()
+        for param in teacher.parameters():
+            param.requires_grad_(False)
+        print("frozen teacher loaded", flush=True)
+
     train_utts = load_train_utterances(args)
     eval_utts = list(iter_librispeech("clean", "test", sample_n=args.eval_n, sample_seed=0))
     train_examples = build_examples(train_utts, processor)
     print(f"train={len(train_examples)} eval={len(eval_utts)}", flush=True)
 
-    results: dict = {"config": config_record, "eval_n": len(eval_utts)}
+    results: dict = {"config": config_record, "eval_n": len(eval_utts), "frozen_teacher": teacher is not None}
 
     print("=== baseline (pretrained) ===", flush=True)
     results["pretrained"] = evaluate(wrapper, eval_utts, args.eval_n)
@@ -331,12 +348,16 @@ def main() -> int:
         ce_value = None
         kl_value = None
         if args.distill_weight > 0:
-            # Self-distillation: the teacher is the same shadows at alpha=0
-            # (full precision); the student is the quantized forward.
-            set_qat_alpha(model, 0.0)
-            with torch.no_grad():
-                teacher_out = model(**batch)
-            set_qat_alpha(model, alpha)
+            if teacher is not None:
+                # Anchored distillation: frozen fp copy of the pretrained model.
+                with torch.no_grad():
+                    teacher_out = teacher(**batch)
+            else:
+                # Self-distillation: the teacher is the same shadows at alpha=0.
+                set_qat_alpha(model, 0.0)
+                with torch.no_grad():
+                    teacher_out = model(**batch)
+                set_qat_alpha(model, alpha)
             out = model(**batch)
             ce = out.loss if hasattr(out, "loss") else out[0]
             kl = distillation_loss(
