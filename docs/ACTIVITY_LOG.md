@@ -7,17 +7,22 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 00:45 IST)
+## Live status (updated 2026-10-11 01:15 IST)
 
 | Job | What | Progress | Result so far | ETA |
 |---|---|---|---|---|
-| `10771` | FFN-only ternary resume | **done** | final: ternary **32.8**, binary 71.0, fp16 226.5 | — |
+| `10780` | **Stage 2a** attention rollout + anchor w=0.1 (resumed on GPU 7) | step ~1000/2000 @ 55/min | step 500: ternary 52.8, fp16 132.6 | **~45–55 min** |
+| `10771` | FFN-only ternary | **done** | final: ternary **32.8**, binary 71.0, fp16 226.5 | — |
 | `10764` | FFN-only binary | **done** | final: binary **97.9**, ternary 106.8, fp16 223.9 | — |
-| `10776` | **Stage 2a**: attention rollout + frozen anchor w=0.1 | step ~500/2000 @ ~80/min | CE 1.4–2.0, KL 5.8–6.6 (early) | **~55–65 min** |
 | `10708` | persistent GPU session | — | — | ends ~04:00 IST |
 
-Next queued after these: co-training / stochastic precision if the small anchor
-is not enough.
+Next: decide whether the anchor (w=0.1) is enough; otherwise try co-training /
+stochastic precision or a smaller anchor with longer rollout.
+
+**GPU-switch rule in action (R1):** Stage 2a's original job landed on GPU 6,
+which later became contended (100 % util, 5 steps/min). It was resumed on GPU 7
+(12 % util) from its step-500 checkpoint → 55 steps/min; the slow original was
+killed. Verified the `--resume` LR fix: `lr schedule advanced to step 500`.
 
 **Session-cgroup rule (learned the hard way):** do not load model + checkpoint
 in the 32 GB interactive session; it OOM-kills silently (log just stops). Use
@@ -281,3 +286,17 @@ restarts at 0). Never resume without the LR-schedule advance.
   attn+ffn runs' ~6 — the FFN init gives a strong start), KL 5.8–6.6 (attention
   quantization error vs the frozen teacher), loss ≈ 0.9·CE + 0.1·KL.
 - **Evidence:** `artifacts/stage1/stage1_decoder_ffn_bw1.{0,58}_*.json`.
+
+### 01:00 — Stage 2a step-500 result + GPU switch (rules R1 again)
+
+- **Result @500:** ternary **52.8**, fp16 **132.6**. Adding attention
+  quantization to the FFN-adapted model (25.7) costs ~27 WER points; 500 rollout
+  steps have not yet recovered it.
+- **Failure:** the job landed on GPU 6 which became contended (100 % util);
+  training crawled at ~5 steps/min and the eval took many minutes.
+- **Fix:** launched `scripts/qat_attn_rollout_resume.pbs` (job `10780`) which
+  picked GPU 7 (12 % util); killed the slow original (`10776`). The `--resume`
+  LR fix was verified in the log: `lr schedule advanced to step 500`.
+  Rate after the switch: **55 steps/min** (11× faster).
+- **Evidence:** `artifacts/stage1/qat_attn_rollout.log` (step-500 eval),
+  `artifacts/stage1/qat_attn_rollout_resume.log` (GPU 7, resumed).
