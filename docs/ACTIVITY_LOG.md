@@ -7,29 +7,28 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 02:30 IST)
+## Live status (updated 2026-10-11 03:10 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10785` | **Stage 2a-ext**: warm-restart (lr 2.5e-5 → 0 over 5000) | starting (resumed step 2000, GPU 6) | 22.6 @2000 at start | **~60–70 min** (3000 steps @ ~90/min + evals) |
+| `10788` | **Stage 2a-ext2**: warm-restart, GPU 2, step 2500→5000 | step ~3150/5000 @ 80/min | **ternary 19.4 @3000** (from 22.6 @2000) | **~45–55 min** |
 | `10780` | **Stage 2a** attention rollout + anchor w=0.1 | **done** | **ternary 22.6**, fp16 97.6, binary 99.5 | — |
 | `10771` | FFN-only ternary | **done** | final: ternary **32.8**, binary 71.0, fp16 226.5 | — |
 | `10764` | FFN-only binary | **done** | final: binary **97.9**, ternary 106.8, fp16 223.9 | — |
 | `10708` | persistent GPU session | — | — | ends ~04:00 IST |
 
-**Stage 2a trajectory (full attention+FFN ternary, 196 BitLinear):** starts from
-the FFN-adapted checkpoint (25.7) → 52.8 after attention quantization @500 →
-38.0 @1000 → 23.1 @1500 → **22.6 @2000** (plateau as LR→0). Recipe: FFN warm
-start + frozen-pretrained-teacher anchor (w=0.1, T=2) + lr 5e-5 cosine.
-The extension continues with a second cosine cycle to push below 20.
+**Full attention+FFN ternary trajectory (best result):**
+52.8 → 38.0 → 23.1 → 22.6 → 21.5 → **19.4** at steps 500…3000. The warm-restart
+extension continues to 5000; expect ~15–17 if the trend holds.
 
-Next: if the extension lands ≤15, run the same recipe for **binary**; then
-consider co-training/stochastic precision and more data.
+Next: binary version of the same recipe; then co-training/stochastic precision
+and more data.
 
-**GPU-switch rule in action (R1):** Stage 2a's original job landed on GPU 6,
-which later became contended (100 % util, 5 steps/min). It was resumed on GPU 7
-(12 % util) from its step-500 checkpoint → 55–97 steps/min; the slow original
-was killed. Verified the `--resume` LR fix: `lr schedule advanced to step 500`.
+**GPU-switch rule in action (R1, twice):** Stage 2a was resumed from GPU 6
+(contended) to GPU 7 (12 % util) → 97 steps/min. The extension (`10785`, GPU 6,
+94 % util) was resumed again as `10788` on GPU 2 → 80 steps/min; the slow job
+was killed both times. The `--resume` LR fix is verified in both resumes
+(`lr schedule advanced to step …`).
 
 **Session-cgroup rule (learned the hard way):** do not load model + checkpoint
 in the 32 GB interactive session; it OOM-kills silently (log just stops). Use
@@ -333,3 +332,17 @@ restarts at 0). Never resume without the LR-schedule advance.
 - **Next:** warm-restart extension (`10785`, cosine cycle 2, lr 2.5e-5 over
   5000 steps) to push below 20; then the same recipe for binary.
 - **Evidence:** `artifacts/stage1/stage1_decoder_attn_ffn_bw1.58_gNone_lr5e-05_adamw_delay_ls1_n4000.json`.
+
+### 02:45 — Warm-restart extension + second GPU switch (ext → ext2)
+
+- **Result of ext (GPU 6):** ternary **21.5 @2500** (from 22.6 @2000) — the
+  second cosine cycle continues the descent.
+- **Failure:** GPU 6 became contended (94 % util, ~33 steps/min).
+- **Fix:** launched `ext2` (job `10788`) resuming from the ext step-2500
+  checkpoint on GPU 2 (picker chose it) → 80 steps/min; killed the slow ext.
+  First ext2 submission had a wrong resume path (sed no-op) and was killed and
+  resubmitted; the fix is in commit `fix(pbs): ext2 resumes from the ext
+  step-2500 checkpoint`.
+- **Result @3000:** ternary **19.4** — below 20, still descending.
+- **Evidence:** `artifacts/stage1/qat_attn_rollout_ext.log`,
+  `artifacts/stage1/qat_attn_rollout_ext2.log`.
