@@ -230,7 +230,11 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--save-dir", default=None, help="Directory for shadow checkpoints.")
     p.add_argument("--save-every", type=int, default=0, help="Checkpoint interval in steps (0=only at end).")
-    p.add_argument("--resume", default=None, help="Checkpoint path to resume shadows from.")
+    p.add_argument("--resume", default=None, help="Checkpoint path to resume shadows from (same run; advances step counter).")
+    p.add_argument(
+        "--init-from", default=None,
+        help="Checkpoint path to initialize shadows from for a NEW phase (step counter starts at 0).",
+    )
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
 
@@ -331,8 +335,16 @@ def main() -> int:
     alpha_warmup = max(1, int(args.steps * args.alpha_warmup_frac))
     history = []
     start_step = 0
+    if args.init_from:
+        loaded = load_checkpoint(args.init_from, model)
+        print(f"initialized shadows from {args.init_from} (checkpoint step {loaded}); new phase starts at 0", flush=True)
     if args.resume:
         start_step = load_checkpoint(args.resume, model)
+        # Advance the LR schedule to the resumed position; otherwise the cosine
+        # restarts and applies a fresh high LR to a converged checkpoint.
+        if start_step > 0:
+            scheduler.last_epoch = start_step
+            print(f"lr schedule advanced to step {start_step}", flush=True)
     print("=== QAT ===", flush=True)
     started = time.perf_counter()
     for step in range(start_step, args.steps):
