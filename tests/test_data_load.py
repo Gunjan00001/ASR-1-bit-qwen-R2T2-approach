@@ -166,6 +166,14 @@ class TestIterLibrispeech:
         assert [u.id for u in first] == [u.id for u in second]
         assert len(first) == 5
 
+    def test_streaming_rejects_subsample(self):
+        with pytest.raises(ValueError):
+            list(iter_librispeech("clean", "test", streaming=True, sample_n=5))
+
+    def test_streaming_rejects_indices(self):
+        with pytest.raises(ValueError):
+            list(iter_librispeech("clean", "test", streaming=True, indices=[0, 1]))
+
 
 class TestSelectSubsample:
     def test_returns_all_when_n_exceeds_length(self):

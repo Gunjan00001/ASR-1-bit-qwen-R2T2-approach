@@ -27,9 +27,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--config", default="clean", help="LibriSpeech config (clean/other).")
     p.add_argument("--split", default="train.100", help="Split, e.g. train.100.")
     p.add_argument("--n", type=int, default=2000, help="Number of utterances to keep.")
-    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--seed", type=int, default=0, help="Recorded for provenance; streaming takes first-n.")
     p.add_argument("--min-sec", type=float, default=0.5)
     p.add_argument("--max-sec", type=float, default=25.0)
+    p.add_argument(
+        "--stream", type=int, default=1,
+        help="Read shards lazily (bounded memory; takes the first n valid rows).",
+    )
     p.add_argument("--out", default=None, help="Output .pt path (default data/qat_<config>_<split>_n<n>.pt).")
     return p.parse_args()
 
@@ -43,9 +47,15 @@ def main() -> int:
     kept: list[dict] = []
     skipped = 0
     seen = 0
-    # Sample more than n to survive the duration filter, preserving determinism.
-    pool = max(args.n * 2, args.n)
-    for utt in iter_librispeech(args.config, args.split, sample_n=pool, sample_seed=args.seed):
+
+    def _iter():
+        if args.stream:
+            yield from iter_librispeech(args.config, args.split, streaming=True)
+        else:
+            pool = max(args.n * 2, args.n)
+            yield from iter_librispeech(args.config, args.split, sample_n=pool, sample_seed=args.seed)
+
+    for utt in _iter():
         seen += 1
         if utt.duration < args.min_sec or utt.duration > args.max_sec:
             skipped += 1
@@ -73,6 +83,7 @@ def main() -> int:
         "seen": seen,
         "skipped": skipped,
         "seed": args.seed,
+        "selection": "stream_first_n" if args.stream else "random_subsample",
         "min_sec": args.min_sec,
         "max_sec": args.max_sec,
         "total_audio_sec": sum(durations),

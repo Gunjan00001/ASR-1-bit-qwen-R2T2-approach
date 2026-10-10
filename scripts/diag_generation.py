@@ -114,6 +114,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", default="Qwen/Qwen3-ASR-0.6B")
     p.add_argument("--policy", default="decoder_attn")
+    p.add_argument("--bit-width", type=float, default=1.0)
     p.add_argument("--learnable-scale", type=int, default=0)
     p.add_argument("--group-size", type=int, default=0, help="0 = per-tensor")
     p.add_argument("--train-steps", type=int, default=0)
@@ -139,6 +140,7 @@ def main() -> int:
     print("utterance:", utterance.id, "| label:", utterance.text, flush=True)
 
     results: dict = {"utterance_id": utterance.id, "label": utterance.text, "conditions": []}
+    precision = "binary" if args.bit_width == 1.0 else "ternary"
 
     # Control: full precision (alpha=0), before binarization.
     results["conditions"].append(run_condition(model, wrapper, batch, utterance, processor, 1.0, 0.0, "fp16_control"))
@@ -147,7 +149,7 @@ def main() -> int:
     apply_layer_policy(
         model,
         args.policy,
-        bit_width=1.0,
+        bit_width=args.bit_width,
         group_size=group_size,
         learnable_scale=bool(args.learnable_scale),
     )
@@ -163,15 +165,17 @@ def main() -> int:
 
     # alpha=0 with replaced layers must reproduce the control exactly.
     results["conditions"].append(
-        run_condition(model, wrapper, batch, utterance, processor, 1.0, 0.0, "fp16_after_replace")
+        run_condition(model, wrapper, batch, utterance, processor, args.bit_width, 0.0, "fp16_after_replace")
     )
-    results["conditions"].append(run_condition(model, wrapper, batch, utterance, processor, 1.0, 1.0, "binary_naive"))
+    results["conditions"].append(
+        run_condition(model, wrapper, batch, utterance, processor, args.bit_width, 1.0, f"{precision}_naive")
+    )
 
     if args.train_steps > 0:
         train_examples = build_examples(train_utts, processor)
         optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=args.lr)
         set_qat_alpha(model, 1.0)
-        print(f"training {args.train_steps} steps (constant alpha=1)...", flush=True)
+        print(f"training {args.train_steps} steps at alpha=1 (lr={args.lr})...", flush=True)
         total_flips = 0
         for step in range(args.train_steps):
             b = {k: (v.cuda() if torch.is_tensor(v) else v)
@@ -189,13 +193,14 @@ def main() -> int:
                 print(f"  step {step} loss={float(loss.detach()):.3f} max_grad={max(norms.values()):.2f} "
                       f"flips={flips} total_flips={total_flips}", flush=True)
         results["total_sign_flips"] = total_flips
-        results["conditions"].append(run_condition(model, wrapper, batch, utterance, processor, 1.0, 1.0, "binary_trained"))
+        results["conditions"].append(
+            run_condition(model, wrapper, batch, utterance, processor, args.bit_width, 1.0, f"{precision}_trained")
+        )
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"diag_generation_{args.policy}_steps{args.train_steps}.json"
+    path = out_dir / f"diag_generation_{args.policy}_bw{args.bit_width}_steps{args.train_steps}.json"
     path.write_text(json.dumps(results, indent=2), encoding="utf-8")
-    print(json.dumps(results, indent=2), flush=True)
     print("wrote", path, flush=True)
     return 0
 

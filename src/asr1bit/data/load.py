@@ -148,6 +148,7 @@ def iter_librispeech(
     indices: Sequence[int] | None = None,
     sample_n: int | None = None,
     sample_seed: int = 0,
+    streaming: bool = False,
 ) -> Iterator[Utterance]:
     """Yield :class:`Utterance` objects from ``openslr/librispeech_asr``.
 
@@ -162,7 +163,12 @@ def iter_librispeech(
         sample_n: Optional deterministic subsample size. Uses ``sample_seed``
             so the same fixed subsample is reused across chunk sizes.
         sample_seed: Seed for ``sample_n`` selection.
+        streaming: Read shards lazily via the Hub streaming API. Bound memory
+            at the cost of random access: ``indices``/``sample_n`` are
+            unsupported in this mode (use ``limit`` instead).
     """
+    if streaming and (indices is not None or sample_n is not None):
+        raise ValueError("streaming mode does not support indices/sample_n; use limit")
     if dataset is None:
         from datasets import Audio, load_dataset
 
@@ -172,7 +178,9 @@ def iter_librispeech(
         # `Audio` feature, so disable its decoding to read raw bytes without a
         # `torchcodec` dependency (`_hf_audio` decodes with soundfile instead).
         pattern = _librispeech_parquet_pattern(config, split)
-        dataset = load_dataset("parquet", data_files={split: pattern}, split=split)
+        dataset = load_dataset(
+            "parquet", data_files={split: pattern}, split=split, streaming=streaming
+        )
         if hasattr(dataset, "cast_column"):
             dataset = dataset.cast_column("audio", Audio(decode=False))
 
