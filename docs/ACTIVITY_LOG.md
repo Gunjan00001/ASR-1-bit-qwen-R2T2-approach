@@ -7,22 +7,28 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 01:15 IST)
+## Live status (updated 2026-10-11 01:35 IST)
 
 | Job | What | Progress | Result so far | ETA |
 |---|---|---|---|---|
-| `10780` | **Stage 2a** attention rollout + anchor w=0.1 (resumed on GPU 7) | step ~1000/2000 @ 55/min | step 500: ternary 52.8, fp16 132.6 | **~45–55 min** |
+| `10780` | **Stage 2a** attention rollout + anchor w=0.1 (GPU 7) | step ~1350/2000 @ 97/min | ternary 52.8 @500 → **38.0 @1000**; fp16 107.6 | **~25–30 min** |
 | `10771` | FFN-only ternary | **done** | final: ternary **32.8**, binary 71.0, fp16 226.5 | — |
 | `10764` | FFN-only binary | **done** | final: binary **97.9**, ternary 106.8, fp16 223.9 | — |
 | `10708` | persistent GPU session | — | — | ends ~04:00 IST |
 
-Next: decide whether the anchor (w=0.1) is enough; otherwise try co-training /
-stochastic precision or a smaller anchor with longer rollout.
+Stage 2a trajectory (full attention+FFN ternary): starts from the FFN-adapted
+checkpoint (25.7) → 52.8 after attention quantization @500 → **38.0 @1000**,
+CE 1.34, KL 4.08. If the FFN-only trend repeats, expect ~20–25 @1500 and
+~15–20 @2000 — i.e. full decoder quantization recovering toward the FFN-only
+level.
+
+Next: if Stage 2a lands ≤25, extend the rollout / add co-training; if it stalls,
+reduce the anchor weight further or freeze FFN during the attention phase.
 
 **GPU-switch rule in action (R1):** Stage 2a's original job landed on GPU 6,
 which later became contended (100 % util, 5 steps/min). It was resumed on GPU 7
-(12 % util) from its step-500 checkpoint → 55 steps/min; the slow original was
-killed. Verified the `--resume` LR fix: `lr schedule advanced to step 500`.
+(12 % util) from its step-500 checkpoint → 55–97 steps/min; the slow original
+was killed. Verified the `--resume` LR fix: `lr schedule advanced to step 500`.
 
 **Session-cgroup rule (learned the hard way):** do not load model + checkpoint
 in the 32 GB interactive session; it OOM-kills silently (log just stops). Use
@@ -300,3 +306,14 @@ restarts at 0). Never resume without the LR-schedule advance.
   Rate after the switch: **55 steps/min** (11× faster).
 - **Evidence:** `artifacts/stage1/qat_attn_rollout.log` (step-500 eval),
   `artifacts/stage1/qat_attn_rollout_resume.log` (GPU 7, resumed).
+
+### 01:30 — Stage 2a recovering: 52.8 → 38.0
+
+- **Result @1000 (GPU 7 resume):** ternary **38.0** (from 52.8 @500), fp16
+  107.6 (from 132.6); CE 1.34, KL 4.08, loss 1.61 at step 1121.
+- **Interpretation:** attention quantization cost ~27 points on the FFN-adapted
+  checkpoint; the rollout + small anchor is recovering it at roughly the
+  FFN-only rate. If the trend holds, expect ~20–25 @1500 and ~15–20 @2000 —
+  **full decoder ternary quantization approaching the FFN-only level (25.7)**.
+- **Rate after GPU switch:** 97.5 steps/min (ETA ~25–30 min to finish).
+- **Evidence:** `artifacts/stage1/qat_attn_rollout_resume.log`.
