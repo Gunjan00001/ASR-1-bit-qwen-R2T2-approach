@@ -78,6 +78,21 @@ def greedy_text(wrapper, utterance) -> str:
     return backends.offline_transcribe(wrapper, utterance.audio, language=None)
 
 
+def quant_signature(model) -> dict:
+    """Per-BitLinear boolean sign pattern of ``W - mean(W)`` (the quantized grid)."""
+    signature = {}
+    for name, module in model.named_modules():
+        if isinstance(module, BitLinear):
+            weight = module.weight.detach()
+            signature[name] = (weight - weight.mean()) >= 0
+    return signature
+
+
+def flip_count(before: dict, after: dict) -> int:
+    """Number of elements whose sign-grid membership changed between snapshots."""
+    return sum(int((mask != after[name]).sum()) for name, mask in before.items())
+
+
 def run_condition(model, wrapper, batch, utterance, processor, bit_width, alpha, label) -> dict:
     set_precision(model, bit_width, alpha)
     with QuantInstrument() as inst:
@@ -157,17 +172,23 @@ def main() -> int:
         optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=args.lr)
         set_qat_alpha(model, 1.0)
         print(f"training {args.train_steps} steps (constant alpha=1)...", flush=True)
+        total_flips = 0
         for step in range(args.train_steps):
             b = {k: (v.cuda() if torch.is_tensor(v) else v)
                  for k, v in collate([train_examples[step % len(train_examples)]], processor).items()}
+            before = quant_signature(model)
             optimizer.zero_grad()
             out = model(**b)
             loss = out.loss if hasattr(out, "loss") else out[0]
             loss.backward()
             norms = grad_norms(model)
             optimizer.step()
+            flips = flip_count(before, quant_signature(model))
+            total_flips += flips
             if step % 100 == 0 or step == args.train_steps - 1:
-                print(f"  step {step} loss={float(loss.detach()):.3f} max_grad={max(norms.values()):.2f}", flush=True)
+                print(f"  step {step} loss={float(loss.detach()):.3f} max_grad={max(norms.values()):.2f} "
+                      f"flips={flips} total_flips={total_flips}", flush=True)
+        results["total_sign_flips"] = total_flips
         results["conditions"].append(run_condition(model, wrapper, batch, utterance, processor, 1.0, 1.0, "binary_trained"))
 
     out_dir = Path(args.out)
