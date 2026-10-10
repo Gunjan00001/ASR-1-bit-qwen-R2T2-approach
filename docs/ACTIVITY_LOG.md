@@ -7,17 +7,21 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-10 23:05 IST)
+## Live status (updated 2026-10-10 23:30 IST)
 
 | Job | What | Progress | Result so far | ETA |
 |---|---|---|---|---|
-| `10737` | FFN-only **ternary** QAT (`decoder_ffn`, 3 000 steps) | step 2000/3000 | WER 118 → 84 → 42 → **25.7** | **~1.5–2 h** (shared GPU, 15 steps/min + evals) |
-| `10764` | FFN-only **binary** QAT (3 000 steps) | step ~900/3000 | 97.0 @500 | **~1 h** (free GPU, ~117 steps/min + evals) |
+| `10771` | FFN-only **ternary** QAT resumed from step 2000 (4 cpus, best GPU) | starting | WER 118 → 84 → 42 → **25.7** (step 2000) | **~35–45 min** |
+| `10764` | FFN-only **binary** QAT (3 000 steps) | step ~1550/3000 | 97.0 @500 → 387.3 @1000 → **100.6 @1500** (transient regression, recovering) | **~40–50 min** |
 | `10708` | persistent GPU session (`gpu-send`) | — | — | ends ~04:00 IST (12 h walltime) |
 
 Next queued after these: Stage 2 design — add attention back incrementally with
 a small anchored KL (≤0.1) or per-layer rollout, co-training/stochastic
 precision.
+
+**Session-cgroup rule (learned the hard way):** do not load model + checkpoint
+in the 32 GB interactive session; it OOM-kills silently (log just stops). Use
+batch jobs for anything heavier than a small probe. See `rules.md` R5.
 
 ---
 
@@ -185,3 +189,47 @@ precision.
 - **Did:** codified GPU policy (never wait; switch GPUs), ETA reporting,
   activity logging, git/SSH, cluster etiquette, environment gotchas.
 - **Evidence:** `rules.md`, `docs/ACTIVITY_LOG.md` (this file).
+
+### 23:10 — GPU-switch rule applied to the slow ternary run (rules R1)
+
+- **Did:** the FFN ternary job (`10737`) was running at **15 steps/min**
+  (4 s/step) sharing a GPU with another agent's load; the binary job on a free
+  GPU ran at ~117 steps/min. Verified the step-2000 checkpoint
+  (`data/checkpoints/qat_ternary_ffn/last.pt`), wrote
+  `scripts/qat_ternary_ffn_resume.pbs` with an improved GPU picker (least
+  utilization among GPUs with ≥25 GiB free), then killed the slow job.
+- **Failure:** the batch resume (`10767`) queued behind the per-user PBS CPU
+  quota (16 ncpus total; the user's other-agent jobs + our binary job filled
+  it). **CPU quota, not GPU, was the blocker.**
+- **Fix:** launched the resume **in the persistent session** on the
+  least-utilized GPU (GPU 5) instead of waiting; cancelled the queued batch
+  copy to avoid duplicate work. This is the intended behaviour under `rules.md`
+  R1 — never idle-wait.
+- **Evidence:** `artifacts/stage1/qat_ternary_ffn_resume_session.log`.
+
+### 23:15 — Binary FFN regression at step 1000
+
+- **Did:** monitoring the FFN-only binary run (`10764`).
+- **Failure:** binary WER 97.0 @500 → **387.3 @1000** (runaway generation).
+- **Cause (hypothesis):** binary sign churn / latent-weight drift destabilizes
+  training; consistent with the memorization result (binary loss floor 2.8 vs
+  ternary 0.0) and with binary being the harder target in the literature.
+- **Follow-up:** by step 1500 it recovered to **100.6** — the regression was a
+  transient phase, not a terminal collapse. Final numbers will decide.
+- **Evidence:** `artifacts/stage1/qat_binary_ffn.log`.
+
+### 23:25 — Session OOM: checkpoint load killed; moved to batch queue
+
+- **Did:** after the session resume launched on GPU 5, it printed
+  `replaced=84 trainable=264241236` and then died.
+- **Failure:** process became a zombie with an empty log; `dmesg` showed
+  `oom-kill ... pid=3986997 ... oom_memcg=.../10708.jiit-master` (session
+  32 GB cgroup).
+- **Cause:** loading the 0.6 B fp32 model + 1.06 GB shadow checkpoint + 3.3 GB
+  utterance cache + page cache exceeds the interactive session's 32 GB cgroup
+  (page cache is charged to the cgroup).
+- **Fix:** resubmitted the resume as a **batch job** with 4 ncpus / 48 GB
+  (`10771`, `scripts/qat_ternary_ffn_resume.pbs`), which started immediately and
+  picks the least-utilized GPU. Rule recorded: heavy loads never run in the
+  interactive session (rules.md R5).
+- **Evidence:** `dmesg` OOM record; job `10771`; `qat_ternary_ffn_resume.log`.
