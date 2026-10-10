@@ -5,8 +5,9 @@ estimator (STE), quantizes weights on the forward pass, and optionally
 quantizes activations to INT8 (absmax, per-token).
 
 ``learnable_scale=True`` adds a BitNet b1.58-style learnable dequantization
-gain (per-tensor or per-group, initialized to ``mean|W|``). The rounding grid
-uses the detached scale while gradients flow exactly to the scale parameter.
+gain (per-tensor or per-group, log-parameterized so it stays strictly positive,
+initialized to ``mean|W|``). The rounding grid uses the detached scale while
+gradients flow exactly to the scale parameter.
 
 Locked interface: ``BitLinear(in_dim, out_dim, bit_width, quantize_activations)``.
 """
@@ -60,7 +61,10 @@ class BitLinear(nn.Module):
             self.register_parameter("bias", None)
         nn.init.kaiming_uniform_(self.weight, a=5 ** 0.5)
         if learnable_scale:
-            self.weight_scale = nn.Parameter(torch.ones(self._scale_shape()))
+            # Log-parameterized scale: ``weight_scale`` holds log(gamma), so the
+            # effective scale stays strictly positive and updates are
+            # multiplicative (BitNet-style tensor-wise learnable scale).
+            self.weight_scale = nn.Parameter(torch.zeros(self._scale_shape()))
             self._init_weight_scale()
         else:
             self.register_parameter("weight_scale", None)
@@ -75,8 +79,12 @@ class BitLinear(nn.Module):
             )
         return (self.weight.numel() // self.group_size, 1)
 
+    def gamma(self) -> torch.Tensor:
+        """Effective positive dequantization scale (exp of the log parameter)."""
+        return self.weight_scale.exp().clamp(min=1e-8, max=1.0)
+
     def _init_weight_scale(self) -> None:
-        """Re-initialize the learnable scale to the observed ``mean|W|``."""
+        """Re-initialize the log-scale so ``gamma`` starts at the observed ``mean|W|``."""
         if self.weight_scale is None:
             return
         with torch.no_grad():
@@ -85,11 +93,11 @@ class BitLinear(nn.Module):
                 value = weight.abs().mean().reshape(())
             else:
                 value = weight.reshape(-1, self.group_size).abs().mean(dim=1, keepdim=True)
-            self.weight_scale.copy_(value)
+            self.weight_scale.copy_(value.clamp(min=1e-8).log())
 
     def _quantized_weight(self) -> torch.Tensor:
         if self.learnable_scale:
-            gamma = self.weight_scale
+            gamma = self.gamma()
             if self.bit_width in _TERNARY_WIDTHS:
                 qw, _ = quantize_ternary(self.weight, self.group_size, gamma=gamma.detach())
             else:

@@ -34,6 +34,7 @@ from asr1bit.train.qat import (
     make_sft_labels,
     progressive_alpha,
     quantization_delay_alpha,
+    scale_stats,
     set_activation_quant,
     set_qat_alpha,
 )
@@ -349,6 +350,7 @@ def main() -> int:
         if step % 5 == 0 or step == args.steps - 1:
             record = {"step": step + 1, "alpha": alpha, "loss": float(loss.detach()),
                       "lr": scheduler.get_last_lr()[0], "max_grad_norm": max_norm}
+            record.update(scale_stats(model))
             history.append(record)
             print(json.dumps(record), flush=True)
         if args.eval_every and (step + 1) % args.eval_every == 0:

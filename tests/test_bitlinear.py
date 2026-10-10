@@ -109,7 +109,16 @@ class TestLearnableScale:
         torch.manual_seed(0)
         layer = BitLinear(8, 4, learnable_scale=True)
         assert isinstance(layer.weight_scale, nn.Parameter)
-        assert torch.allclose(layer.weight_scale, layer.weight.detach().abs().mean())
+        assert torch.allclose(layer.gamma(), layer.weight.detach().abs().mean())
+
+    def test_gamma_is_always_positive(self):
+        layer = BitLinear(8, 4, learnable_scale=True)
+        with torch.no_grad():
+            layer.weight_scale.fill_(-50.0)
+        assert float(layer.gamma().detach()) > 0
+        with torch.no_grad():
+            layer.weight_scale.fill_(50.0)
+        assert float(layer.gamma().detach()) > 0
 
     def test_groupwise_scale_shape(self):
         layer = BitLinear(8, 4, learnable_scale=True, group_size=4)
@@ -118,16 +127,18 @@ class TestLearnableScale:
     def test_from_linear_initializes_scale(self):
         linear = nn.Linear(6, 5)
         layer = BitLinear.from_linear(linear, learnable_scale=True)
-        assert torch.allclose(layer.weight_scale, linear.weight.detach().abs().mean())
+        assert torch.allclose(layer.gamma(), linear.weight.detach().abs().mean())
 
     def test_alpha_one_binary_output_scales_with_scale(self):
+        import math
+
         torch.manual_seed(0)
         layer = BitLinear(8, 4, learnable_scale=True, quantize_activations=False)
         layer.alpha = 1.0
         x = torch.randn(2, 8)
         first = layer(x)
         with torch.no_grad():
-            layer.weight_scale.mul_(2.0)
+            layer.weight_scale.add_(math.log(2.0))  # double gamma
         assert torch.allclose(layer(x), 2.0 * first, atol=1e-5)
 
     def test_scale_gradient_flows_at_alpha_one(self):

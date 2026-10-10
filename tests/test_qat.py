@@ -17,6 +17,7 @@ from asr1bit.train.qat import (
     non_bitlinear_linear_names,
     progressive_alpha,
     quantization_delay_alpha,
+    scale_stats,
     set_activation_quant,
     set_qat_alpha,
     train_step,
@@ -113,6 +114,21 @@ class TestSetActivationQuant:
         for module in model.modules():
             if isinstance(module, BitLinear):
                 assert module.quantize_activations is True
+
+
+class TestScaleStats:
+    def test_reports_gamma_when_learnable(self):
+        model = _FakeASR()
+        apply_layer_policy(model, "decoder_attn", learnable_scale=True)
+        stats = scale_stats(model)
+        assert set(stats) == {"gamma_min", "gamma_mean", "gamma_max"}
+        assert stats["gamma_min"] > 0
+        assert stats["gamma_min"] <= stats["gamma_mean"] <= stats["gamma_max"]
+
+    def test_empty_without_learnable_scales(self):
+        model = _FakeASR()
+        apply_layer_policy(model, "decoder_attn")
+        assert scale_stats(model) == {}
 
 
 class TestFreezeNonBitlinear:

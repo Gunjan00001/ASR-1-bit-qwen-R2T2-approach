@@ -26,7 +26,7 @@ from asr1bit.bitlinear import BitLinear
 from asr1bit.data.load import iter_librispeech
 from asr1bit.qwen import backends
 from asr1bit.replace import apply_layer_policy
-from asr1bit.train.qat import grad_norms, set_activation_quant, set_qat_alpha
+from asr1bit.train.qat import grad_norms, scale_stats, set_activation_quant, set_qat_alpha
 
 
 class QuantInstrument:
@@ -91,27 +91,6 @@ def quant_signature(model) -> dict:
 def flip_count(before: dict, after: dict) -> int:
     """Number of elements whose sign-grid membership changed between snapshots."""
     return sum(int((mask != after[name]).sum()) for name, mask in before.items())
-
-
-def scale_stats(model) -> dict:
-    """Summary of learnable scales and shadow magnitudes (empty if disabled)."""
-    scales = [
-        module.weight_scale.detach()
-        for module in model.modules()
-        if isinstance(module, BitLinear) and module.weight_scale is not None
-    ]
-    if not scales:
-        return {}
-    flat = torch.cat([scale.reshape(-1) for scale in scales])
-    weight_abs = torch.stack(
-        [module.weight.detach().abs().mean() for module in model.modules() if isinstance(module, BitLinear)]
-    )
-    return {
-        "scale_min": float(flat.min()),
-        "scale_mean": float(flat.mean()),
-        "scale_max": float(flat.max()),
-        "shadow_abs_mean": float(weight_abs.mean()),
-    }
 
 
 def run_condition(model, wrapper, batch, utterance, processor, bit_width, alpha, label) -> dict:

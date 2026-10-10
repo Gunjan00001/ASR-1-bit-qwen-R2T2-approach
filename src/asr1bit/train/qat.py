@@ -61,6 +61,23 @@ def set_activation_quant(model: nn.Module, enabled: bool) -> int:
     return count
 
 
+def scale_stats(model: nn.Module) -> dict[str, float]:
+    """Min/mean/max of the effective learnable gamma (empty when disabled)."""
+    gammas = [
+        module.gamma().detach()
+        for module in model.modules()
+        if isinstance(module, BitLinear) and module.weight_scale is not None
+    ]
+    if not gammas:
+        return {}
+    flat = torch.cat([gamma.reshape(-1) for gamma in gammas])
+    return {
+        "gamma_min": float(flat.min()),
+        "gamma_mean": float(flat.mean()),
+        "gamma_max": float(flat.max()),
+    }
+
+
 def non_bitlinear_linear_names(model: nn.Module) -> list[str]:
     """Names of ``nn.Linear`` modules that were *not* replaced by BitLinear."""
     return [
