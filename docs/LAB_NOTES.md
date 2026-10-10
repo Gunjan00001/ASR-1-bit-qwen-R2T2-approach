@@ -409,3 +409,25 @@ environmental, not model bugs):
   (b) **anchored distillation** with a *frozen* fp teacher and lower shadow lr
   (5e-5) — submitted (`scripts/qat_ternary_anchored.pbs`).
 - **Artifacts:** `artifacts/stage1/inspect_v2.json`.
+
+---
+
+## 2026-10-10 — FFN-only RECOVERS; attention is the blocker
+
+- **Did:** ternary QAT with `decoder_ffn` (attention stays fp; 84 BitLinear),
+  same data/schedule as the failing attn+ffn runs (4 k utts, lr 2e-4 cosine,
+  delay 5 %, batch 4).
+- **Result (periodic ternary WER):** 118.0 @500 → 84.3 @1000 → **42.2 @1500**;
+  training loss 4.1 → 2.1; gamma healthy. WER roughly halves every 500 steps.
+  Binary FFN-only queued for the table; run continues to 3 000 steps.
+- **Why it matters:** attention quantization was the blocker (it destroys audio
+  conditioning — the collapsed models emit generic prior text). FFN ternary
+  (gate/up/down, ~2/3 of decoder params) is recoverable at this budget.
+- **Also tried — anchored distillation is destructive at w=0.5:** frozen fp
+  teacher + KL 0.5 explodes (KL 11–15) and collapses the model (fp16 427,
+  ternary 315 @1000 steps, killed). Anchoring needs small weight or a
+  trust-region form, not a flat KL.
+- **Chose:** FFN-only is the lead Stage 2 configuration; add attention back
+  incrementally later (per-layer rollout + small anchor), not flat KL.
+- **Artifacts:** `artifacts/stage1/qat_ternary_ffn.log`,
+  `artifacts/stage1/qat_ternary_anchored.log`.

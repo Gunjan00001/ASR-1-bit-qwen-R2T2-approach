@@ -226,10 +226,29 @@ parameter — fixed), lr 2e-4, 100-step warmup, cosine, batch 4 (distill: 2),
 | naive (v1, free gamma) | 3 000 | 93.6 @500 → 232.9 @1000 (killed) | — | — | — |
 | naive (v2, log gamma) | 6 000 | 127 → 121.6 → **96.5** → 96.9 → 103.5 | **113.1** | 99.8 | 107.8 |
 | self-distillation (w=0.5, T=2) | 4 000 | 114.6 → 125.0 → 111.3 → **98.1** | **108.3** | 118.3 | 98.1 |
-| FFN-only (running) | 3 000 | see `qat_ternary_ffn.log` | — | — | — |
+| **FFN-only ternary** | 3 000 | 118.0 → 84.3 → **42.2** → … | (running) | — | (running) |
+| anchored distillation (frozen teacher, w=0.5, lr 5e-5) | 4 000 | **315.4 @1000**, fp16 427 (killed) | — | — | — |
 
 Reference: pretrained fp16 = **2.44** WER (50-utt subsample); zero-shot naive
 ternary ≈ 100.
+
+**FFN-only (`decoder_ffn`: attention stays fp) recovers** — ternary WER
+118 → 84 → **42** at steps 500/1000/1500, training loss 4.1 → 2.1, roughly
+halving WER every 500 steps. Keeping the attention projections fp preserves
+audio conditioning; the FFN ternary bottleneck is recoverable at this budget.
+Binary FFN-only is queued for the table.
+
+**Anchored distillation (frozen fp teacher, w=0.5) is destructive** at this
+configuration: KL explodes (11–15) and the model collapses (fp16 427, ternary
+315 @1000 steps). The KL gradient from an unattainable frozen teacher dominates
+the CE term. Anchoring needs a much smaller weight/temperature or a trust-region
+formulation, not a flat 0.5 KL.
+
+**Failure mode (checkpoint inspection):** the collapsed attn+ffn models emit
+fluent generic text unrelated to the audio ("AND THE FIRST OF THE HUMAN BODY…")
+— the decoder loses audio conditioning and falls back to the language prior
+(fp16 and ternary readouts identical at WER 112). Attention quantization is the
+cause; the FFN-only result confirms it.
 
 ## Findings (2026-10-10)
 
@@ -254,22 +273,24 @@ ternary ≈ 100.
 ## Interpretation
 
 Post-hoc ternary conversion of a 0.6 B ASR model by QAT on 4 k utterances is in
-the **destructive regime**: the sign bottleneck (per-tensor ternary, ~52 %
-weight error) is too coarse for this model size, and the optimizer's only
-escape is to drift the latent weights into a degenerate basin. This matches the
-plan's premise: naive QAT is not enough; the Stage 2 recovery stack (on-policy
-distillation with a *fixed* fp teacher, co-training/stochastic precision,
-trust-region anchoring, more data) is required. The FFN-only ablation tests
-whether keeping attention fp is a viable shortcut.
+the **destructive regime** when attention is quantized: the sign bottleneck
+(per-tensor ternary, ~52 % weight error) is too coarse for the attention
+pathway, the decoder loses audio conditioning, and the optimizer drifts the
+latent weights into the language prior. **FFN-only quantization recovers**
+(118 → 42 WER in 1.5 k steps, still descending) — attention must stay
+higher-precision at this scale, matching the per-projection sensitivity table.
+The Stage 2 recovery stack should be built on the FFN-only surface first, then
+attention added incrementally with an anchored/trust-region objective.
 
 ## Next steps (Stage 2 priorities)
 
-1. **Anchor training to the pretrained model** (KL to a frozen fp copy / low lr
-   for shadows / per-step drift penalty) so the fp readout cannot collapse.
-2. **FFN-only vs attn+ffn**: pick the largest recoverable quantization surface
-   from the running ablation.
+1. **FFN-only is the lead configuration** — finish the ternary run (expect
+   WER ≈ 20–30 by 3 000 steps), then binary FFN-only for the table.
+2. **Add attention back incrementally** with an anchored objective: small KL
+   weight (≤0.1) to a frozen fp teacher, or per-layer quantization rollout
+   (FFN first, attention last), rather than flat w=0.5 KL (destructive, 315 WER).
 3. **Co-training / stochastic precision**: alternate fp and quantized steps so
    the fp path remains strong.
 4. Only then extend training time and data.
-5. `0.3.0` stays untagged: the gate's "WER table emitted" is satisfied, but
-   the recovery evidence is negative; keep Stage 1 open.
+5. `0.3.0` stays untagged: the gate's "WER table emitted" is satisfied and the
+   loss is controllable, but recovery is still in progress; keep Stage 1 open.
