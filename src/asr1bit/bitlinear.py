@@ -4,6 +4,10 @@ Stage 1, T1.2. Holds fp32 shadow weights updated via a straight-through
 estimator (STE), quantizes weights on the forward pass, and optionally
 quantizes activations to INT8 (absmax, per-token).
 
+``learnable_scale=True`` adds a BitNet b1.58-style learnable dequantization
+gain (per-tensor or per-group, initialized to ``mean|W|``). The rounding grid
+uses the detached scale while gradients flow exactly to the scale parameter.
+
 Locked interface: ``BitLinear(in_dim, out_dim, bit_width, quantize_activations)``.
 """
 
@@ -38,6 +42,7 @@ class BitLinear(nn.Module):
         quantize_activations: bool = True,
         group_size: int | None = None,
         bias: bool = False,
+        learnable_scale: bool = False,
     ):
         super().__init__()
         self.in_features = in_features
@@ -45,6 +50,7 @@ class BitLinear(nn.Module):
         self.bit_width = bit_width
         self.quantize_activations = quantize_activations
         self.group_size = group_size
+        self.learnable_scale = learnable_scale
         # Progressive QAT ramp: 0 = full precision, 1 = fully quantized.
         self.alpha = 1.0
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
@@ -53,17 +59,57 @@ class BitLinear(nn.Module):
         else:
             self.register_parameter("bias", None)
         nn.init.kaiming_uniform_(self.weight, a=5 ** 0.5)
+        if learnable_scale:
+            self.weight_scale = nn.Parameter(torch.ones(self._scale_shape()))
+            self._init_weight_scale()
+        else:
+            self.register_parameter("weight_scale", None)
+
+    def _scale_shape(self) -> tuple[int, ...]:
+        """Shape of the learnable scale: scalar per-tensor, ``(groups, 1)`` grouped."""
+        if self.group_size is None:
+            return ()
+        if self.weight.numel() % self.group_size != 0:
+            raise ValueError(
+                f"group_size {self.group_size} must divide weight numel {self.weight.numel()}"
+            )
+        return (self.weight.numel() // self.group_size, 1)
+
+    def _init_weight_scale(self) -> None:
+        """Re-initialize the learnable scale to the observed ``mean|W|``."""
+        if self.weight_scale is None:
+            return
+        with torch.no_grad():
+            weight = self.weight.detach()
+            if self.group_size is None:
+                value = weight.abs().mean().reshape(())
+            else:
+                value = weight.reshape(-1, self.group_size).abs().mean(dim=1, keepdim=True)
+            self.weight_scale.copy_(value)
 
     def _quantized_weight(self) -> torch.Tensor:
-        if self.bit_width in _TERNARY_WIDTHS:
-            qw, scale = quantize_ternary(self.weight, self.group_size)
+        if self.learnable_scale:
+            gamma = self.weight_scale
+            if self.bit_width in _TERNARY_WIDTHS:
+                qw, _ = quantize_ternary(self.weight, self.group_size, gamma=gamma.detach())
+            else:
+                qw, _ = quantize_binary(self.weight, self.group_size)
+            dequantized = dequantize_weights(qw, gamma, self.group_size)
         else:
-            qw, scale = quantize_binary(self.weight, self.group_size)
-        dequantized = dequantize_weights(qw, scale, self.group_size)
+            if self.bit_width in _TERNARY_WIDTHS:
+                qw, scale = quantize_ternary(self.weight, self.group_size)
+            else:
+                qw, scale = quantize_binary(self.weight, self.group_size)
+            dequantized = dequantize_weights(qw, scale, self.group_size)
         # Progressive ramp: alpha=0 is full precision, alpha=1 fully quantized.
         blended = (1.0 - self.alpha) * self.weight + self.alpha * dequantized
         # STE: forward uses the blended value, gradient flows to the shadow.
-        return self.weight + (blended - self.weight).detach()
+        output = self.weight + (blended - self.weight).detach()
+        if self.learnable_scale:
+            # Zero in forward, exact gradient for the scale in backward.
+            scale_term = self.alpha * dequantized
+            output = output + (scale_term - scale_term.detach())
+        return output
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.quantize_activations:
@@ -88,11 +134,12 @@ class BitLinear(nn.Module):
             self.weight.copy_(linear.weight.detach().float())
             if self.bias is not None and linear.bias is not None:
                 self.bias.copy_(linear.bias.detach().float())
+        self._init_weight_scale()
         return self
 
     def extra_repr(self) -> str:
         return (
             f"in_features={self.in_features}, out_features={self.out_features}, "
             f"bit_width={self.bit_width}, quantize_activations={self.quantize_activations}, "
-            f"group_size={self.group_size}"
+            f"group_size={self.group_size}, learnable_scale={self.learnable_scale}"
         )

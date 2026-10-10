@@ -101,6 +101,59 @@ class TestGroupSize:
         assert layer(torch.randn(2, 8)).shape == (2, 4)
 
 
+class TestLearnableScale:
+    def test_disabled_by_default(self):
+        assert BitLinear(8, 4).weight_scale is None
+
+    def test_parameter_initialized_to_mean_abs(self):
+        torch.manual_seed(0)
+        layer = BitLinear(8, 4, learnable_scale=True)
+        assert isinstance(layer.weight_scale, nn.Parameter)
+        assert torch.allclose(layer.weight_scale, layer.weight.detach().abs().mean())
+
+    def test_groupwise_scale_shape(self):
+        layer = BitLinear(8, 4, learnable_scale=True, group_size=4)
+        assert layer.weight_scale.shape == (layer.weight.numel() // 4, 1)
+
+    def test_from_linear_initializes_scale(self):
+        linear = nn.Linear(6, 5)
+        layer = BitLinear.from_linear(linear, learnable_scale=True)
+        assert torch.allclose(layer.weight_scale, linear.weight.detach().abs().mean())
+
+    def test_alpha_one_binary_output_scales_with_scale(self):
+        torch.manual_seed(0)
+        layer = BitLinear(8, 4, learnable_scale=True, quantize_activations=False)
+        layer.alpha = 1.0
+        x = torch.randn(2, 8)
+        first = layer(x)
+        with torch.no_grad():
+            layer.weight_scale.mul_(2.0)
+        assert torch.allclose(layer(x), 2.0 * first, atol=1e-5)
+
+    def test_scale_gradient_flows_at_alpha_one(self):
+        torch.manual_seed(0)
+        for width in (1.0, 1.58):
+            layer = BitLinear(8, 4, bit_width=width, learnable_scale=True, quantize_activations=False)
+            layer.alpha = 1.0
+            layer(torch.randn(2, 8)).sum().backward()
+            assert layer.weight_scale.grad is not None
+            assert layer.weight_scale.grad.abs().sum() > 0
+
+    def test_no_scale_gradient_at_alpha_zero(self):
+        layer = BitLinear(8, 4, learnable_scale=True, quantize_activations=False)
+        layer.alpha = 0.0
+        layer(torch.randn(2, 8)).sum().backward()
+        grad = layer.weight_scale.grad
+        assert grad is None or torch.allclose(grad, torch.zeros_like(grad))
+
+    def test_groupwise_forward_and_backward_run(self):
+        layer = BitLinear(8, 4, learnable_scale=True, group_size=4, quantize_activations=False)
+        layer.alpha = 1.0
+        layer(torch.randn(2, 8)).sum().backward()
+        assert layer.weight_scale.grad is not None
+        assert layer.weight.grad is not None
+
+
 class TestSteCapability:
     def test_overfits_one_synthetic_batch_at_alpha_one(self):
         """STE must let a single BitLinear learn a separable batch at alpha=1."""

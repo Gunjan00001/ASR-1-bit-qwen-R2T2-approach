@@ -14,6 +14,7 @@ from asr1bit.data.load import (
     iter_utterances,
     load_audio,
     load_manifest,
+    load_utterance_cache,
     select_subsample,
     write_manifest,
 )
@@ -185,3 +186,30 @@ class TestSelectSubsample:
         items = list(range(100))
         sample = select_subsample(items, 10, seed=2)
         assert sample == sorted(sample)
+
+
+class TestUtteranceCache:
+    def test_round_trip(self, tmp_path):
+        import torch
+
+        audio = np.zeros(1600, dtype=np.float32)
+        payload = {
+            "meta": {"kept": 1},
+            "utterances": [
+                {"id": "u1", "text": "Hello, World!", "audio": torch.from_numpy(audio)},
+            ],
+        }
+        path = tmp_path / "cache.pt"
+        torch.save(payload, path)
+        utterances = load_utterance_cache(path)
+        assert len(utterances) == 1
+        utt = utterances[0]
+        assert utt.id == "u1"
+        assert utt.text == "Hello, World!"
+        assert utt.reference == "hello world"
+        assert utt.audio.dtype == np.float32
+        assert abs(utt.duration - 0.1) < 1e-3
+
+    def test_missing_cache_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            load_utterance_cache(tmp_path / "nope.pt")

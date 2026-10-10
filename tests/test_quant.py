@@ -85,6 +85,24 @@ class TestTernary:
         with pytest.raises(ValueError):
             quantize_ternary(torch.zeros(1, 3), group_size=2)
 
+    def test_gamma_override_is_used_and_returned(self):
+        w = torch.tensor([0.5, -1.5, 2.0])
+        gamma = torch.tensor(0.5)
+        q, scale = quantize_ternary(w, gamma=gamma)
+        assert torch.allclose(scale, gamma)
+        # grid: w / 0.5 -> [1, -3, 4] -> round/clamp -> [1, -1, 1]
+        assert torch.equal(q, torch.tensor([1.0, -1.0, 1.0]))
+
+    def test_gamma_override_groupwise_shape(self):
+        gamma = torch.tensor([[0.5], [1.0]])
+        q, scale = quantize_ternary(torch.randn(1, 4), group_size=2, gamma=gamma)
+        assert q.shape == (1, 4)
+        assert torch.allclose(scale, gamma)
+
+    def test_gamma_override_wrong_group_count_raises(self):
+        with pytest.raises(ValueError):
+            quantize_ternary(torch.zeros(2, 4), group_size=2, gamma=torch.ones(3, 1))
+
 
 class TestDequantize:
     def test_pertensor(self):

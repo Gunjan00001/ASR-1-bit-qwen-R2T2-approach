@@ -314,3 +314,21 @@ Dated, append-only. Record what changed, why, and alternatives rejected.
   (five fields per entry); this section records dated decisions; failed runs are
   recorded with diagnosis and never deleted. Docs are committed with the code
   they describe.
+- **2026-10-10 — Stage 1 continues on the JIIT A100 cluster.** Rationale: the
+  Colab T4 runtime was lost and the Kaggle kernel was contended; the cluster
+  offers 8 × A100-80GB (PBS `gpu` queue, 12 h interactive sessions) and the
+  filesystem is shared between login and GPU nodes. Env: torch 2.11.0+cu126,
+  transformers 4.57.6, qwen-asr 0.0.6.
+- **2026-10-10 — Quantizer verdict: correct; collapse is inherent.** Measured
+  per-tensor binary relative Frobenius error 0.648 (closed form ≈ 0.60 for
+  Gaussian weights); group-wise scaling does not fix sign-pattern loss. The
+  single-projection collapse is expected naive 1-bit behaviour, not a bug.
+  Recovery remains the Stage 2 stack; Stage 1 adds the missing **learnable
+  dequantization scales** (BitNet b1.58-style, `BitLinear(learnable_scale=True)`,
+  default off) plus a cosine LR schedule, utterance-cache QAT data, and shadow
+  checkpoints. QAT budget moves from "40–1000 steps, ≤200 utts" to
+  train-clean-100 (~4k utts) with thousands of steps on A100.
+- **2026-10-10 — Training data policy for Stage 1.** Use a deterministic 4k
+  utterance cache from `train.100` (durations 0.5–25 s) built by
+  `scripts/build_qat_cache.py` into gitignored `data/`; evaluation stays on a
+  fixed test-clean sample (N ≥ 100) so floors and checkpoints are comparable.

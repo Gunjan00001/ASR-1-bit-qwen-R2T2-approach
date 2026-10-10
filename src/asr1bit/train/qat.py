@@ -116,16 +116,17 @@ def freeze_non_bitlinear(model: nn.Module) -> int:
     """Freeze every parameter except BitLinear shadow weights (QAT-only).
 
     Used when LoRA is unavailable so a QAT run updates only the quantized
-    projections instead of the whole model (which diverges). Returns the number
-    of trainable parameters remaining.
+    projections instead of the whole model (which diverges). Learnable scales
+    (``weight_scale``) are kept trainable as well. Returns the number of
+    trainable parameters remaining.
     """
     for param in model.parameters():
         param.requires_grad_(False)
     for module in model.modules():
         if isinstance(module, BitLinear):
-            module.weight.requires_grad_(True)
-            if module.bias is not None:
-                module.bias.requires_grad_(True)
+            for param in (module.weight, module.bias, module.weight_scale):
+                if param is not None:
+                    param.requires_grad_(True)
     return trainable_parameter_count(model)
 
 

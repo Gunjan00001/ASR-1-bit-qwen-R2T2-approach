@@ -2,12 +2,14 @@
 
 Locked interfaces::
 
-    quantize_binary(weight, group_size=None)  -> (qW, scale)
-    quantize_ternary(weight, group_size=None) -> (qW, scale)
-    dequantize_weights(qW, scale, group_size=None) -> weight
+    quantize_binary(weight, group_size=None)            -> (qW, scale)
+    quantize_ternary(weight, group_size=None, gamma=None) -> (qW, scale)
+    dequantize_weights(qW, scale, group_size=None)      -> weight
 
 Binary:  ``q = sign(W - mean(W))``, ``scale = mean|W|`` (sign(>=0) -> +1).
-Ternary: ``q = RoundClip(W / gamma, -1, 1)``, ``gamma = mean|W|``.
+Ternary: ``q = RoundClip(W / gamma, -1, 1)``, ``gamma = mean|W|`` (or a
+caller-supplied ``gamma`` so :class:`~asr1bit.bitlinear.BitLinear` can use a
+learnable per-tensor/per-group scale).
 
 Group-wise scaling (Bonsai-style) reduces along the last dimension in blocks of
 ``group_size``; ``scale`` then has shape ``(num_groups, 1)`` and broadcasts when
@@ -46,16 +48,42 @@ def quantize_binary(weight: torch.Tensor, group_size: int | None = None) -> tupl
     return q.reshape(original_shape), scale
 
 
-def quantize_ternary(weight: torch.Tensor, group_size: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
-    """Quantize ``weight`` to ``{-1, 0, +1}`` via RoundClip with scale ``mean|W|``."""
+def quantize_ternary(
+    weight: torch.Tensor,
+    group_size: int | None = None,
+    gamma: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Quantize ``weight`` to ``{-1, 0, +1}`` via RoundClip.
+
+    Args:
+        weight: Weight matrix, any shape.
+        group_size: Optional block size along the last dimension.
+        gamma: Optional rounding scale (scalar or ``(num_groups, 1)``). When
+            omitted the observed ``mean|W|`` per tensor/group is used. A
+            learnable scale passes ``gamma.detach()`` here for the rounding
+            grid while keeping the parameter as the dequantization gain.
+
+    Returns:
+        ``(q, scale)`` where ``q`` holds the ``{-1, 0, +1}`` values and
+        ``scale`` is the gamma actually used.
+    """
     original_shape = weight.shape
     grouped, _ = _group_view(weight, group_size)
-    gamma = grouped.abs().mean(dim=1, keepdim=True).to(weight.dtype)
-    q = torch.clamp(torch.round(grouped / gamma.clamp(min=torch.finfo(weight.dtype).tiny)), -1.0, 1.0)
-    q = torch.where(gamma == 0, torch.zeros_like(q), q).to(weight.dtype)
+    if gamma is None:
+        gamma_eff = grouped.abs().mean(dim=1, keepdim=True).to(weight.dtype)
+    else:
+        gamma_eff = gamma.to(device=grouped.device, dtype=weight.dtype).reshape(-1, 1)
+        if gamma_eff.shape[0] != grouped.shape[0]:
+            raise ValueError(
+                f"gamma has {gamma_eff.shape[0]} scales but weight has {grouped.shape[0]} groups"
+            )
+    q = torch.clamp(
+        torch.round(grouped / gamma_eff.clamp(min=torch.finfo(weight.dtype).tiny)), -1.0, 1.0
+    )
+    q = torch.where(gamma_eff == 0, torch.zeros_like(q), q).to(weight.dtype)
     if group_size is None:
-        return q.reshape(original_shape), gamma.reshape(())
-    return q.reshape(original_shape), gamma
+        return q.reshape(original_shape), gamma_eff.reshape(())
+    return q.reshape(original_shape), gamma_eff
 
 
 def dequantize_weights(

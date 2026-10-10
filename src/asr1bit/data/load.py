@@ -205,3 +205,34 @@ def select_subsample(items: Sequence[Any], n: int, seed: int = 0) -> list[Any]:
     rng = random.Random(seed)
     indices = sorted(rng.sample(range(len(items)), n))
     return [items[i] for i in indices]
+
+
+def load_utterance_cache(path: str | Path, target_sr: int = SAMPLE_RATE) -> list[Utterance]:
+    """Load a ``.pt`` utterance cache written by ``scripts/build_qat_cache.py``.
+
+    The cache holds ``{"meta": ..., "utterances": [{"id", "text", "audio"}]}``
+    with 16 kHz float32 waveforms, avoiding repeated Hub streaming during
+    multi-epoch QAT.
+    """
+    import torch  # lazy: torch is a core dep, but keep module import light
+
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Utterance cache not found: {path}")
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    utterances: list[Utterance] = []
+    for index, item in enumerate(payload["utterances"]):
+        audio = np.asarray(item["audio"], dtype=np.float32).reshape(-1)
+        if int(target_sr) != SAMPLE_RATE:
+            audio = soxr.resample(audio, SAMPLE_RATE, int(target_sr)).astype(np.float32)
+        text = item.get("text", "")
+        utterances.append(
+            Utterance(
+                id=str(item.get("id", index)),
+                audio=audio,
+                text=text,
+                reference=normalize_text(text),
+                duration=audio.shape[0] / float(target_sr),
+            )
+        )
+    return utterances

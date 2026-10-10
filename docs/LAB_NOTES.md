@@ -262,3 +262,46 @@ off.
   centered-sign, scale granularity).
 - **Artifacts:** `artifacts/stage1/diag_generation_decoder_attn_steps0.json`,
   `artifacts/stage1/diag_projection_decoder_attn.json`.
+
+---
+
+## 2026-10-10 — Quantizer audit (A100 cluster): math is correct; collapse is expected
+
+Moved to the JIIT cluster (8 × A100-SXM4-80GB, PBS `gpu` queue; see `gpu.md`).
+Environment: python 3.13.12, torch 2.11.0+cu126, transformers 4.57.6,
+qwen-asr 0.0.6, datasets 5.0.1, numpy 2.5.3. All 178 existing tests pass here.
+
+- **Did:** measured the relative Frobenius error `||Q(W)-W|| / ||W||` of all 196
+  decoder projections directly from `model.safetensors` under every quantizer
+  configuration (`scripts/diag_quant_error.py`).
+- **Result (avg over 196 projections):**
+
+  | config | rel. Frobenius error |
+  |---|---|
+  | bf16 round-trip | ~0 (checkpoint is already bf16) |
+  | binary, per-tensor | **0.648** (0.61–0.74 per projection) |
+  | ternary, per-tensor | 0.565 |
+  | binary, group 64/128 | 0.616 / 0.614 |
+  | ternary, group 64/128 | 0.519 / 0.522 |
+
+- **What this means:** closed form for centred-sign with scale `mean|W|` on
+  Gaussian weights is `sqrt(1 + 2/π − 2·(2/π)) ≈ 0.60` — the measured numbers
+  match to within the weights' non-Gaussianity. **The quantizer math is correct.**
+  Group-wise scaling barely helps because sign() discards magnitude regardless of
+  the scale; the error is dominated by the sign pattern, not the scale.
+- **Why the earlier single-projection collapse happened:** a linear layer whose
+  weights are ±mean|W| adds ~60% relative noise to its output; through 28
+  attention layers that is catastrophic. Single-projection WER 100 is expected
+  naive 1-bit behaviour (consistent with "Towards One-bit ASR", +52% relative WER
+  even *after* naive QAT). It was never a harness/STE bug.
+- **Chose:** treat the collapse as inherent; add the missing BitNet b1.58
+  ingredients — **learnable dequantization scales** (per-tensor or per-group,
+  `BitLinear(learnable_scale=True)`, off by default), a cosine LR schedule,
+  utterance-cache training data, and shadow checkpoints — then run real QAT on
+  the A100 (the T4 budget of 40–1000 steps on ≤200 utts cannot recover 60% noise).
+- **Next:** (a) 1-utterance memorization smoke at α=1 (loss controllability);
+  (b) binary vs ternary recovery on train-clean-100 (~4k utts), policy
+  `decoder_attn_ffn`, learnable scales; (c) emit the Stage 1 WER table.
+- **Artifacts:** `artifacts/stage1/diag_quant_error.json` (per-layer rows).
+- **Environment note:** `datasets>=5` requires numpy≥2; the shared `~/miniconda3`
+  was upgraded to numpy 2.5.3 (torch 2.11 unaffected).

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from pathlib import Path
@@ -22,7 +23,7 @@ from pathlib import Path
 import torch
 
 from asr1bit.bitlinear import BitLinear
-from asr1bit.data.load import iter_librispeech
+from asr1bit.data.load import iter_librispeech, load_utterance_cache
 from asr1bit.eval.wer import corpus_cer, corpus_wer
 from asr1bit.qwen import backends
 from asr1bit.replace import apply_layer_policy
@@ -119,6 +120,55 @@ def evaluate_precisions(wrapper, model, utterances, n) -> dict:
     return {"binary": binary, "ternary": ternary}
 
 
+def shadow_state(model) -> dict:
+    """Trainable tensor snapshot (BitLinear shadows and learnable scales)."""
+    return {name: p.detach().cpu() for name, p in model.named_parameters() if p.requires_grad}
+
+
+def save_checkpoint(path: Path, model, step: int, args: argparse.Namespace) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save({"step": step, "config": vars(args), "shadows": shadow_state(model)}, path)
+    print(f"saved checkpoint {path}", flush=True)
+
+
+def load_checkpoint(path: str | Path, model) -> int:
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    shadows = payload.get("shadows", {})
+    restored = 0
+    with torch.no_grad():
+        for name, param in model.named_parameters():
+            if name in shadows and shadows[name].shape == param.shape:
+                param.copy_(shadows[name])
+                restored += 1
+    print(f"resumed {restored} tensors from {path} (step {payload.get('step')})", flush=True)
+    return int(payload.get("step", 0))
+
+
+def build_lr_lambda(args: argparse.Namespace):
+    """Warmup then constant or cosine decay to zero over ``--steps``."""
+    warmup = max(1, args.warmup_steps)
+
+    def lr_lambda(step: int) -> float:
+        if step < warmup:
+            return (step + 1) / warmup
+        if args.lr_schedule == "cosine":
+            progress = (step - warmup) / max(1, args.steps - warmup)
+            return 0.5 * (1.0 + math.cos(math.pi * min(1.0, progress)))
+        return 1.0
+
+    return lr_lambda
+
+
+def load_train_utterances(args: argparse.Namespace) -> list:
+    """Training utterances from a local cache when given, else Hub validation sample."""
+    if args.train_cache:
+        utterances = load_utterance_cache(args.train_cache)
+        if args.train_n and args.train_n < len(utterances):
+            return utterances[: args.train_n]
+        return utterances
+    return list(iter_librispeech("clean", "validation", sample_n=args.train_n, sample_seed=0))
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", default="Qwen/Qwen3-ASR-0.6B")
@@ -144,6 +194,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--log-grad-norms", type=int, default=1)
     p.add_argument("--zero-shot", type=int, default=0, help="Evaluate alpha=1 without training")
     p.add_argument("--eval-every", type=int, default=0, help="WER eval interval during training (0=off)")
+    p.add_argument(
+        "--learnable-scale", type=int, default=0,
+        help="BitNet b1.58-style learnable per-tensor/group dequantization gain.",
+    )
+    p.add_argument("--lr-schedule", choices=["const", "cosine"], default="const")
+    p.add_argument(
+        "--train-cache", default=None,
+        help="Utterance .pt cache from scripts/build_qat_cache.py (fast multi-epoch QAT).",
+    )
+    p.add_argument("--save-dir", default=None, help="Directory for shadow checkpoints.")
+    p.add_argument("--save-every", type=int, default=0, help="Checkpoint interval in steps (0=only at end).")
+    p.add_argument("--resume", default=None, help="Checkpoint path to resume shadows from.")
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
 
@@ -165,7 +227,7 @@ def main() -> int:
     processor = wrapper.processor
     patch_outer_forward(model)
 
-    train_utts = list(iter_librispeech("clean", "validation", sample_n=args.train_n, sample_seed=0))
+    train_utts = load_train_utterances(args)
     eval_utts = list(iter_librispeech("clean", "test", sample_n=args.eval_n, sample_seed=0))
     train_examples = build_examples(train_utts, processor)
     print(f"train={len(train_examples)} eval={len(eval_utts)}", flush=True)
@@ -176,18 +238,24 @@ def main() -> int:
     results["pretrained"] = evaluate(wrapper, eval_utts, args.eval_n)
     print(json.dumps(results["pretrained"]), flush=True)
 
-    apply_layer_policy(model, args.policy, bit_width=args.bit_width, group_size=group_size)
+    apply_layer_policy(
+        model,
+        args.policy,
+        bit_width=args.bit_width,
+        group_size=group_size,
+        learnable_scale=bool(args.learnable_scale),
+    )
     model.to("cuda:0")
     results["bitlinear_replaced"] = getattr(model, "bitlinear_replaced", 0)
 
-    # QAT-only: freeze everything except BitLinear shadows.
+    # QAT-only: freeze everything except BitLinear shadows and learnable scales.
     for param in model.parameters():
         param.requires_grad_(False)
     for module in model.modules():
         if isinstance(module, BitLinear):
-            module.weight.requires_grad_(True)
-            if module.bias is not None:
-                module.bias.requires_grad_(True)
+            for param in (module.weight, module.bias, module.weight_scale):
+                if param is not None:
+                    param.requires_grad_(True)
     set_activation_quant(model, bool(args.activation_quant))
     if args.grad_checkpointing:
         model.gradient_checkpointing_enable()
@@ -213,18 +281,19 @@ def main() -> int:
         return 0
 
     optimizer = build_optimizer(model, lr=args.lr, use_8bit=(args.optimizer == "adam8bit"))
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, lr_lambda=lambda step: min(1.0, (step + 1) / max(1, args.warmup_steps))
-    )
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=build_lr_lambda(args))
     scaler = torch.amp.GradScaler("cuda") if args.autocast else None
 
     batches = [collate(train_examples[i : i + args.batch_size], processor)
                for i in range(0, len(train_examples), args.batch_size)]
     alpha_warmup = max(1, int(args.steps * args.alpha_warmup_frac))
     history = []
+    start_step = 0
+    if args.resume:
+        start_step = load_checkpoint(args.resume, model)
     print("=== QAT ===", flush=True)
     started = time.perf_counter()
-    for step in range(args.steps):
+    for step in range(start_step, args.steps):
         if args.alpha_mode == "ramp":
             alpha = progressive_alpha(step, alpha_warmup)
         elif args.alpha_mode == "delay":
@@ -269,8 +338,12 @@ def main() -> int:
             history.append(ev)
             print("EVAL " + json.dumps(ev), flush=True)
             set_precision(model, args.bit_width, alpha)  # restore training precision
+        if args.save_dir and args.save_every and (step + 1) % args.save_every == 0:
+            save_checkpoint(Path(args.save_dir) / "last.pt", model, step + 1, args)
     results["history"] = history
     results["qat_seconds"] = time.perf_counter() - started
+    if args.save_dir:
+        save_checkpoint(Path(args.save_dir) / "last.pt", model, args.steps, args)
 
     print("=== ablations (offline WER) ===", flush=True)
     disable = getattr(model, "gradient_checkpointing_disable", None)
@@ -292,7 +365,7 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     tag = (
         f"{args.policy}_bw{args.bit_width}_g{group_size}_lr{args.lr}_"
-        f"{args.optimizer}_{args.alpha_mode}_n{args.train_n}"
+        f"{args.optimizer}_{args.alpha_mode}_ls{args.learnable_scale}_n{args.train_n}"
     )
     (out_dir / f"stage1_{tag}.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     print("wrote", out_dir / f"stage1_{tag}.json", flush=True)
