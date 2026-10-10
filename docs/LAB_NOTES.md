@@ -389,3 +389,23 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/stage1_decoder_attn_ffn_*.json`,
   `artifacts/stage1/qat_ternary_attnffn_ls2.log`,
   `artifacts/stage1/qat_ternary_distill.log`.
+
+---
+
+## 2026-10-10 — Failure mode confirmed: the model ignores audio (prior collapse)
+
+- **Did:** `scripts/inspect_checkpoint.py` on the v2 (naive, 6000-step)
+  checkpoint, 5 fixed test-clean utterances.
+- **Result:** fp16 readout WER 112.2 and quantized WER 112.2 (identical);
+  hypotheses are fluent **generic text unrelated to the audio**, e.g.
+  ref "IF IT ONLY WERE NOT SO DARK HERE AND SO TERRIBLY LONELY" →
+  hyp "AND THE FIRST OF THE HUMAN BODY IS THE FIRST OF THE HUMAN BODY AND HE…".
+- **Why:** the decoder lost audio conditioning and collapsed onto the language
+  prior. Teacher-forced loss (~4.5) stays low because the prompt still anchors
+  the continuation; free-running generation ignores the audio entirely. The
+  frozen AuT encoder is fine — the damaged part is the ternary attention
+  pathway in the decoder, consistent with the per-projection sensitivity table.
+- **Chose:** (a) FFN-only run (attention fp) as the decisive ablation — running;
+  (b) **anchored distillation** with a *frozen* fp teacher and lower shadow lr
+  (5e-5) — submitted (`scripts/qat_ternary_anchored.pbs`).
+- **Artifacts:** `artifacts/stage1/inspect_v2.json`.
