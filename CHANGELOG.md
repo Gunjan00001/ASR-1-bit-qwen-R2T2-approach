@@ -18,6 +18,8 @@ gate. `stage-0` was merged to `main` at `0.2.0`.
 | `0.1.1` | 2026-09-20 | `stage-0` | Stage 0 plan corrections (eval protocol, append-only scope, feasibility) | — |
 | `0.1.2`–`0.1.17` | 2026-09-20 | `stage-0` | Stage 0 implementation + gate-runner hardening (17 checkpoints, summarized below) | — |
 | `0.2.0` | 2026-09-20 | `stage-0` → `main` | **Stage 0 gate PASSED** — fp16 baselines reproduced; `X = +1.5` locked | **passed** |
+| `0.2.1`–`0.2.10` | 2026-09-20 | `stage-1` | Stage 1 T1.1–T1.4 implementation; first QAT run invalid (shadow corruption) | — |
+| `0.2.11`–`0.2.28` | 2026-10-10 | `stage-1` | Quantizer audit (math correct), A100 tooling, log-scaled learnable scales, distillation QAT, policy ablations | — |
 
 ## 0.2.0 — Stage 0 gate passed
 
@@ -94,6 +96,32 @@ complete; the gate is **not met** and `0.3.0` is intentionally untagged.
 - Debug phase: STE correctness tests (overfit-one-batch at α=1), `grad_norms` /
   `check_finite_grads` diagnostics, and a stabilized runner (fp32 AdamW, α=1,
   no grad-ckpt/act-quant/autocast, QAT-only freeze). 171 tests pass.
+
+## 0.2.11 – 0.2.28 — Stage 1 continued on the JIIT A100 cluster (2026-10-10)
+
+- **Quantizer audit** (`scripts/diag_quant_error.py`): per-tensor binary
+  relative Frobenius error 0.648 ≈ the closed-form 0.60 for Gaussian weights;
+  group-wise scaling barely changes it. Verdict: quantizer math correct; the
+  earlier single-projection collapse is inherent naive 1-bit behaviour.
+- **Loss controllability proven** (`scripts/diag_generation.py`): single-utterance
+  QAT memorizes **exactly** at ternary (loss 0.000, greedy == label) and
+  partially at binary (loss 2.8). Earlier "bug" verdict retracted.
+- **Learnable scales** (`BitLinear(learnable_scale=True)`): BitNet b1.58-style
+  per-tensor gain, **log-parameterized** after the first run showed gamma
+  collapsing to ~0 and going negative (`gamma()` stays positive; stats logged).
+- **Training tooling**: `--lr-schedule cosine`, `--train-cache`, shadow
+  checkpoints + resume, `--lazy-collate`, `--eval-both`,
+  `scripts/build_qat_cache.py` (streaming; 4k utts train-clean-100, 14.5 h),
+  `scripts/install_fast_tokenizer.py` (fixes multi-minute slow-tokenizer stalls),
+  PBS launchers (`scripts/qat_ternary*.pbs`).
+- **Self-distillation QAT** (`--distill-weight`, teacher = same shadows at
+  α=0; `distillation_loss`): KL ~0.4–0.6, faster CE descent than naive QAT.
+- **Policies**: added `decoder_ffn` (FFN-only) for the attention-bottleneck
+  ablation.
+- **Runs on A100**: naive ternary `decoder_attn_ffn` plateaus at WER ~96–97
+  (test-clean 50-utt); distillation ~114 @1k steps; FFN-only queued. fp16
+  readouts stay clean. Full WER table and analysis in
+  `docs/stage1_results.md` (updated 2026-10-10). `0.3.0` stays untagged.
 
 ## 0.1.1 — Stage 0 plan corrections
 
