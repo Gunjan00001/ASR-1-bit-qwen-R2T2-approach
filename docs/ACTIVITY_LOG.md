@@ -7,32 +7,32 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 03:10 IST)
+## Live status (updated 2026-10-11 03:25 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10788` | **Stage 2a-ext2**: warm-restart, GPU 2, step 2500→5000 | step ~3150/5000 @ 80/min | **ternary 19.4 @3000** (from 22.6 @2000) | **~45–55 min** |
-| `10780` | **Stage 2a** attention rollout + anchor w=0.1 | **done** | **ternary 22.6**, fp16 97.6, binary 99.5 | — |
-| `10771` | FFN-only ternary | **done** | final: ternary **32.8**, binary 71.0, fp16 226.5 | — |
-| `10764` | FFN-only binary | **done** | final: binary **97.9**, ternary 106.8, fp16 223.9 | — |
-| `10708` | persistent GPU session | — | — | ends ~04:00 IST |
+| `10788` | **Stage 2a-ext2**: warm-restart, GPU 2, step 2500→5000 | step ~3900/5000 @ 80/min | **ternary 17.5 @3500** (52.8→38→23.1→22.6→21.5→19.4→17.5) | **~35–40 min** |
+| `10789` | **Stage 2b**: binary rollout from the ternary checkpoint | starting | init from ext2 step-3500 | **~40–50 min** |
+| `10780` | Stage 2a attention rollout | **done** | ternary 22.6, fp16 97.6, binary 99.5 | — |
+| `10771` | FFN-only ternary | **done** | ternary **32.8** | — |
+| `10764` | FFN-only binary | **done** | binary **97.9** | — |
+| login node | 8k-utterance cache build | running | — | ~5 min |
 
 **Full attention+FFN ternary trajectory (best result):**
-52.8 → 38.0 → 23.1 → 22.6 → 21.5 → **19.4** at steps 500…3000. The warm-restart
-extension continues to 5000; expect ~15–17 if the trend holds.
+52.8 → 38.0 → 23.1 → 22.6 → 21.5 → 19.4 → **17.5** at steps 500…3500.
+Recipe: FFN warm start (84 layers) → attention rollout with a frozen-pretrained
+teacher anchor (w=0.1, T=2), lr 5e-5 → warm-restart cosine cycle 2.
 
-Next: binary version of the same recipe; then co-training/stochastic precision
-and more data.
+Next: binary rollout (Stage 2b, progressive precision from ternary); 8k cache
+for longer runs.
 
-**GPU-switch rule in action (R1, twice):** Stage 2a was resumed from GPU 6
-(contended) to GPU 7 (12 % util) → 97 steps/min. The extension (`10785`, GPU 6,
-94 % util) was resumed again as `10788` on GPU 2 → 80 steps/min; the slow job
-was killed both times. The `--resume` LR fix is verified in both resumes
-(`lr schedule advanced to step …`).
+**GPU-switch rule in action (R1, twice):** Stage 2a resumed from GPU 6
+(contended) to GPU 7 → 97 steps/min. The extension (`10785`, GPU 6) was resumed
+as `10788` on GPU 2 → 80 steps/min. Both slow originals were killed. The
+`--resume` LR fix is verified in both resumes (`lr schedule advanced to step …`).
 
-**Session-cgroup rule (learned the hard way):** do not load model + checkpoint
-in the 32 GB interactive session; it OOM-kills silently (log just stops). Use
-batch jobs for anything heavier than a small probe. See `rules.md` R5.
+**Session-cgroup rule:** do not load model + checkpoint in the 32 GB interactive
+session; it OOM-kills silently (log just stops). Use batch jobs (rules.md R5).
 
 **Resume rule:** `--resume` continues the same run (advances the LR schedule and
 step counter); `--init-from` loads weights for a new phase (step counter
@@ -346,3 +346,19 @@ restarts at 0). Never resume without the LR-schedule advance.
 - **Result @3000:** ternary **19.4** — below 20, still descending.
 - **Evidence:** `artifacts/stage1/qat_attn_rollout_ext.log`,
   `artifacts/stage1/qat_attn_rollout_ext2.log`.
+
+### 03:20 — Stage 2b (binary rollout) + 8k cache launched
+
+- **Did:** submitted `scripts/qat_binary_rollout.pbs` (job `10789`):
+  `--bit-width 1.0`, `--init-from` the ternary rollout checkpoint
+  (`qat_attn_rollout_ext2/last.pt`, ~step 3500, ternary 17.5), same frozen
+  anchor (w=0.1) + lr 5e-5, 2 000 steps. Rationale: binary FFN-only stalled
+  (~98 WER), so binary starts from **ternary-adapted shadows** (progressive
+  precision) instead of a binary warm start.
+- **Also:** started an 8k-utterance `train.clean.100` cache build on the login
+  node (`data/qat_clean_train.100_n8000.pt`, streaming) for longer future runs.
+- **Note:** `10789` started before ext2 finished, so it initialized from ext2's
+  step-3500 checkpoint (not the final 5000) — acceptable, the ternary model at
+  17.5 is a strong start.
+- **Evidence:** `artifacts/stage1/qat_binary_rollout.log`,
+  `artifacts/stage1/build_qat_cache_8k.log`.
