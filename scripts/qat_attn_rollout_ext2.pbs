@@ -57,7 +57,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --policy decoder_attn_ffn \
   --bit-width 1.58 \
   --learnable-scale 1 \
-  --resume data/checkpoints/qat_attn_rollout_g7/last.pt \
+  --resume data/checkpoints/qat_attn_rollout_ext/last.pt \
   --steps 5000 \
   --train-cache "$CACHE" \
   --train-n 4000 \
