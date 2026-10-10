@@ -108,16 +108,23 @@ def set_precision(model, bit_width: float, alpha: float) -> None:
             module.alpha = alpha
 
 
-def evaluate_precisions(wrapper, model, utterances, n) -> dict:
-    """WER at alpha=1 for binary and ternary (used for periodic/zero-shot)."""
+def evaluate_precisions(wrapper, model, utterances, n, *, bit_width: float = 1.0, both: bool = True) -> dict:
+    """WER at alpha=1 for binary and/or ternary (used for periodic/zero-shot).
+
+    With ``both=False`` only the training precision (``bit_width``) is scored,
+    halving eval time on long runs.
+    """
     model.eval()
+    results: dict = {}
     with torch.no_grad():
-        set_precision(model, 1.0, 1.0)
-        binary = evaluate(wrapper, utterances, n)
-        set_precision(model, 1.58, 1.0)
-        ternary = evaluate(wrapper, utterances, n)
+        if both or bit_width == 1.0:
+            set_precision(model, 1.0, 1.0)
+            results["binary"] = evaluate(wrapper, utterances, n)
+        if both or bit_width != 1.0:
+            set_precision(model, 1.58, 1.0)
+            results["ternary"] = evaluate(wrapper, utterances, n)
     model.train()
-    return {"binary": binary, "ternary": ternary}
+    return results
 
 
 def shadow_state(model) -> dict:
@@ -194,6 +201,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--log-grad-norms", type=int, default=1)
     p.add_argument("--zero-shot", type=int, default=0, help="Evaluate alpha=1 without training")
     p.add_argument("--eval-every", type=int, default=0, help="WER eval interval during training (0=off)")
+    p.add_argument("--eval-both", type=int, default=1, help="1 = score binary and ternary at evals; 0 = training precision only.")
     p.add_argument(
         "--learnable-scale", type=int, default=0,
         help="BitNet b1.58-style learnable per-tensor/group dequantization gain.",
@@ -332,9 +340,13 @@ def main() -> int:
             history.append(record)
             print(json.dumps(record), flush=True)
         if args.eval_every and (step + 1) % args.eval_every == 0:
-            prec = evaluate_precisions(wrapper, model, eval_utts, args.eval_n)
+            prec = evaluate_precisions(
+                wrapper, model, eval_utts, args.eval_n,
+                bit_width=args.bit_width, both=bool(args.eval_both),
+            )
             ev = {"step": step + 1, "alpha": alpha,
-                  "binary_wer": prec["binary"]["wer"], "ternary_wer": prec["ternary"]["wer"]}
+                  "binary_wer": prec["binary"]["wer"] if "binary" in prec else None,
+                  "ternary_wer": prec["ternary"]["wer"] if "ternary" in prec else None}
             history.append(ev)
             print("EVAL " + json.dumps(ev), flush=True)
             set_precision(model, args.bit_width, alpha)  # restore training precision
