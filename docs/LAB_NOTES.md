@@ -431,3 +431,32 @@ environmental, not model bugs):
   incrementally later (per-layer rollout + small anchor), not flat KL.
 - **Artifacts:** `artifacts/stage1/qat_ternary_ffn.log`,
   `artifacts/stage1/qat_ternary_anchored.log`.
+
+---
+
+## 2026-10-11 — Stage 2a/2b: full quantization recovers to 16.2 ternary / 17.5 binary
+
+- **Did:** (2a) FFN-only ternary warm start → attention rollout with a
+  **frozen pretrained fp teacher anchor** (w=0.1, T=2) at lr 5e-5 (2 k steps),
+  then a warm-restart cosine cycle (lr 2.5e-5, 5 k steps). (2b) switch
+  `bit_width=1.0` from the ternary checkpoint (progressive precision, 2 k
+  steps).
+- **Result (50-utt test-clean, fp16 baseline 2.44, naive QAT ≈ 100):**
+  - ternary, all 196 decoder projections: **16.2 final / 14.4 best**;
+  - binary, all 196 decoder projections: **17.5** (51.5 → 38.1 → 25.4 → 17.5);
+  - FFN-only comparison: ternary 25.7 best / 32.8 final; binary 97.9;
+  - fp16 readouts of the trained shadows drift (85–100) — the anchor slows but
+    does not prevent drift; the quantized function is the deliverable.
+- **Why it works:** the FFN warm start gives a strong basin; the small anchor
+  preserves audio conditioning while attention adapts; low lr + cosine keeps the
+  sign pattern from churning; progressive precision (ternary → binary) avoids
+  the binary-from-fp collapse.
+- **Infra findings (see `docs/ACTIVITY_LOG.md`):** `--resume` must advance the
+  LR schedule (fixed); use `--init-from` for new phases; never load
+  model+checkpoint in the 32 GB session cgroup; switch GPUs instead of waiting
+  (rules.md R1).
+- **Next:** longer runs on the 8k cache, co-training/stochastic precision, then
+  the streaming (320 ms) primary-metric evaluation.
+- **Artifacts:** `artifacts/stage1/stage1_decoder_attn_ffn_bw1.58_gNone_lr2.5e-05_*.json`,
+  `artifacts/stage1/stage1_decoder_attn_ffn_bw1.0_gNone_lr5e-05_*.json`,
+  `artifacts/stage1/qat_attn_rollout*.log`, `artifacts/stage1/qat_binary_rollout.log`.

@@ -230,7 +230,7 @@ parameter — fixed), lr 2e-4, 100-step warmup, cosine, batch 4 (distill: 2),
 | FFN-only binary | 3 000 | (binary) 97.0 → 387.3 → 100.6 → 93.9 → 91.9 → 97.9 | 223.9 | **97.9** | 106.8 |
 | **Stage 2a: attn+FFN ternary, FFN-warm-start + anchor w=0.1** | 2 000 | 52.8 → 38.0 → 23.1 → **22.6** | 97.6 | 99.5 | **22.6** |
 | **Stage 2a-ext2 (warm restart, lr 2.5e-5, 5 000)** | 5 000 | 19.4 → 17.5 → 17.7 → **14.4** → 16.2 | 85.8 | 99.9 | **16.2** (best 14.4) |
-| Stage 2b: binary rollout from ternary | running | 51.5 → 38.1 @1000 | — | — | — |
+| **Stage 2b: binary rollout from ternary** | 2 000 | 51.5 → 38.1 → 25.4 → **17.5** | 99.8 | **17.5** | 30.5 |
 | anchored distillation (frozen teacher, w=0.5, lr 5e-5) | 4 000 | **315.4 @1000**, fp16 427 (killed) | — | — | — |
 
 \* the 25.7 @2000 is the best FFN checkpoint; the resumed run (fresh
@@ -248,8 +248,10 @@ anchor (w=0.1, T=2)** at lr 5e-5, then a **warm-restart cosine cycle** (lr
 17.5 → 17.7 → 14.4 → 16.2.
 
 **Progressive precision for binary (Stage 2b):** starting from the ternary
-rollout checkpoint and switching `bit_width=1.0` gives binary 51.5 @500 →
-38.1 @1000 (running) — far better than binary FFN-only (best 91.9).
+rollout checkpoint and switching `bit_width=1.0` gives binary
+51.5 → 38.1 → 25.4 → **17.5** (2 000 steps) — far better than binary FFN-only
+(best 91.9) and the naive binary collapse (~100). Final table: pretrained 2.44,
+fp16 99.8, **binary 17.5**, ternary readout 30.5.
 
 **Shadow-drift pattern (all long runs at lr 2e-4):** the fp16 readout of the
 trained shadows degrades to WER ~110–230 even when the quantized readout
