@@ -7,33 +7,31 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 05:10 IST)
+## Live status (updated 2026-10-11 06:15 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| — | **all training jobs done** | — | — | — |
-| `10708` | persistent GPU session | — | — | ends at 12 h walltime |
+| `10795` | **Ternary long**: 8k cache, 8000 steps, anchor w=0.05 (GPU 6) | step ~1000/8000 @ ~90/min | first eval pending | **~2 h** |
+| `10798` | **Binary long**: 8k cache, 6000 steps, anchor w=0.05 (GPU 2) | step ~1000/6000 @ ~85/min | first eval pending | **~1 h 30 m** |
+| `10708` | persistent GPU session | — | — | ends ~07:15 IST |
 
-**Headline results (50-utt test-clean; fp16 baseline 2.44; naive QAT ≈ 100):**
+Both runs continue the best checkpoints (ternary 16.2/14.4 from step 5000;
+binary 17.5 from step 2000) on the 8k-utterance cache with a fresh long cosine
+cycle and a halved anchor (w=0.05).
+
+**GPU-switch rule (R1) exercised again:** both first submissions raced and
+picked GPU 6; the binary job was killed and resubmitted, picking GPU 2 — no
+waiting, no sharing.
+
+**Headline results so far (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
 
 | Configuration | WER |
 |---|---|
-| **Ternary, all 196 decoder projections (Stage 2a)** | **16.2** final / **14.4** best |
-| **Binary, all 196 decoder projections (Stage 2b, progressive precision)** | **17.5** |
+| Ternary, all 196 decoder projections | **16.2** final / **14.4** best |
+| Binary, all 196 decoder projections | **17.5** |
 | FFN-only ternary | 25.7 best / 32.8 final |
 | FFN-only binary | 97.9 |
-| Naive attn+FFN (ternary / binary) | ~98–108 |
-
-Recipe that works: **FFN warm start → attention rollout with a frozen
-pretrained-teacher anchor (w=0.1, T=2) at lr 5e-5 → warm-restart cosine cycle;
-binary by switching `bit_width=1.0` from the ternary checkpoint.**
-
-Next steps: longer runs on the 8k cache (`data/qat_clean_train.100_n8000.pt`,
-also staged on `/tmp/asr1bit`), co-training/stochastic precision, then the
-streaming (320 ms) evaluation for the Stage 1 primary metric.
-
-**GPU-switch rule (R1) exercised 3×:** all slow jobs were resumed on freer GPUs
-and killed instead of waiting. `--resume` LR fix verified each time.
+| Naive attn+FFN | ~98–108 |
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
@@ -419,3 +417,21 @@ restarts at 0).
 - **No training was run in this pass** (documentation only, per request).
 - **Evidence:** `docs/PROJECT_STATUS.md`, `docs/figures/*.png`,
   `artifacts/stage1/wer_summary.json`.
+
+### 06:00 — Long runs launched on the 8k cache (ternary + binary)
+
+- **Did:** launched two batch jobs continuing the best checkpoints on the
+  8k-utterance cache (`/tmp/asr1bit/qat_clean_train.100_n8000.pt`, 6.6 GB) with
+  a fresh long cosine cycle and a halved anchor:
+  - `10795` **ternary long** (GPU 6): init-from ext2 step 5000 (16.2 / 14.4),
+    8 000 steps, lr 2.5e-5, anchor w=0.05, train-n 8 000;
+  - `10798` **binary long** (GPU 2): init-from binary rollout step 2000 (17.5),
+    6 000 steps, lr 2e-5, anchor w=0.05, train-n 8 000.
+- **Failure:** both first submissions raced the GPU picker and landed on GPU 6
+  together.
+- **Fix:** killed the binary job and resubmitted; the picker (now seeing GPU 6
+  occupied) chose GPU 2 (rules.md R1 — switch, never share/wait).
+- **Rates:** ternary ~90 steps/min, binary ~85 steps/min.
+- **ETA:** ternary ~2 h; binary ~1 h 30 m.
+- **Evidence:** `artifacts/stage1/qat_ternary_long.log`,
+  `artifacts/stage1/qat_binary_long.log`.
