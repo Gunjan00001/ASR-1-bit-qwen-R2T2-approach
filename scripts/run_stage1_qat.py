@@ -30,6 +30,7 @@ from asr1bit.replace import apply_layer_policy
 from asr1bit.train.qat import (
     build_optimizer,
     check_finite_grads,
+    distillation_loss,
     grad_norms,
     make_sft_labels,
     progressive_alpha,
@@ -199,6 +200,9 @@ def parse_args() -> argparse.Namespace:
         help="delay = fp warmup then constant alpha=1 (safe); ramp = blended (unsafe, see LAB_NOTES).",
     )
     p.add_argument("--alpha-warmup-frac", type=float, default=0.3, help="Delay fraction before alpha=1.")
+    p.add_argument("--distill-weight", type=float, default=0.0,
+                   help="Weight of self-distillation KL (teacher = same shadows at alpha=0).")
+    p.add_argument("--distill-temp", type=float, default=2.0, help="Distillation temperature.")
     p.add_argument("--log-grad-norms", type=int, default=1)
     p.add_argument("--zero-shot", type=int, default=0, help="Evaluate alpha=1 without training")
     p.add_argument("--eval-every", type=int, default=0, help="WER eval interval during training (0=off)")
@@ -324,7 +328,29 @@ def main() -> int:
             batch = batches[step % len(batches)]
         batch = {k: (v.cuda() if torch.is_tensor(v) else v) for k, v in batch.items()}
         optimizer.zero_grad()
-        if scaler is not None:
+        ce_value = None
+        kl_value = None
+        if args.distill_weight > 0:
+            # Self-distillation: the teacher is the same shadows at alpha=0
+            # (full precision); the student is the quantized forward.
+            set_qat_alpha(model, 0.0)
+            with torch.no_grad():
+                teacher_out = model(**batch)
+            set_qat_alpha(model, alpha)
+            out = model(**batch)
+            ce = out.loss if hasattr(out, "loss") else out[0]
+            kl = distillation_loss(
+                out.logits, teacher_out.logits, batch["labels"], temperature=args.distill_temp
+            )
+            loss = (1.0 - args.distill_weight) * ce + args.distill_weight * kl
+            ce_value = float(ce.detach())
+            kl_value = float(kl.detach())
+            loss.backward()
+            check_finite_grads(model)
+            norms = grad_norms(model)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+        elif scaler is not None:
             with torch.amp.autocast("cuda", dtype=torch.float16):
                 out = model(**batch)
                 loss = out.loss if hasattr(out, "loss") else out[0]
@@ -350,6 +376,9 @@ def main() -> int:
         if step % 5 == 0 or step == args.steps - 1:
             record = {"step": step + 1, "alpha": alpha, "loss": float(loss.detach()),
                       "lr": scheduler.get_last_lr()[0], "max_grad_norm": max_norm}
+            if ce_value is not None:
+                record["ce"] = ce_value
+                record["kl"] = kl_value
             record.update(scale_stats(model))
             history.append(record)
             print(json.dumps(record), flush=True)

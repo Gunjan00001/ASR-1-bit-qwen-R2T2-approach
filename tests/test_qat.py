@@ -2,6 +2,7 @@
 
 import types
 
+import pytest
 import torch
 from torch import nn
 
@@ -10,6 +11,7 @@ from asr1bit.replace import apply_layer_policy
 from asr1bit.train.qat import (
     build_optimizer,
     check_finite_grads,
+    distillation_loss,
     enable_gradient_checkpointing,
     freeze_non_bitlinear,
     grad_norms,
@@ -246,3 +248,55 @@ class TestTrainStep:
         optimizer = build_optimizer(model, lr=0.1, use_8bit=False)
         losses = [train_step(model, x, labels, optimizer) for _ in range(20)]
         assert losses[-1] < losses[0]
+
+
+class TestDistillationLoss:
+    @staticmethod
+    def _labels(batch=2, seq=6, vocab=11):
+        labels = torch.full((batch, seq), -100)
+        labels[:, 2:] = torch.randint(0, vocab, (batch, seq - 2))
+        return labels
+
+    def test_identical_logits_give_zero(self):
+        torch.manual_seed(0)
+        logits = torch.randn(2, 6, 11)
+        loss = distillation_loss(logits, logits.clone(), self._labels())
+        assert float(loss) == pytest.approx(0.0, abs=1e-6)
+
+    def test_gradient_flows_to_student(self):
+        torch.manual_seed(0)
+        student = torch.randn(2, 6, 11, requires_grad=True)
+        teacher = torch.randn(2, 6, 11)
+        loss = distillation_loss(student, teacher, self._labels())
+        loss.backward()
+        assert student.grad is not None
+        assert student.grad.abs().sum() > 0
+
+    def test_all_masked_gives_zero(self):
+        student = torch.randn(2, 6, 11, requires_grad=True)
+        teacher = torch.randn(2, 6, 11)
+        labels = torch.full((2, 6), -100)
+        loss = distillation_loss(student, teacher, labels)
+        assert float(loss.detach()) == 0.0
+
+    def test_mask_ignores_prompt_positions(self):
+        torch.manual_seed(0)
+        student = torch.randn(2, 6, 11)
+        teacher = torch.randn(2, 6, 11)
+        labels = torch.full((2, 6), -100)
+        labels[:, 4:] = 1
+        full = distillation_loss(student, teacher, labels)
+        teacher_only_prompt_diff = teacher.clone()
+        # Unmasked labels start at position 4 -> logit index 3 after the shift.
+        teacher_only_prompt_diff[:, :3] = student[:, :3]  # differ only in masked region
+        same = distillation_loss(student, teacher_only_prompt_diff, labels)
+        assert float(full) == pytest.approx(float(same), abs=1e-6)
+
+    def test_temperature_scales_loss(self):
+        torch.manual_seed(0)
+        student = torch.randn(2, 6, 11)
+        teacher = torch.randn(2, 6, 11)
+        labels = self._labels()
+        low = float(distillation_loss(student, teacher, labels, temperature=1.0))
+        high = float(distillation_loss(student, teacher, labels, temperature=4.0))
+        assert low != pytest.approx(high, abs=1e-3)

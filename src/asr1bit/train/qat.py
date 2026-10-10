@@ -218,6 +218,37 @@ def train_step(
     return float(loss.detach())
 
 
+def distillation_loss(
+    student_logits: torch.Tensor,
+    teacher_logits: torch.Tensor,
+    labels: torch.Tensor,
+    *,
+    temperature: float = 2.0,
+) -> torch.Tensor:
+    """KL distillation over the label positions (shifted like causal LM loss).
+
+    Both logits are ``(batch, seq, vocab)``. Only positions with a real label
+    (``labels != -100``) contribute, so the loss focuses on the transcription
+    rather than the prompt. Returns ``T^2 * KL(teacher || student)``.
+    """
+    student = student_logits[:, :-1]
+    teacher = teacher_logits[:, :-1]
+    target = labels[:, 1:]
+    mask = target != -100
+    if not mask.any():
+        return student_logits.sum() * 0.0
+    student_flat = student[mask]
+    teacher_flat = teacher[mask]
+    return (
+        F.kl_div(
+            F.log_softmax(student_flat / temperature, dim=-1),
+            F.softmax(teacher_flat / temperature, dim=-1),
+            reduction="batchmean",
+        )
+        * (temperature ** 2)
+    )
+
+
 @dataclass
 class QATConfig:
     """Settings for a progressive QAT run."""
