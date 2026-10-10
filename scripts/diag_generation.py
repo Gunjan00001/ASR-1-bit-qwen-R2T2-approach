@@ -93,6 +93,27 @@ def flip_count(before: dict, after: dict) -> int:
     return sum(int((mask != after[name]).sum()) for name, mask in before.items())
 
 
+def scale_stats(model) -> dict:
+    """Summary of learnable scales and shadow magnitudes (empty if disabled)."""
+    scales = [
+        module.weight_scale.detach()
+        for module in model.modules()
+        if isinstance(module, BitLinear) and module.weight_scale is not None
+    ]
+    if not scales:
+        return {}
+    flat = torch.cat([scale.reshape(-1) for scale in scales])
+    weight_abs = torch.stack(
+        [module.weight.detach().abs().mean() for module in model.modules() if isinstance(module, BitLinear)]
+    )
+    return {
+        "scale_min": float(flat.min()),
+        "scale_mean": float(flat.mean()),
+        "scale_max": float(flat.max()),
+        "shadow_abs_mean": float(weight_abs.mean()),
+    }
+
+
 def run_condition(model, wrapper, batch, utterance, processor, bit_width, alpha, label) -> dict:
     set_precision(model, bit_width, alpha)
     with QuantInstrument() as inst:
@@ -120,6 +141,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--train-steps", type=int, default=0)
     p.add_argument("--train-n", type=int, default=64)
     p.add_argument("--lr", type=float, default=1e-5)
+    p.add_argument("--alpha-start", type=float, default=1.0)
+    p.add_argument("--alpha-end", type=float, default=1.0)
     p.add_argument("--max-new-tokens", type=int, default=128)
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
@@ -174,10 +197,17 @@ def main() -> int:
     if args.train_steps > 0:
         train_examples = build_examples(train_utts, processor)
         optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=args.lr)
-        set_qat_alpha(model, 1.0)
-        print(f"training {args.train_steps} steps at alpha=1 (lr={args.lr})...", flush=True)
+        print(
+            f"training {args.train_steps} steps at lr={args.lr} "
+            f"alpha {args.alpha_start}->{args.alpha_end}...",
+            flush=True,
+        )
         total_flips = 0
         for step in range(args.train_steps):
+            alpha = args.alpha_start + (args.alpha_end - args.alpha_start) * step / max(
+                1, args.train_steps - 1
+            )
+            set_qat_alpha(model, alpha)
             b = {k: (v.cuda() if torch.is_tensor(v) else v)
                  for k, v in collate([train_examples[step % len(train_examples)]], processor).items()}
             before = quant_signature(model)
@@ -190,9 +220,12 @@ def main() -> int:
             flips = flip_count(before, quant_signature(model))
             total_flips += flips
             if step % 100 == 0 or step == args.train_steps - 1:
+                stats = scale_stats(model)
+                extra = " ".join(f"{k}={v:.4g}" for k, v in stats.items())
                 print(f"  step {step} loss={float(loss.detach()):.3f} max_grad={max(norms.values()):.2f} "
-                      f"flips={flips} total_flips={total_flips}", flush=True)
+                      f"flips={flips} total_flips={total_flips} {extra}", flush=True)
         results["total_sign_flips"] = total_flips
+        results["final_scale_stats"] = scale_stats(model)
         results["conditions"].append(
             run_condition(model, wrapper, batch, utterance, processor, args.bit_width, 1.0, f"{precision}_trained")
         )
