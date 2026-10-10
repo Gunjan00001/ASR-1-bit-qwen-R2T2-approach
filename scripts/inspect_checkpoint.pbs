@@ -1,0 +1,40 @@
+#!/bin/bash
+#PBS -N asr1bit-inspect
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=32gb
+#PBS -l walltime=01:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/inspect_checkpoint.out
+#
+# Inspect generations from the v2 ternary checkpoint (fp16 vs quantized).
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
+[ -d "$MODEL" ] || MODEL=Qwen/Qwen3-ASR-0.6B
+
+export CUDA_VISIBLE_DEVICES=$(
+  nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
+    | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' '
+)
+
+"$PY" scripts/inspect_checkpoint.py \
+  --model "$MODEL" \
+  --checkpoint data/checkpoints/qat_ternary_attnffn_v2/last.pt \
+  --policy decoder_attn_ffn \
+  --bit-width 1.58 \
+  --n 5 \
+  --out artifacts/stage1/inspect_v2.json
