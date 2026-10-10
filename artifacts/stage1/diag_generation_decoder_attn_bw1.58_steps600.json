@@ -1,0 +1,109 @@
+{
+  "utterance_id": "3081-166546-0003",
+  "label": "THE LADY IS NOT THE MOTHER OF THE BOYS BUT THEIR AUNT",
+  "conditions": [
+    {
+      "condition": "fp16_control",
+      "bit_width": 1.0,
+      "alpha": 0.0,
+      "quantized_effective_weight_changed": false,
+      "weight_norms": [],
+      "loss": 2.2248263359069824,
+      "token_accuracy": 0.7777777910232544,
+      "teacher_forced_text": "language ANSWADY IS NOT THE MOTHER OF THE BOYS, THEIR AUNT.",
+      "label_text": "THE LADY IS NOT THE MOTHER OF THE BOYS BUT THEIR AUNT",
+      "greedy_text": "The lady is not the mother of the boys, but their aunt."
+    },
+    {
+      "condition": "fp16_after_replace",
+      "bit_width": 1.58,
+      "alpha": 0.0,
+      "quantized_effective_weight_changed": false,
+      "weight_norms": [
+        [
+          39.181392669677734,
+          39.181392669677734,
+          0.0
+        ],
+        [
+          26.992324829101562,
+          26.992324829101562,
+          0.0
+        ],
+        [
+          23.59772300720215,
+          23.59772300720215,
+          0.0
+        ]
+      ],
+      "loss": 2.2248263359069824,
+      "token_accuracy": 0.7777777910232544,
+      "teacher_forced_text": "language ANSWADY IS NOT THE MOTHER OF THE BOYS, THEIR AUNT.",
+      "label_text": "THE LADY IS NOT THE MOTHER OF THE BOYS BUT THEIR AUNT",
+      "greedy_text": "The lady is not the mother of the boys, but their aunt."
+    },
+    {
+      "condition": "ternary_naive",
+      "bit_width": 1.58,
+      "alpha": 1.0,
+      "quantized_effective_weight_changed": true,
+      "weight_norms": [
+        [
+          39.181392669677734,
+          23.998641967773438,
+          22.70868682861328
+        ],
+        [
+          26.992324829101562,
+          16.835445404052734,
+          15.294424057006836
+        ],
+        [
+          23.59772300720215,
+          15.23208236694336,
+          12.580947875976562
+        ]
+      ],
+      "loss": 11.631539344787598,
+      "token_accuracy": 0.0,
+      "teacher_forced_text": "gu up.IT neITREN_YEAR\ufffd._BACKGROUND Bo BO BACK_wallellyATE.",
+      "label_text": "THE LADY IS NOT THE MOTHER OF THE BOYS BUT THEIR AUNT",
+      "greedy_text": "gulick-wing(right ado. W..\"_ere.now (ugearon toy itty.exclude Pewver words.me.\ube44\uc704."
+    },
+    {
+      "condition": "ternary_trained",
+      "bit_width": 1.58,
+      "alpha": 1.0,
+      "quantized_effective_weight_changed": true,
+      "weight_norms": [
+        [
+          40.04145050048828,
+          27.706588745117188,
+          21.551254272460938
+        ],
+        [
+          27.61769676208496,
+          15.898139953613281,
+          16.31892967224121
+        ],
+        [
+          24.336912155151367,
+          18.043336868286133,
+          11.789426803588867
+        ]
+      ],
+      "loss": 1.066914865077706e-05,
+      "token_accuracy": 1.0,
+      "teacher_forced_text": "THE LADY IS NOT THE MOTHER OF THE BOYS BUT THEIR AUNT",
+      "label_text": "THE LADY IS NOT THE MOTHER OF THE BOYS BUT THEIR AUNT",
+      "greedy_text": "THE LADY IS NOT THE MOTHER OF THE BOYS BUT THEIR AUNT"
+    }
+  ],
+  "total_sign_flips": 30367316,
+  "final_scale_stats": {
+    "scale_min": -0.0005063688731752336,
+    "scale_mean": 0.016767172142863274,
+    "scale_max": 0.036527447402477264,
+    "shadow_abs_mean": 0.018666323274374008
+  }
+}

@@ -305,3 +305,48 @@ qwen-asr 0.0.6, datasets 5.0.1, numpy 2.5.3. All 178 existing tests pass here.
 - **Artifacts:** `artifacts/stage1/diag_quant_error.json` (per-layer rows).
 - **Environment note:** `datasets>=5` requires numpy≥2; the shared `~/miniconda3`
   was upgraded to numpy 2.5.3 (torch 2.11 unaffected).
+
+---
+
+## 2026-10-10 — Loss controllability PROVEN (ternary memorizes; "bug" verdict retracted)
+
+Two infrastructure traps were fixed first (both looked like hangs, both were
+environmental, not model bugs):
+
+- **Slow tokenizer:** the released checkpoints ship `vocab.json`/`merges.txt`
+  but no `tokenizer.json`, so every process rebuilt the slow Python
+  `Qwen2Tokenizer` line-by-line from `merges.txt` (hours under BeeGFS/CPU
+  contention; py-spy showed `bpe_merges.append` at line 76k/151k). Fix:
+  `scripts/install_fast_tokenizer.py` builds `tokenizer.json` once
+  (`Qwen2TokenizerFast`; full CPU load 11.6 s vs multi-minute stalls).
+- **Data/OOM:** materializing `train.100` with `datasets` (non-streaming) blew
+  the 32 GB PBS cgroup (`oom-kill` in dmesg). Fix: streaming reads
+  (`iter_librispeech(..., streaming=True)`) and building the 4k-utterance cache
+  on the login node (`scripts/build_qat_cache.py --n 4000 --stream 1`;
+  3.34 GB, 14.5 h audio, mean 13.0 s/utt). Also staged conda + model + cache on
+  node-local `/tmp` to avoid shared-FS stalls.
+
+- **Did (memorization test):** one utterance (`train-n 1`), 600 steps, constant
+  α, lr 1e-3, `decoder_attn` + learnable scales. The earlier runs had *never*
+  actually tested memorization: they cycled 64 utterances with batch 1.
+
+  | condition | naive loss | trained loss | token acc | greedy |
+  |---|---|---|---|---|
+  | α=0 fp control | 2.225 | **0.000** (step 300) | 1.000 | exact |
+  | binary α=1 | 18.49 | 2.818 (step 600) | 0.111 | "THE THE" |
+  | ternary α=1 | 11.63 | **0.000** (step 300) | 1.000 | exact label |
+
+- **What this means:** the harness (labels, STE, learnable scales, patched
+  forward) is correct and **ternary QAT is fully controllable** — the quantized
+  model can memorize through `Q(W)`. The earlier "forward/objective bug" verdict
+  is retracted: failures were budget + config (40–1000 steps, lr 1e-5, ≤200
+  utterances, no learnable scales), plus the inherent ~60% quantization error
+  documented in the previous entry. Binary lags ternary substantially
+  (loss 2.8 vs 0.0) — consistent with the literature; ternary is the realistic
+  ship, binary the stretch target.
+- **Chose:** run the real Stage 1 recovery on the 4k-utt cache:
+  `decoder_attn_ffn` (196 BitLinear), ternary, learnable per-tensor scales,
+  constant α=1, lr 2e-4 with 100-step warmup + cosine, batch 4, 3000 steps,
+  fixed 50-utt test-clean eval every 500 steps, shadow checkpoints every 500.
+- **Artifacts:** `artifacts/stage1/diag_generation_decoder_attn_bw1.0_steps600.json`,
+  `..._bw1.58_steps600.json`, `artifacts/stage1/qat_ternary_attnffn_ls.log`.

@@ -332,3 +332,17 @@ Dated, append-only. Record what changed, why, and alternatives rejected.
   utterance cache from `train.100` (durations 0.5–25 s) built by
   `scripts/build_qat_cache.py` into gitignored `data/`; evaluation stays on a
   fixed test-clean sample (N ≥ 100) so floors and checkpoints are comparable.
+- **2026-10-10 — Loss controllability proven; ternary is the Stage 1 lead.**
+  Single-utterance QAT memorizes **exactly** at ternary (loss 0.000, greedy ==
+  label) and partially at binary (loss 2.8). The earlier "bug" verdict is
+  retracted — the harness is sound; the earlier budget (≤1k steps, lr 1e-5,
+  ≤200 utts, no learnable scales) was the problem. Real Stage 1 recovery run:
+  `decoder_attn_ffn`, ternary, learnable per-tensor scales, α=1, lr 2e-4 cosine,
+  batch 4, 3000 steps on 4k train.100 utterances; binary follows as the stretch
+  target.
+- **2026-10-10 — Fast tokenizer required on this cluster.** Qwen3-ASR ships no
+  `tokenizer.json`; the slow Python tokenizer rebuild stalls under cluster FS/CPU
+  contention. Run `scripts/install_fast_tokenizer.py` once per checkpoint dir
+  (staged copies included). Lesson: on shared clusters, stage conda/model/data on
+  node-local disk and stream data; do not materialize full HF splits inside the
+  PBS memory cgroup.
