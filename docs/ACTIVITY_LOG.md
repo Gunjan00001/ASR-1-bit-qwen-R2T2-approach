@@ -7,13 +7,13 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 00:05 IST)
+## Live status (updated 2026-10-11 00:45 IST)
 
 | Job | What | Progress | Result so far | ETA |
 |---|---|---|---|---|
-| `10771` | FFN-only **ternary** resume (2000→3000) | step ~2900/3000 @ 80/min | 25.7 @2000 → 42.8 @2500 (LR-restart artifact) | **~15 min** (final eval + ablations) |
-| `10764` | FFN-only **binary** (3000 steps) | step ~2600/3000 @ 117/min | 97.0 → 387 → 100.6 → 93.9 → 91.9 | **~15–20 min** |
-| `10776` | **Stage 2a**: attention rollout + frozen anchor w=0.1 | queued | — | starts when a slot frees; run **~50–70 min** |
+| `10771` | FFN-only ternary resume | **done** | final: ternary **32.8**, binary 71.0, fp16 226.5 | — |
+| `10764` | FFN-only binary | **done** | final: binary **97.9**, ternary 106.8, fp16 223.9 | — |
+| `10776` | **Stage 2a**: attention rollout + frozen anchor w=0.1 | step ~500/2000 @ ~80/min | CE 1.4–2.0, KL 5.8–6.6 (early) | **~55–65 min** |
 | `10708` | persistent GPU session | — | — | ends ~04:00 IST |
 
 Next queued after these: co-training / stochastic precision if the small anchor
@@ -266,3 +266,18 @@ restarts at 0). Never resume without the LR-schedule advance.
 - **Launcher:** `scripts/qat_attn_rollout.pbs` (job `10776`, queued behind the
   per-user ncpus quota; starts when the binary/ternary runs end).
 - **Evidence:** `artifacts/stage1/qat_attn_rollout.log` (once running).
+
+### 00:30 — FFN-only final tables + shadow-drift pattern
+
+- **Did:** collected final ablations for both FFN-only runs.
+- **Result:** ternary FFN **32.8** (best checkpoint 25.7 @2000); binary FFN
+  **97.9** (no recovery); fp16 readouts **226.5 / 223.9** — the shadows drift
+  far from the pretrained basin in every long run at lr 2e-4, even when the
+  quantized readout recovers.
+- **Lesson:** STE + lr 2e-4 + 3 000 steps ⇒ fp readout destroyed; the
+  *quantized* function is what recovers. An anchored objective is needed to
+  preserve both (Stage 2a tests this).
+- **Stage 2a running:** at step ~400, CE 1.4–2.0 (much lower than the
+  attn+ffn runs' ~6 — the FFN init gives a strong start), KL 5.8–6.6 (attention
+  quantization error vs the frozen teacher), loss ≈ 0.9·CE + 0.1·KL.
+- **Evidence:** `artifacts/stage1/stage1_decoder_ffn_bw1.{0,58}_*.json`.

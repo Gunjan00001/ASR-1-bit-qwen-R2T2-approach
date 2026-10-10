@@ -226,23 +226,29 @@ parameter — fixed), lr 2e-4, 100-step warmup, cosine, batch 4 (distill: 2),
 | naive (v1, free gamma) | 3 000 | 93.6 @500 → 232.9 @1000 (killed) | — | — | — |
 | naive (v2, log gamma) | 6 000 | 127 → 121.6 → **96.5** → 96.9 → 103.5 | **113.1** | 99.8 | 107.8 |
 | self-distillation (w=0.5, T=2) | 4 000 | 114.6 → 125.0 → 111.3 → **98.1** | **108.3** | 118.3 | 98.1 |
-| **FFN-only ternary** | 3 000 | 118.0 → 84.3 → **42.2** → … | (running) | — | (running) |
+| **FFN-only ternary** | 3 000 | 118.0 → 84.3 → 42.2 → 25.7 → 32.8* | 226.5 | 71.0 | **32.8** |
+| FFN-only binary | 3 000 | (binary) 97.0 → 387.3 → 100.6 → 93.9 → 91.9 → 97.9 | 223.9 | **97.9** | 106.8 |
 | anchored distillation (frozen teacher, w=0.5, lr 5e-5) | 4 000 | **315.4 @1000**, fp16 427 (killed) | — | — | — |
+
+\* the 25.7 @2000 is the best FFN checkpoint; the resumed run (fresh
+optimizer, LR schedule restarted before the fix) reached 32.8 @3000.
 
 Reference: pretrained fp16 = **2.44** WER (50-utt subsample); zero-shot naive
 ternary ≈ 100.
 
-**FFN-only (`decoder_ffn`: attention stays fp) recovers** — ternary WER
-118 → 84 → **42** at steps 500/1000/1500, training loss 4.1 → 2.1, roughly
-halving WER every 500 steps. Keeping the attention projections fp preserves
-audio conditioning; the FFN ternary bottleneck is recoverable at this budget.
-Binary FFN-only is queued for the table.
+**Shadow-drift pattern (all long runs at lr 2e-4):** the fp16 readout of the
+trained shadows degrades to WER ~110–230 even when the quantized readout
+recovers (FFN-only ternary: fp16 226.5 vs ternary 32.8). The STE updates move
+the latent weights far from the pretrained basin; the *quantized* function is
+what recovers. This is acceptable for a quantized deliverable but means an
+anchored objective is needed to preserve the fp path (Stage 2a).
 
-**Anchored distillation (frozen fp teacher, w=0.5) is destructive** at this
-configuration: KL explodes (11–15) and the model collapses (fp16 427, ternary
-315 @1000 steps). The KL gradient from an unattainable frozen teacher dominates
-the CE term. Anchoring needs a much smaller weight/temperature or a trust-region
-formulation, not a flat 0.5 KL.
+**FFN-only (`decoder_ffn`: attention stays fp) recovers** — ternary WER
+118 → 84 → **42** → **25.7** at steps 500/1000/1500/2000; training loss 4.1 →
+2.1. Keeping the attention projections fp preserves audio conditioning; the FFN
+ternary bottleneck is recoverable at this budget. **Binary FFN-only does not
+recover** within 3 000 steps (best 91.9, ends 97.9) — binary remains the stretch
+target and needs the Stage 2 stack.
 
 **Failure mode (checkpoint inspection):** the collapsed attn+ffn models emit
 fluent generic text unrelated to the audio ("AND THE FIRST OF THE HUMAN BODY…")
