@@ -236,13 +236,19 @@ python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_f
 2. The **official prefix algorithm** remains broken despite a scaled streaming
    SFT (203.5 WER; correct transcripts followed by repetition loops). Inference
    controls do not fix it (repetition_penalty made it worse: 438).
-3. Next for the official algorithm — research-grade work:
-   - **on-policy streaming SFT**: build prefixes from the model's *own*
-     generations (not gold transcripts), so training matches the inference
-     distribution;
-   - **LSP emission policy** (Stage 4 / T4.4) with explicit stop handling;
-   - longer streaming SFT (10–20 k steps) with a balanced mix (keep ≥50 %
-     standard samples to limit the offline cost, currently ~3 points).
+3. **Implemented (2026-10-11, result pending):**
+   - **on-policy streaming SFT** — samples come from replaying the official
+     algorithm with the current model; targets are the reference remainder
+     (EOS when the own text already covers the transcript; warm-up chunks 0/1
+     train EOS), mixed 50/50 with standard samples
+     (`--op-rollout*`, `scripts/qat_stream_opd.pbs` — running as `11020`);
+   - **LSP emission policy** (Stage 4 / T4.4) — `LSPState`/`update_lsp`/
+     `emit_stable`/`flush_lsp`, append-only by construction, reported by
+     `eval_streaming.py --lsp-margin-words`;
+   - the decisive official-algorithm test runs after phase 1
+     (`scripts/eval_streaming_opd.pbs`); a second DAgger phase
+     (`scripts/qat_stream_opd2.pbs`) follows. See `docs/LAB_NOTES.md`
+     (2026-10-11) for the design argument.
 4. Interim reporting uses the chunked re-feed number (9.43, RTF ~9.7).
 
 **Stage 2 — accuracy recovery (offline, done for now)**

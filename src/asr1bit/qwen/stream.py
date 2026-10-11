@@ -12,6 +12,7 @@ policy and its append-only invariant are Stage 4 / T4.4.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -22,6 +23,8 @@ SAMPLE_RATE = 16000
 ASR_TEXT_TAG = "<asr_text>"
 LANG_PREFIX = "language "
 REPLACEMENT_CHAR = "\ufffd"
+
+WORD_RE = re.compile(r"\S+")
 
 
 def chunk_size_samples(chunk_ms: float, sample_rate: int = SAMPLE_RATE) -> int:
@@ -79,6 +82,29 @@ def parse_stream_output(raw: str | None, user_language: str | None = None) -> tu
                 language = value[:1].upper() + value[1:].lower()
             break
     return language, remainder.strip()
+
+
+def rollback_prefix(codec: TokenCodec, text: str, unfixed_token_num: int) -> str:
+    """Drop the last ``unfixed_token_num`` tokens of ``text`` (official rollback).
+
+    Mirrors the official ``streaming_transcribe`` prefix policy: encode the
+    accumulated decode, drop the trailing ``unfixed_token_num`` tokens and
+    decode the rest. The rollback is extended token-by-token while the decoded
+    prefix would end inside a byte-BPE token (replacement character), so the
+    returned prefix is always decodable text.
+    """
+    if not text:
+        return ""
+    ids = list(codec.encode(text))
+    k = unfixed_token_num
+    while True:
+        end = max(0, len(ids) - k)
+        prefix = codec.decode(ids[:end]) if end > 0 else ""
+        if REPLACEMENT_CHAR not in prefix:
+            return prefix
+        if end == 0:
+            return ""
+        k += 1
 
 
 @dataclass
@@ -168,18 +194,7 @@ class ChunkedStreamer:
         return audio.astype(np.float32, copy=False)
 
     def _rollback_prefix(self, text: str) -> str:
-        if not text:
-            return ""
-        ids = list(self.codec.encode(text))
-        k = self.unfixed_token_num
-        while True:
-            end = max(0, len(ids) - k)
-            prefix = self.codec.decode(ids[:end]) if end > 0 else ""
-            if REPLACEMENT_CHAR not in prefix:
-                return prefix
-            if end == 0:
-                return ""
-            k += 1
+        return rollback_prefix(self.codec, text, self.unfixed_token_num)
 
     def _decode_chunk(self, chunk: np.ndarray, state: ASRStreamingState) -> None:
         if state.audio_accum.shape[0] == 0:
@@ -225,13 +240,117 @@ class ChunkedStreamer:
         return state
 
 
+def common_prefix_len(a: str, b: str) -> int:
+    """Length of the longest common prefix of two strings."""
+    limit = min(len(a), len(b))
+    index = 0
+    while index < limit and a[index] == b[index]:
+        index += 1
+    return index
+
+
+def word_safe_cut(text: str, limit: int, margin_words: int = 0) -> int:
+    """Largest word-boundary cut ``<= limit`` leaving ``margin_words`` words out.
+
+    The returned cut never splits a word, and it absorbs the whitespace that
+    follows the last included word so ``pending`` cannot glue onto ``committed``.
+    """
+    limit = max(0, min(int(limit), len(text)))
+    spans = [(m.start(), m.end()) for m in WORD_RE.finditer(text) if m.end() <= limit]
+    keep = max(0, len(spans) - max(0, int(margin_words)))
+    if keep == 0:
+        return 0
+    cut = spans[keep - 1][1]
+    while cut < len(text) and text[cut].isspace():
+        cut += 1
+    return cut
+
+
+@dataclass
 class LSPState:
-    """Streaming state for Longest-Stable-Prefix emission (Stage 4, T4.4)."""
+    """Longest-Stable-Prefix emission state (Stage 4, T4.4).
+
+    Emission policy: text is **committed** only once it has survived a revision
+    — i.e. it lies inside the longest common prefix of two consecutive updates —
+    and only up to a word boundary. The last ``margin_words`` words of the
+    surviving text stay **pending** so they can still be revised (the streaming
+    algorithm's rollback window is a few words wide; a margin of that size keeps
+    normal revisions inside ``pending``).
+
+    ``committed`` is append-only by construction: once text is committed it is
+    never changed, even if the model later revises it. A revision that reaches
+    into committed text is appended after the divergence point (or held if the
+    text diverges from its very beginning), so the committed transcript stays a
+    stable, never-revised stream.
+    """
+
+    margin_words: int = 0
+    committed: str = ""
+    pending: str = ""
+    last_full: str = ""
+    updates: int = 0
+    revisions: int = 0
+    commit_lengths: list[int] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.margin_words < 0:
+            raise ValueError(f"margin_words must be >= 0, got {self.margin_words}")
+
+    @property
+    def text(self) -> str:
+        """Current emitted text (``committed`` + ``pending``)."""
+        return self.committed + self.pending
+
+    def update(self, full_text: str) -> None:
+        """Ingest the latest full transcript produced by the streamer."""
+        full_text = str(full_text or "")
+        previous = self.committed + self.pending
+        if full_text != previous:
+            self.updates += 1
+            if not full_text.startswith(previous):
+                self.revisions += 1
+
+        keep = len(self.committed)
+        if full_text.startswith(self.committed):
+            stable = min(common_prefix_len(previous, full_text), len(full_text))
+            cut = max(keep, word_safe_cut(full_text, stable, self.margin_words))
+            cut = min(cut, len(full_text))
+            if cut > keep:
+                self.commit_lengths.append(cut)
+            self.committed = full_text[:cut]
+            self.pending = full_text[cut:]
+        else:
+            # The model revised already-committed text: the append-only policy
+            # keeps committed as-is. Re-anchor after the divergence point so the
+            # stream keeps moving; if the text diverges from the very start,
+            # hold the pending tail until the model re-converges.
+            divergence = common_prefix_len(self.committed, full_text)
+            if divergence > 0:
+                self.pending = full_text[divergence:]
+        self.last_full = full_text
+
+    def flush(self) -> None:
+        """Commit the pending tail — call when the stream ends (no revisions left)."""
+        if self.pending:
+            self.committed = self.text
+            self.pending = ""
+            self.commit_lengths.append(len(self.committed))
 
 
-def emit_stable(state):
+def update_lsp(state: LSPState, full_text: str) -> None:
+    """Functional form of :meth:`LSPState.update`."""
+    state.update(full_text)
+
+
+def emit_stable(state: LSPState) -> tuple[str, str]:
     """Return ``(committed, pending)`` where committed text never changes.
 
     Stage 4 / T4.4.
     """
-    raise NotImplementedError("Stage 4, T4.4")
+    return state.committed, state.pending
+
+
+def flush_lsp(state: LSPState) -> str:
+    """Flush the stream tail and return the final append-only transcript."""
+    state.flush()
+    return state.committed

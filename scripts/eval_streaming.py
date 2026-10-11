@@ -26,6 +26,7 @@ from run_stage1_qat import load_checkpoint, patch_outer_forward
 from asr1bit.data.load import iter_librispeech
 from asr1bit.eval.wer import corpus_cer, corpus_wer
 from asr1bit.qwen import backends
+from asr1bit.qwen.stream import LSPState
 from asr1bit.replace import apply_layer_policy
 from asr1bit.train.qat import set_qat_alpha
 
@@ -50,6 +51,10 @@ def parse_args() -> argparse.Namespace:
                    help="generate() repetition penalty (breaks streaming repetition loops).")
     p.add_argument("--no-repeat-ngram", type=int, default=None,
                    help="generate() no_repeat_ngram_size (breaks streaming repetition loops).")
+    p.add_argument("--lsp-margin-words", type=int, default=None,
+                   help="Enable Longest-Stable-Prefix emission holding back this many words "
+                        "(Stage 4 / T4.4). The final text is unchanged; the report adds the "
+                        "append-only commit latency and revision count.")
     p.add_argument("--out", default=None)
     return p.parse_args()
 
@@ -97,18 +102,35 @@ def main() -> int:
             total_decode = 0.0
             total_audio = 0.0
             started = time.perf_counter()
+            lsp_revisions = 0
+            lsp_progress: dict[float, list[float]] = {}
+            lsp_enabled = args.lsp_margin_words is not None
             for utt in utterances:
+                lsp_state = (
+                    LSPState(margin_words=args.lsp_margin_words) if lsp_enabled else None
+                )
                 trace = backends.stream_transcribe_portable(
                     wrapper, utt.audio,
                     chunk_size_sec=args.chunk_ms / 1000.0,
                     step_sec=args.chunk_ms / 1000.0,
                     unfixed_token_num=args.unfixed_token_num,
                     generate_kwargs=generate_kwargs or None,
+                    lsp=lsp_state,
                 )
                 refs.append(utt.text)
                 hyps.append(trace.text)
                 total_decode += trace.total_decode_sec
                 total_audio += trace.audio_sec
+                if lsp_state is not None:
+                    lsp_revisions += trace.revisions
+                    for fraction in (0.5, 0.8):
+                        cutoff = fraction * trace.audio_sec
+                        committed = 0
+                        for audio_sec, committed_len in trace.commits:
+                            if audio_sec <= cutoff:
+                                committed = committed_len
+                        denominator = max(1, len(trace.text))
+                        lsp_progress.setdefault(fraction, []).append(committed / denominator)
             wer = corpus_wer(refs, hyps)
             cer = corpus_cer(refs, hyps)
             wall = time.perf_counter() - started
@@ -121,12 +143,31 @@ def main() -> int:
                 "hypotheses": hyps,
                 "references": refs,
             }
+            if lsp_enabled:
+                results["conditions"][name]["lsp"] = {
+                    "margin_words": args.lsp_margin_words,
+                    "revisions": lsp_revisions,
+                    "committed_frac": {
+                        str(fraction): sum(values) / len(values)
+                        for fraction, values in sorted(lsp_progress.items())
+                    },
+                }
             print(
                 f"--- {name} (alpha={alpha}) chunk {args.chunk_ms} ms: "
                 f"WER {wer:.2f} | CER {cer:.2f} | RTF {total_decode / total_audio:.3f} | "
                 f"wall {wall:.0f}s",
                 flush=True,
             )
+            if lsp_enabled:
+                lsp_report = results["conditions"][name]["lsp"]
+                print(
+                    f"    LSP(margin={args.lsp_margin_words}): revisions {lsp_report['revisions']} | "
+                    + " | ".join(
+                        f"committed@{fraction}: {value * 100:.1f}%"
+                        for fraction, value in lsp_report["committed_frac"].items()
+                    ),
+                    flush=True,
+                )
             for ref, hyp in list(zip(refs, hyps))[:3]:
                 print(f"  ref: {ref[:70]}", flush=True)
                 print(f"  hyp: {hyp[:70]}", flush=True)

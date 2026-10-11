@@ -7,6 +7,27 @@
 
 ---
 
+## 0. Latest session (2026-10-11 late) — WP1 implemented, jobs running
+
+- **WP1 code is in** (was the critical path): on-policy streaming SFT
+  (`src/asr1bit/train/sft.py` + `--op-rollout*` in `scripts/run_stage1_qat.py`)
+  and the LSP emission policy (`LSPState`/`update_lsp`/`emit_stable`/`flush_lsp`
+  in `src/asr1bit/qwen/stream.py`, reported by
+  `scripts/eval_streaming.py --lsp-margin-words`). 277 tests, ruff clean.
+  See `docs/LAB_NOTES.md` (2026-10-11 entry) for the design argument.
+- **Running:** `11020` WP1 phase 1 on-policy SFT (ternary, init 9.2, GPU 1,
+  `scripts/qat_stream_opd.pbs`) and `11022` WP2 ternary continuation on the full
+  28 539-utt cache (GPU 2, `scripts/qat_ternary_full.pbs`). Results pending —
+  check `artifacts/stage1/qat_stream_opd.log` / `qat_ternary_full.log` and the
+  "Live status" table in `docs/ACTIVITY_LOG.md`.
+- **Next steps:** decisive official-algorithm eval on the phase-1 checkpoint
+  (`qsub scripts/eval_streaming_opd.pbs`), then phase 2
+  (`scripts/qat_stream_opd2.pbs`, fresh rollout from the phase-1 checkpoint).
+  WP2 binary (`scripts/qat_binary_full.pbs`) was held back — no GPU with
+  ≥35 GB free; submit when one frees.
+
+---
+
 ## 1. Where the project stands (30-second version)
 
 | Layer | Result | Reference |
@@ -14,14 +35,16 @@
 | **Offline WER**, ternary, all 196 decoder projections | **9.2** (best 9.1) | fp16 pretrained 2.44; naive QAT ≈ 100 |
 | **Offline WER**, binary, all 196 decoder projections | **10.7** | same |
 | **Streaming 320 ms** (valid chunked re-feed variant) | ternary **9.43**, binary **10.28** | same-variant pretrained 2.54 |
-| Streaming 320 ms, official prefix algorithm | **collapses** (203.5 best) | needs Stage 4 work (see §3) |
+| Streaming 320 ms, official prefix algorithm | **collapses** (203.5 best) | WP1 fix implemented, phase-1 result pending (see §0) |
+| LSP emission (append-only) | policy implemented + tested | Stage 4 / T4.4; WER-neutral, reports commit latency |
 
 - Stage 0 gate passed (`0.2.0`); Stage 1/2 machinery is implemented, tested
-  (203 tests, ruff clean), documented, and pushed.
+  (277 tests, ruff clean), documented, and pushed.
 - The quantization pipeline works: ternary/binary weights across the whole
   decoder recover to single-digit/low-teens WER via the recipe in §2.
 - **The open problem is streaming robustness of the official algorithm** — a
-  training-side (Stage 4) issue, not fixable at inference (see §3, WP1).
+  training-side (Stage 4) issue, addressed by WP1 on-policy streaming SFT +
+  LSP emission (see §3, §0).
 
 ## 2. The recipe that works (copy-paste ready)
 
@@ -58,25 +81,34 @@ regenerates the full transcript; RTF ~10). The official prefix algorithm
 
 ## 3. What's left (prioritized work packages)
 
-**WP1 — Streaming robustness (critical path; Stage 4).**
-The official prefix algorithm collapses because the model (a) runaway-generates
-on near-empty warm-up chunks and (b) falls into repetition loops when
-continuing its own rolled-back text. Scaled streaming SFT (5 000 steps,
-prefix + silence samples) improved 1296 → 203.5 but did not fix it; inference
-controls fail (rep-penalty 438, ngram=4 264). Next:
-- **On-policy streaming SFT**: build prefixes from the model's *own* partial
-  generations (run it on truncated audio, collect its text, train on
-  continuation of that), blended ≥50 % with standard samples to protect
-  offline quality (streaming SFT currently costs ~2.5 offline points).
-- **LSP emission policy** (Stage 4/T4.4): explicit stable-prefix commit + stop
-  handling. `src/asr1bit/qwen/stream.py` has the `LSPState`/`emit_stable`
-  stubs.
-- Re-test with the official algorithm; target single-digit WER.
+**WP1 — Streaming robustness (critical path; Stage 4). — IMPLEMENTED, RESULT PENDING**
+The official prefix algorithm collapsed because the model (a) runaway-generated
+on near-empty warm-up chunks and (b) fell into repetition loops when continuing
+its own rolled-back text. Scaled streaming SFT (5 000 steps, static gold prefixes
++ silence samples) improved 1296 → 203.5 but did not fix it; inference controls
+fail (rep-penalty 438, ngram=4 264).
+- **On-policy streaming SFT: done** — `--op-rollout` replays the official
+  algorithm with the current model (batched), training on the reference
+  remainder of its own prefixes; warm-up chunks train EOS; mixed ≥50 % standard
+  samples (`docs/LAB_NOTES.md` 2026-10-11 has the full design argument).
+  Launchers: `scripts/qat_stream_opd.pbs` (phase 1, running as `11020`),
+  `scripts/qat_stream_opd2.pbs` (phase 2, fresh rollout).
+- **LSP emission policy (Stage 4/T4.4): done** — `LSPState`, `update_lsp`,
+  `emit_stable`, `flush_lsp` in `src/asr1bit/qwen/stream.py`; append-only by
+  construction with a word-level margin; reported via
+  `scripts/eval_streaming.py --lsp-margin-words N` (revision count + committed
+  fraction at 50 %/80 % of the audio).
+- **Pending:** the decisive official-algorithm eval (`scripts/eval_streaming_opd.pbs`,
+  target single-digit WER); if phase 1 still loops, raise `--op-mix-frac` or run
+  in-job refreshes (`--op-refresh-every`) before touching the offline recipe.
 
 **WP2 — Offline scale-up.**
 The 8k-data recipe plateaued at 9.2 / 10.7. The full **28 539-utterance**
 `train-clean-100` cache is built (`data/qat_clean_train.100_full.pt`, 100.6 h,
-23 GB). Re-run stages 1–3 on it; expect a further offline drop.
+23 GB). Continuations with fresh cosine cycles are the cheapest test:
+`scripts/qat_ternary_full.pbs` (running as `11022`, 10 000 steps, lr 1e-5) and
+`scripts/qat_binary_full.pbs` (held: no GPU ≥35 GB free) — re-run stages 1–3 on
+the full cache only if these win.
 
 **WP3 — `test-other`.**
 All numbers are `test-clean` (50-utt fixed subsample, seed 0). Run the recipe's

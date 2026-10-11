@@ -15,12 +15,15 @@ from asr1bit.qwen.backends import (
     SAMPLE_RATE,
     StreamTrace,
     TokenizerCodec,
+    build_transformers_batch_decode_fn,
     build_transformers_decode_fn,
     environment_report,
     load_model,
     stream_transcribe,
     stream_transcribe_official,
+    stream_transcribe_portable,
 )
+from asr1bit.qwen.stream import LSPState
 
 
 class _FakeProcessor:
@@ -30,10 +33,11 @@ class _FakeProcessor:
 
     def __call__(self, text, audio, return_tensors=None, padding=None):
         self.calls.append({"text": text, "audio": audio})
-        return _FakeInputs(7)
+        batch = len(text) if isinstance(text, (list, tuple)) else 1
+        return _FakeInputs(7, batch)
 
     def batch_decode(self, ids, skip_special_tokens=True, clean_up_tokenization_spaces=False):
-        return [" continued"]
+        return [" continued"] * int(np.asarray(ids).shape[0])
 
 
 class _FakeTokenizer:
@@ -45,8 +49,9 @@ class _FakeTokenizer:
 
 
 class _FakeInputs:
-    def __init__(self, n):
+    def __init__(self, n, batch=1):
         self._n = n
+        self._batch = batch
 
     def to(self, *args, **kwargs):
         return self
@@ -55,11 +60,11 @@ class _FakeInputs:
         return self
 
     def keys(self):
-        return []
+        return ["input_ids"]
 
     @property
     def shape(self):
-        return (1, self._n)
+        return (self._batch, self._n)
 
 
 class _FakeInner:
@@ -71,7 +76,9 @@ class _FakeInner:
 
     def generate(self, **kwargs):
         self.generate_kwargs = kwargs
-        return types.SimpleNamespace(sequences=np.zeros((1, 9), dtype=int))
+        inputs = kwargs.get("input_ids")
+        batch = inputs.shape[0] if inputs is not None else 1
+        return types.SimpleNamespace(sequences=np.zeros((batch, 9), dtype=int))
 
 
 class _FakeTransformersModel:
@@ -79,6 +86,9 @@ class _FakeTransformersModel:
         self.processor = _FakeProcessor()
         self.model = _FakeInner()
         self.max_new_tokens = 32
+
+    def _build_text_prompt(self, context="", force_language=None):
+        return "PROMPT"
 
 
 class _FakeOfficialModel:
@@ -206,6 +216,61 @@ class TestBuildTransformersDecodeFn:
         assert call["text"] == ["PROMPT"]
         assert np.asarray(call["audio"][0]).shape[0] == SAMPLE_RATE
         assert model.model.generate_kwargs["max_new_tokens"] == 5
+
+
+class TestBuildTransformersBatchDecodeFn:
+    def test_decodes_a_batch_in_one_call(self):
+        model = _FakeTransformersModel()
+        decode_batch = build_transformers_batch_decode_fn(model, max_new_tokens=7)
+        prompts = ["P1", "P2"]
+        audios = [
+            np.zeros(SAMPLE_RATE, dtype=np.float32),
+            np.zeros(2 * SAMPLE_RATE, dtype=np.float32),
+        ]
+        out = decode_batch(prompts, audios)
+        assert out == [" continued", " continued"]
+        assert len(model.processor.calls) == 1
+        call = model.processor.calls[0]
+        assert call["text"] == ["P1", "P2"]
+        assert [np.asarray(a).shape[0] for a in call["audio"]] == [SAMPLE_RATE, 2 * SAMPLE_RATE]
+        assert model.model.generate_kwargs["max_new_tokens"] == 7
+
+    def test_single_prompt_wrapper_still_returns_a_string(self):
+        model = _FakeTransformersModel()
+        decode_fn = build_transformers_decode_fn(model)
+        assert decode_fn("P", np.zeros(SAMPLE_RATE, dtype=np.float32)) == " continued"
+
+
+class TestPortableStreaming:
+    def test_feeds_chunks_and_returns_trace(self):
+        model = _FakeTransformersModel()
+        audio = np.zeros(2 * SAMPLE_RATE, dtype=np.float32)
+        trace = stream_transcribe_portable(model, audio, chunk_size_sec=1.0, step_sec=1.0)
+        assert trace.text == "continued"
+        assert len(model.processor.calls) == 2  # one decode per full chunk
+        assert trace.audio_sec == pytest.approx(2.0)
+        assert trace.revisions == 0
+        assert trace.commits == []
+
+    def test_lsp_reports_commits_and_unrevised_text(self):
+        model = _FakeTransformersModel()
+        audio = np.zeros(4 * SAMPLE_RATE, dtype=np.float32)
+        lsp = LSPState()
+        trace = stream_transcribe_portable(
+            model, audio, chunk_size_sec=1.0, step_sec=1.0, lsp=lsp
+        )
+        # The fake decoder repeats " continued"; LSP commits it once it has
+        # survived an update, and the flush event closes the stream.
+        assert trace.text == "continued"
+        assert trace.commits == [(2.0, 9), (4.0, 9)]
+        assert trace.revisions == 0
+
+    def test_unknown_language_is_forwarded_to_the_prompt(self):
+        model = _FakeTransformersModel()
+        stream_transcribe_portable(
+            model, np.zeros(SAMPLE_RATE, dtype=np.float32), chunk_size_sec=1.0, language="English"
+        )
+        assert model.processor.calls  # prompt built and fed
 
 
 class TestStreamTrace:

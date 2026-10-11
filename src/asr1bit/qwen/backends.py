@@ -16,18 +16,19 @@ from __future__ import annotations
 import importlib
 import platform
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 
-from asr1bit.qwen.stream import SAMPLE_RATE, ChunkedStreamer
+from asr1bit.qwen.stream import SAMPLE_RATE, ChunkedStreamer, LSPState, flush_lsp
 
 __all__ = [
     "SAMPLE_RATE",
     "StreamTrace",
     "TokenizerCodec",
+    "build_transformers_batch_decode_fn",
     "build_transformers_decode_fn",
     "environment_report",
     "load_model",
@@ -47,6 +48,8 @@ class StreamTrace:
     total_decode_sec: float = 0.0
     audio_sec: float = 0.0
     language: str = ""
+    revisions: int = 0
+    commits: list[tuple[float, int]] = field(default_factory=list)
 
     @property
     def rtf(self) -> float:
@@ -136,6 +139,40 @@ def offline_transcribe(
     return results[0].text
 
 
+def build_transformers_batch_decode_fn(
+    model: Any, max_new_tokens: int | None = None, **generate_kwargs: Any
+) -> Callable[[Sequence[str], Sequence[np.ndarray]], list[str]]:
+    """Build a batched ``decode_batch(prompts, audios) -> continuations``.
+
+    Same semantics as :func:`build_transformers_decode_fn`, but every prompt is
+    decoded in one ``generate`` call (used by the on-policy streaming SFT
+    rollout, where all utterances' chunk-``k`` decodes can be batched).
+    """
+    inner = model.model
+    processor = model.processor
+    limit = max_new_tokens if max_new_tokens is not None else getattr(model, "max_new_tokens", 512)
+
+    def decode_batch(prompts: Sequence[str], audios: Sequence[np.ndarray]) -> list[str]:
+        inputs = processor(
+            text=list(prompts),
+            audio=[np.asarray(audio, dtype=np.float32) for audio in audios],
+            return_tensors="pt",
+            padding=True,
+        )
+        inputs = inputs.to(inner.device).to(inner.dtype)
+        generated = inner.generate(**inputs, max_new_tokens=limit, **generate_kwargs)
+        prompt_len = inputs["input_ids"].shape[1]
+        return list(
+            processor.batch_decode(
+                generated.sequences[:, prompt_len:],
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=False,
+            )
+        )
+
+    return decode_batch
+
+
 def build_transformers_decode_fn(
     model: Any, max_new_tokens: int | None = None, **generate_kwargs: Any
 ) -> Callable[[str, np.ndarray], str]:
@@ -145,26 +182,10 @@ def build_transformers_decode_fn(
     ``repetition_penalty=1.3`` or ``no_repeat_ngram_size=4`` to break
     repetition loops in streaming).
     """
-    inner = model.model
-    processor = model.processor
-    limit = max_new_tokens if max_new_tokens is not None else getattr(model, "max_new_tokens", 512)
+    decode_batch = build_transformers_batch_decode_fn(model, max_new_tokens, **generate_kwargs)
 
     def decode_fn(prompt: str, audio: np.ndarray) -> str:
-        inputs = processor(
-            text=[prompt],
-            audio=[np.asarray(audio, dtype=np.float32)],
-            return_tensors="pt",
-            padding=True,
-        )
-        inputs = inputs.to(inner.device).to(inner.dtype)
-        generated = inner.generate(**inputs, max_new_tokens=limit, **generate_kwargs)
-        prompt_len = inputs["input_ids"].shape[1]
-        decoded = processor.batch_decode(
-            generated.sequences[:, prompt_len:],
-            skip_special_tokens=True,
-            clean_up_tokenization_spaces=False,
-        )
-        return decoded[0]
+        return decode_batch([prompt], [audio])[0]
 
     return decode_fn
 
@@ -226,11 +247,17 @@ def stream_transcribe_portable(
     unfixed_token_num: int = 5,
     language: str | None = None,
     generate_kwargs: dict[str, Any] | None = None,
+    lsp: LSPState | None = None,
 ) -> StreamTrace:
     """Stream with :class:`ChunkedStreamer` over the transformers backend.
 
     ``generate_kwargs`` are forwarded to the underlying ``generate`` calls
     (e.g. repetition controls for models that loop on self-prefixes).
+
+    When an :class:`LSPState` is given, every chunk's full text is fed through
+    the Longest-Stable-Prefix policy and the trace reports the append-only
+    ``committed`` transcript plus commit timings (audio seconds, committed
+    length) and the revision count.
     """
     audio = np.asarray(audio, dtype=np.float32)
     base_decode = build_transformers_decode_fn(model, **(generate_kwargs or {}))
@@ -252,15 +279,31 @@ def stream_transcribe_portable(
     prompt_raw = model._build_text_prompt(context="", force_language=language)
     state = streamer.init_state(prompt_raw=prompt_raw, force_language=language)
     step = max(1, round(step_sec * SAMPLE_RATE))
+    total_samples = int(audio.shape[0])
+    commits: list[tuple[float, int]] = []
     for position in range(0, audio.shape[0], step):
         streamer.push(audio[position : position + step], state)
+        if lsp is not None:
+            before = len(lsp.committed)
+            lsp.update(state.text)
+            if len(lsp.committed) > before:
+                commits.append(
+                    (min(position + step, total_samples) / float(SAMPLE_RATE), len(lsp.committed))
+                )
     streamer.finish(state)
+    text = state.text
+    if lsp is not None:
+        lsp.update(state.text)
+        text = flush_lsp(lsp)
+        commits.append((total_samples / float(SAMPLE_RATE), len(lsp.committed)))
     return StreamTrace(
-        text=state.text,
+        text=text,
         chunks=[state.text] if durations else [],
         total_decode_sec=float(sum(durations)),
         audio_sec=audio.shape[0] / float(SAMPLE_RATE),
         language=state.language,
+        revisions=lsp.revisions if lsp is not None else 0,
+        commits=commits,
     )
 
 

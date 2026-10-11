@@ -460,3 +460,43 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/stage1_decoder_attn_ffn_bw1.58_gNone_lr2.5e-05_*.json`,
   `artifacts/stage1/stage1_decoder_attn_ffn_bw1.0_gNone_lr5e-05_*.json`,
   `artifacts/stage1/qat_attn_rollout*.log`, `artifacts/stage1/qat_binary_rollout.log`.
+
+---
+
+## 2026-10-11 — WP1 design: on-policy streaming SFT + LSP emission (implementation)
+
+- **Did:** implemented WP1 (`src/asr1bit/train/sft.py`, `src/asr1bit/qwen/stream.py`,
+  runner flags `--op-rollout*`, `eval_streaming.py --lsp-margin-words`); 277 tests
+  pass, ruff clean. Launched WP1 phase 1 (`11020`, rollout 700 utts, 2 400 on-policy
+  + 2 400 standard, 3 000 steps, init 9.2) and WP2 ternary full
+  (`11022`, 10 000 steps on 28 539 utts).
+- **Failed:** nothing yet — results pending (the previous inference-side controls
+  had already failed: repetition_penalty 438.2, no_repeat_ngram 264.5).
+- **Why (the design argument):** the official algorithm's collapse has two
+  signature modes, both distribution mismatches, not inference bugs:
+  1. *warm-up runaway* — the model answers a 0.32 s chunk with
+     `assistant\nassistant…` (32 tokens, no EOS), where the pretrained model
+     emits metadata + EOS;
+  2. *self-prefix loops* — the prompt is the model's own rolled-back text, a
+     pattern the static prefix SFT never saw (it trained on *gold* prefixes with
+     the **full** audio, while inference uses truncated audio).
+  On-policy rollouts fix both: the training prompt is exactly the prompt the
+  model meets at inference, the target is the reference remainder (so the
+  transcript is completed from any own-prefix state) and completing the
+  transcript trains EOS (the stop signal the 5 000-step SFT never had — its
+  prefixes stopped at 95 % of the transcript).
+- **Chose:** one DAgger rollout per phase (phase 2 = `qat_stream_opd2.pbs` with a
+  fresh rollout from the phase-1 checkpoint) rather than in-job refreshes, so
+  each phase re-uses the stable offline recipe's LR/cosine structure; rollout
+  capped at ≤16 rounds (bounds the O(n²) re-feed), states kept at warm-up +
+  stride + last round (~8/utt), pool capped at 2 400 to land the 50/50 mix.
+  Rejected: keeping the static prefix samples in the mix (the 95 %-prefix sample
+  taught "continue to the end" but never "stop"; warm-up EOS plus
+  complete-prefix-EOS covers both ends).
+- **Next:** decisive official-algorithm eval (`eval_streaming_opd.pbs`, LSP
+  margin 3 words → append-only commit latency + revision counts), then phase 2;
+  if phase 1 still loops, raise the on-policy share / add checkpoint-level
+  refreshes before touching the offline recipe.
+- **Artifacts:** `artifacts/stage1/qat_stream_opd.log`,
+  `artifacts/stage1/qat_ternary_full.log`, `tests/test_train_sft.py`,
+  `tests/test_trainer_rollout.py`.

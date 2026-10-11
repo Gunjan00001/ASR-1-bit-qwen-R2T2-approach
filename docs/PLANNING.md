@@ -346,3 +346,31 @@ Dated, append-only. Record what changed, why, and alternatives rejected.
   (staged copies included). Lesson: on shared clusters, stage conda/model/data on
   node-local disk and stream data; do not materialize full HF splits inside the
   PBS memory cgroup.
+- **2026-10-11 — WP1: on-policy streaming SFT is the Stage-4 training answer.**
+  The official prefix algorithm's collapse is a training-distribution problem
+  (static gold prefixes + full audio at train time vs the model's own rolled-back
+  text + truncated audio at inference), so streaming SFT samples are now built by
+  *replaying the official algorithm with the current model* (`--op-rollout`),
+  batched over utterances. Targets: reference remainder for mid/late chunks (EOS
+  when the own text already covers the transcript), EOS for warm-up chunks 0/1.
+  The mix must keep ≥50 % standard samples (protects offline quality; the 5 k-step
+  static SFT cost ~3 offline points). One DAgger rollout per phase (phase 2 =
+  fresh rollout from the phase-1 checkpoint) — rejected in-job refreshes for the
+  first iteration to keep the offline recipe's LR/cosine structure stable.
+  Alternatives rejected (measured): inference repetition controls
+  (repetition_penalty 438.2, no_repeat_ngram 264.5), longer static prefix SFT
+  (203.5 with loops).
+- **2026-10-11 — WP1: LSP emission policy semantics (T4.4).** `LSPState` commits
+  text only once it survived a revision (longest common prefix of consecutive
+  chunk texts), word-aligned, holding back `margin_words` (≈ the rollback window)
+  so normal revisions stay inside `pending`. Committed text is append-only **by
+  construction**: a revision that reaches into committed text is appended after
+  the divergence point (or held if the text diverges from the very start), never
+  applied to `committed`. `flush_lsp` commits the tail at stream end (stop
+  handling). Reported by `eval_streaming.py --lsp-margin-words` as revision
+  count + committed fraction at 50 % / 80 % of the audio.
+- **2026-10-11 — Offline scale-up (WP2) runs on the full 28 539-utt cache.**
+  Continuations of the best ternary (9.2) / binary (10.7) checkpoints with fresh
+  cosine cycles (lr 1e-5, anchor 0.05) instead of a full re-run of stages 1–3 —
+  cheapest test of whether data volume breaks the 8k plateau; the warm-start
+  stages can be re-run on the full cache later if the continuation wins.

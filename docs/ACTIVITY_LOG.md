@@ -7,12 +7,13 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 21:30 IST)
+## Live status (updated 2026-10-11 22:25 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10980` | Repetition controls on the scaled-SFT model (official algorithm) | penalty done; **ngram=4 running** | penalty 438.2 (worse); ngram pending | **~50 m** |
-| — | All training jobs | done | — | — |
+| `11020` | **WP1 phase 1** — on-policy streaming SFT (ternary, init 9.2), GPU 1 | on-policy rollout running | pending | ~2 h total |
+| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | loading cache | pending | ~3 h |
+| — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — no GPU with ≥35 GB free at submit time | — | when a GPU frees |
 
 **Streaming 320 ms (50 utts) — final picture:**
 
@@ -21,7 +22,7 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 | Official prefix algorithm | **2.33** | collapse 1296 → 952 (short SFT) → **203.5** (scaled SFT) | — |
 | Official + repetition_penalty=1.3 | — | 438.2 (worse) | — |
 | No-prefix re-feed, 32 tokens | 19.28 | 33.58 | 33.26 |
-| **No-prefix re-feed, 128 tokens (reported)** | **2.54** | **9.43** | — |
+| **No-prefix re-feed, 128 tokens (reported)** | **2.54** | **9.43** | **10.28** |
 
 **Offline (50-utt test-clean; fp16 baseline 2.44):** ternary **9.2** (best 9.1);
 binary **10.7**; ternary+streaming-SFT ~12.
@@ -724,3 +725,58 @@ restarts at 0).
 checkpoints (`data/checkpoints/`), all artifacts under `artifacts/stage1/`,
 figures in `docs/figures/`. Everything is committed and pushed (`stage-1`,
 tags through `0.2.39`).
+
+---
+
+### 22:20 — WP1 implemented: on-policy streaming SFT + LSP emission (code + tests)
+
+- **Did:** implemented the two WP1 work packages end-to-end; suite 277 passed,
+  1 skipped, `ruff check .` clean.
+  - **On-policy streaming SFT** (`src/asr1bit/train/sft.py`, was a stub):
+    `collect_streaming_samples` replays the *official* algorithm (full audio
+    re-feed per chunk + `unfixed_token_num` rollback) with the current model and
+    records the exact `(prompt, audio heard, own text)` state — batched so all
+    utterances' chunk-*k* decodes run as one `generate` call (identical math,
+    much less wall time). `gold_coverage` aligns the model's own text to the
+    reference by unit-cost edit distance, so the training target is the
+    **unfinished remainder** (`""` when the own text already covers the
+    transcript — the EOS-stop sample the previous SFT never trained).
+    Warm-up chunks 0/1 (empty prefix) train EOS, killing the
+    `assistant\nassistant…` runaway. `interleave_with_ratio` blends the pool
+    with standard offline samples (target share `--op-mix-frac`, default 0.5).
+  - **LSP emission policy** (`src/asr1bit/qwen/stream.py`, Stage 4 / T4.4):
+    `LSPState` + `update_lsp` / `emit_stable` / `flush_lsp`. Text is committed
+    only once it has survived a revision (longest common prefix of consecutive
+    updates), always at a word boundary, with `margin_words` held back so the
+    model's rollback window stays revisable; committed text is **append-only by
+    construction**. `rollback_prefix` was factored out for reuse by the rollout.
+  - **Runner:** `--op-rollout*` flags (rollout size, batch, stride, round cap,
+    pool cap, mix fraction, refresh interval, warm-up EOS);
+    `eval_streaming.py --lsp-margin-words` reports revisions and the committed
+    fraction of the transcript at 50 % / 80 % of the audio.
+- **New tests:** `tests/test_train_sft.py` (rollout replay incl. rollback chain,
+  alignment, target construction, mixing), `tests/test_trainer_rollout.py`
+  (trainer glue with a fake wrapper), extended `tests/test_stream.py`
+  (LSP invariants) and `tests/test_backends.py` (batched decode fn, LSP trace).
+- **Launched:**
+  - `11020` **WP1 phase 1** (`scripts/qat_stream_opd.pbs`, GPU 1): init from the
+    9.2 ternary; rollout 700 utts (320 ms, ≤16 rounds, batch 6), 2 400
+    on-policy + 2 400 standard samples, 3 000 steps, lr 1e-5 cosine, anchor 0.05;
+    checkpoint `data/checkpoints/qat_stream_opd/`.
+  - `11022` **WP2 ternary full** (`scripts/qat_ternary_full.pbs`, pinned GPU 2):
+    continuation from the 9.2 checkpoint on the full 28 539-utterance cache,
+    10 000 steps, lr 1e-5 cosine, anchor 0.05;
+    checkpoint `data/checkpoints/qat_ternary_full/`.
+- **Failure:** the first WP2 submission (`11021`) raced `11020` onto GPU 1 —
+  every other GPU was ≥72 GB used by other users at submit time. Killed and
+  resubmitted with `-v QAT_GPU=2` (rules.md R1: switch, never share).
+- **Held back:** `scripts/qat_binary_full.pbs` (WP2 binary) — no GPU with
+  ≥35 GB free; submit when a GPU frees.
+- **ETA:** WP1 ≈ 2 h (rollout ≈ 45–60 min + 3 000 steps ≈ 50 min + evals);
+  WP2 ternary ≈ 3 h.
+- **Next:** decisive official-algorithm eval on the phase-1 checkpoint
+  (`scripts/eval_streaming_opd.pbs`, LSP margin 3), then phase 2
+  (`scripts/qat_stream_opd2.pbs`, fresh rollout from the phase-1 checkpoint).
+- **Evidence:** `src/asr1bit/train/sft.py`, `src/asr1bit/qwen/stream.py`,
+  `scripts/run_stage1_qat.py`, `scripts/eval_streaming.py`,
+  `artifacts/stage1/qat_stream_opd.log`, `artifacts/stage1/qat_ternary_full.log`.

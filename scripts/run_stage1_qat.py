@@ -39,6 +39,12 @@ from asr1bit.train.qat import (
     set_activation_quant,
     set_qat_alpha,
 )
+from asr1bit.train.sft import (
+    build_onpolicy_examples,
+    collect_streaming_samples,
+    interleave_with_ratio,
+    select_evenly,
+)
 
 
 def patch_outer_forward(model) -> None:
@@ -165,6 +171,70 @@ def evaluate_precisions(
     return results
 
 
+def build_op_keep(args: argparse.Namespace):
+    """State-selection policy for the on-policy rollout.
+
+    Always keep the warm-up chunks (the runaway-generation fix) and the last
+    chunk; keep mid-stream chunks on a fixed stride to bound memory.
+    """
+
+    def keep(chunk_id: int, final: bool) -> bool:
+        if chunk_id < 2 or final:
+            return True
+        if args.op_max_rounds and chunk_id >= args.op_max_rounds - 1:
+            return True
+        return args.op_chunk_stride > 0 and chunk_id % args.op_chunk_stride == 0
+
+    return keep
+
+
+def rollout_onpolicy_examples(
+    args: argparse.Namespace, wrapper, model, utterances
+) -> list[dict]:
+    """Replay the official streaming algorithm with the *current* model.
+
+    Returns ``(audio, prefix_text, target)`` examples whose prompts are the
+    model's own rolled-back generations (on-policy), with the reference
+    remainder as the target.
+    """
+    decode_batch = backends.build_transformers_batch_decode_fn(
+        wrapper, max_new_tokens=args.op_max_new_tokens
+    )
+    codec = backends.TokenizerCodec(wrapper.processor.tokenizer)
+    prompt_raw = wrapper._build_text_prompt(context="", force_language=None)
+    audios = [utt.audio for utt in utterances]
+    started = time.perf_counter()
+
+    def progress(done: int, total: int) -> None:
+        if done == total or done % 50 == 0:
+            elapsed = time.perf_counter() - started
+            eta = elapsed / max(1, done) * (total - done)
+            print(
+                f"rollout {done}/{total} utts ({elapsed:.0f}s elapsed, ~{eta:.0f}s left)",
+                flush=True,
+            )
+
+    samples = collect_streaming_samples(
+        decode_batch,
+        codec,
+        prompt_raw,
+        audios,
+        chunk_size_sec=args.op_chunk_ms / 1000.0,
+        unfixed_chunk_num=2,
+        unfixed_token_num=5,
+        keep=build_op_keep(args),
+        batch_size=args.op_batch_size,
+        max_rounds=args.op_max_rounds or None,
+        progress=progress,
+    )
+    examples = build_onpolicy_examples(
+        samples,
+        [utt.text for utt in utterances],
+        warmup_target_eos=bool(args.op_warmup_eos),
+    )
+    return select_evenly(examples, args.op_max_samples)
+
+
 def shadow_state(model) -> dict:
     """Trainable tensor snapshot (BitLinear shadows and learnable scales)."""
     return {name: p.detach().cpu() for name, p in model.named_parameters() if p.requires_grad}
@@ -274,12 +344,36 @@ def parse_args() -> argparse.Namespace:
         help="Also add a near-empty-audio sample per utterance (truncated to this many "
              "seconds, empty target) so the model learns to emit EOS on warm-up chunks.",
     )
+    p.add_argument(
+        "--op-rollout", type=int, default=0,
+        help="1 = on-policy streaming SFT: replay the official streaming algorithm with "
+             "the current model, train on continuations of its own prefixes, and mix "
+             "them with the standard samples (Stage 4).",
+    )
+    p.add_argument("--op-rollout-n", type=int, default=600, help="Utterances for the on-policy rollout.")
+    p.add_argument("--op-batch-size", type=int, default=6, help="Utterances decoded per rollout call.")
+    p.add_argument("--op-max-new-tokens", type=int, default=32,
+                   help="Per-chunk generation cap during the rollout (match the streaming eval).")
+    p.add_argument("--op-chunk-ms", type=int, default=320, help="Chunk length of the on-policy rollout.")
+    p.add_argument("--op-chunk-stride", type=int, default=3, help="Keep every Nth mid-stream chunk state.")
+    p.add_argument("--op-max-rounds", type=int, default=16,
+                   help="Cap rollout rounds per utterance (bounds the O(n^2) re-feed; 0 = no cap).")
+    p.add_argument("--op-max-samples", type=int, default=2400, help="Cap on the on-policy example pool.")
+    p.add_argument("--op-mix-frac", type=float, default=0.5,
+                   help="Target share of on-policy samples in the training mix.")
+    p.add_argument("--op-refresh-every", type=int, default=0,
+                   help="Re-run the rollout every N steps with the current model (0 = once).")
+    p.add_argument("--op-warmup-eos", type=int, default=1,
+                   help="1 = warm-up chunks (no prefix) train an immediate EOS.")
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.op_rollout and not args.lazy_collate:
+        print("--op-rollout enables --lazy-collate (the mix changes across refreshes)", flush=True)
+        args.lazy_collate = 1
     group_size = args.group_size or None
     config_record = vars(args) | {"group_size": group_size}
     print("=== environment ===")
@@ -391,6 +485,25 @@ def main() -> int:
         if start_step > 0:
             scheduler.last_epoch = start_step
             print(f"lr schedule advanced to step {start_step}", flush=True)
+
+    standard_examples = train_examples
+    op_utterances: list = []
+    op_examples: list[dict] = []
+    if args.op_rollout:
+        op_utterances = train_utts[: args.op_rollout_n]
+        print(f"=== on-policy rollout ({len(op_utterances)} utts, {args.op_chunk_ms} ms chunks) ===", flush=True)
+        set_precision(model, args.bit_width, 1.0)
+        model.eval()
+        with torch.no_grad():
+            op_examples = rollout_onpolicy_examples(args, wrapper, model, op_utterances)
+        model.train()
+        train_examples = interleave_with_ratio(standard_examples, op_examples, args.op_mix_frac)
+        print(
+            f"on-policy rollout: {len(op_examples)} examples | mix {len(train_examples)} "
+            f"({len(standard_examples)} standard + {len(op_examples)} on-policy)",
+            flush=True,
+        )
+
     print("=== QAT ===", flush=True)
     started = time.perf_counter()
     for step in range(start_step, args.steps):
@@ -469,6 +582,26 @@ def main() -> int:
             record.update(scale_stats(model))
             history.append(record)
             print(json.dumps(record), flush=True)
+        if (
+            args.op_rollout
+            and args.op_refresh_every
+            and (step + 1) % args.op_refresh_every == 0
+        ):
+            print(f"=== on-policy rollout refresh @ step {step + 1} ===", flush=True)
+            set_precision(model, args.bit_width, 1.0)
+            model.eval()
+            with torch.no_grad():
+                op_examples = rollout_onpolicy_examples(args, wrapper, model, op_utterances)
+            model.train()
+            set_precision(model, args.bit_width, alpha)
+            train_examples = interleave_with_ratio(standard_examples, op_examples, args.op_mix_frac)
+            print(
+                "OPREFRESH "
+                + json.dumps(
+                    {"step": step + 1, "op_examples": len(op_examples), "mix": len(train_examples)}
+                ),
+                flush=True,
+            )
         if args.eval_every and (step + 1) % args.eval_every == 0:
             prec = evaluate_precisions(
                 wrapper, model, eval_utts, args.eval_n,
@@ -486,6 +619,10 @@ def main() -> int:
             save_checkpoint(Path(args.save_dir) / "last.pt", model, step + 1, args)
     results["history"] = history
     results["qat_seconds"] = time.perf_counter() - started
+    if args.op_rollout:
+        results["on_policy_examples"] = len(op_examples)
+        results["on_policy_utterances"] = len(op_utterances)
+        results["mix_size"] = len(train_examples)
     if args.save_dir:
         save_checkpoint(Path(args.save_dir) / "last.pt", model, args.steps, args)
 
