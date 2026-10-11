@@ -1,0 +1,96 @@
+{
+  "checkpoint": "data/checkpoints/qat_ternary_long2/last.pt",
+  "utterance_id": "1089-134691-0015",
+  "reference": "WORDS WAS IT THEIR COLOURS",
+  "final_text": "WORDS WAS IT'S'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T",
+  "chunks": [
+    {
+      "chunk": 0,
+      "audio_sec": 0.32,
+      "prompt_chars": 121,
+      "generated_tokens": 0,
+      "eos": false,
+      "text": "<skipped: warm-up>"
+    },
+    {
+      "chunk": 1,
+      "audio_sec": 0.64,
+      "prompt_chars": 121,
+      "generated_tokens": 0,
+      "eos": false,
+      "text": "<skipped: warm-up>"
+    },
+    {
+      "chunk": 2,
+      "audio_sec": 0.96,
+      "prompt_chars": 121,
+      "generated_tokens": 0,
+      "eos": false,
+      "text": "<skipped: warm-up>"
+    },
+    {
+      "chunk": 3,
+      "audio_sec": 1.28,
+      "prompt_chars": 121,
+      "generated_tokens": 2,
+      "eos": true,
+      "text": "WORDS"
+    },
+    {
+      "chunk": 4,
+      "audio_sec": 1.6,
+      "prompt_chars": 121,
+      "generated_tokens": 2,
+      "eos": true,
+      "text": "WORDS"
+    },
+    {
+      "chunk": 5,
+      "audio_sec": 1.92,
+      "prompt_chars": 121,
+      "generated_tokens": 2,
+      "eos": true,
+      "text": "WORDS"
+    },
+    {
+      "chunk": 6,
+      "audio_sec": 2.24,
+      "prompt_chars": 121,
+      "generated_tokens": 32,
+      "eos": false,
+      "text": "WORDS WAS IT'S'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T"
+    },
+    {
+      "chunk": 7,
+      "audio_sec": 2.56,
+      "prompt_chars": 181,
+      "generated_tokens": 32,
+      "eos": false,
+      "text": "'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T"
+    },
+    {
+      "chunk": 8,
+      "audio_sec": 2.88,
+      "prompt_chars": 235,
+      "generated_tokens": 32,
+      "eos": false,
+      "text": "'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T"
+    },
+    {
+      "chunk": 9,
+      "audio_sec": 3.2,
+      "prompt_chars": 289,
+      "generated_tokens": 32,
+      "eos": false,
+      "text": "'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T"
+    },
+    {
+      "chunk": 10,
+      "audio_sec": 3.4,
+      "prompt_chars": 343,
+      "generated_tokens": 32,
+      "eos": false,
+      "text": "'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T'T"
+    }
+  ]
+}

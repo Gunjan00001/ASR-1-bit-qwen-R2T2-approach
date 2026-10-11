@@ -7,37 +7,39 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 06:40 IST)
+## Live status (updated 2026-10-11 08:05 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10835` | **Streaming 320 ms, quantized** (pretrained baseline + ternary long2 + binary long3, 50 utts, GPU 6) | condition 1 running | pretrained 10-utt check: **3.59 WER, RTF 1.16** | **~30–45 m** |
-| `10833` | Pretrained streaming diagnostic | **done** | **portable path works** | — |
-| `10826`/`10827` | Round-4 continuations | killed | plateaued (ternary ~9.3–10.3, binary ~10.7–11.8) | — |
+| `10844` | **Streaming 320 ms (no-prefix variant)**: pretrained baseline + ternary long2 + binary long3, 50 utts | running | — | **~30–60 m** |
+| — | Full `train-clean-100` cache built | **done** | 28 539 utts, 100.6 h, 23 GB | — |
+| `10835` | Streaming (prefix variant) | done | pretrained **2.33**; ternary **1296** (collapse) | — |
 
-**Best results (50-utt test-clean offline; fp16 baseline 2.44; naive ≈ 100):**
+**Best offline results (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
 
 | Configuration | WER |
 |---|---|
 | Ternary, all 196 decoder projections (8k, long2) | **9.2** (best 9.1) |
 | Binary, all 196 decoder projections (8k, long3) | **10.7** |
-| FFN-only ternary | 25.7 best / 32.8 final |
-| Naive attn+FFN | ~98–108 |
 
-**Streaming-path findings (important):**
-1. The portable `ChunkedStreamer` **works**: the pretrained model at 320 ms
-   scores **3.59 WER / RTF 1.16** (10 utts) with correct transcriptions.
-2. The **fp16 readout of QAT-trained shadows is not a valid streaming
-   baseline** — its drift (offline 37.7) turns into runaway generation in
-   streaming (WER 1860, RTF 6.0). The meaningful metric is the model at its
-   **trained precision** (ternary/binary).
-3. The streaming evaluation therefore compares: pretrained fp16 baseline vs
-   ternary/binary quantized readouts on the **same 50 utts** (job `10835`).
+**Streaming findings (2026-10-11):**
+1. The portable streamer works for the pretrained model: **2.33 WER, RTF 1.16**
+   (50 utts, 320 ms).
+2. QAT models (fp16 readout and quantized) **collapse in the prefix-continuation
+   streaming loop** (WER ~1300–1900, runaway generation). Root cause found via
+   per-chunk traces (`scripts/diag_stream_generation.py`):
+   - near-empty first chunks (0.32 s) trigger runaway "assistant" repetition
+     (the pretrained model emits `language None<asr_text>` + EOS);
+   - the model fails at the **first prefix-continuation** chunk (2.24 s):
+     instead of continuing the rolled-back text, it repeats tokens ("'T'T'T…").
+     QAT training never included partial-prefix continuation samples.
+3. **Workaround that works:** disable the prefix continuation
+   (`unfixed_token_num=9999`, no-prefix re-feed) — the ternary model then
+   produces the correct transcript ("WORDS WAS IT THEIR COLORS"). The proper
+   fix is Stage 4 streaming SFT (partial-prefix samples), per the plan.
 
-**Recipe plateau:** four continuation rounds converge to ~9.2 (ternary) /
-~10.7 (binary) on 8k data; further rounds do not improve. Next levers: more
-data (28.5k full `train.clean-100` / `train.360`), the 1.7B model, or the
-remaining Stage 2 stack (co-training/stochastic precision).
+**Recipe plateau:** continuations converge to ~9.2 (ternary) / ~10.7 (binary)
+on 8k data. The full 28.5k cache is ready for the next scale-up.
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
@@ -564,3 +566,31 @@ restarts at 0).
 - **Evidence:** `artifacts/stage1/streaming_pretrained.json`,
   `artifacts/stage1/eval_streaming.log` (WER 1860 line),
   `docs/figures/wer_trajectories.png`.
+
+### 08:05 — Streaming collapse root-caused; no-prefix re-feed workaround; full cache built
+
+- **Did:** per-chunk streaming traces (`scripts/diag_stream_generation.py`)
+  comparing the pretrained model and the ternary long2 checkpoint on the same
+  utterance.
+- **Pretrained trace:** 11 chunks, EOS emitted every chunk; first chunk
+  (0.32 s) → `language None<asr_text>`; final text correct.
+- **Ternary trace:** first chunk → **32 tokens of "assistant\nassistant…"
+  without EOS** (runaway); later chunks OK; at the **first
+  prefix-continuation chunk** (2.24 s) it collapses into a token repetition
+  loop ("'T'T'T…"). Root cause: **QAT never trained partial-prefix
+  continuation** (the streaming algorithm's rolled-back self-prefix), and the
+  near-empty first chunk triggers runaway.
+- **Warm-up skip alone did not fix it** (the prefix-continuation failure
+  remains).
+- **Workaround that works:** disable the prefix continuation
+  (`unfixed_token_num=9999`, no-prefix re-feed) — the ternary model then emits
+  the correct transcript ("WORDS WAS IT THEIR COLORS"). Added
+  `--unfixed-token-num` to `eval_streaming.py` and relaunched the 50-utt
+  evaluation (`10844`) for pretrained + ternary + binary with the same variant.
+- **Proper fix:** Stage 4 streaming SFT (partial-prefix samples) — recorded in
+  the future plan.
+- **Full cache built:** `data/qat_clean_train.100_full.pt` (28 539 utts,
+  100.6 h, 23 GB) after fixing a transient certifi failure.
+- **Evidence:** `artifacts/stage1/diag_stream_pretrained.json`,
+  `diag_stream_ternary.json`, `diag_stream_ternary_min05.json`,
+  `diag_stream_ternary_noprefix.json`.
