@@ -1,0 +1,82 @@
+#!/bin/bash
+#PBS -N asr1bit-prefix-sft
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=48gb
+#PBS -l walltime=04:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/prefix_sft.out
+#
+# Stage 4-lite: prefix-continuation SFT for streaming robustness.
+# Trains the best ternary model on samples where the prompt contains the first
+# fraction of the transcript (mimicking the streaming rolled-back self-prefix)
+# and the target is the remaining words. Low lr + anchor to avoid regression.
+# Submit: qsub scripts/qat_prefix_sft.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage1/qat_prefix_sft.log"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
+[ -d "$MODEL" ] || MODEL=Qwen/Qwen3-ASR-0.6B
+if [ -f /tmp/asr1bit/qat_clean_train.100_n8000.pt ]; then
+  CACHE=/tmp/asr1bit/qat_clean_train.100_n8000.pt
+else
+  CACHE="$ROOT/data/qat_clean_train.100_n8000.pt"
+fi
+
+PICK=$(for _ in 1 2 3; do
+  nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits
+  sleep 1
+done | awk -F', ' '$2 < 45000 {u[$1]+=$3; m[$1]=$2} END {for (g in u) print u[g], m[g], g}' \
+  | sort -n | head -1 | awk '{print $3}')
+[ -z "$PICK" ] && PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
+  | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
+PICK="${QAT_GPU:-$PICK}"
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+"$PY" scripts/run_stage1_qat.py \
+  --model "$MODEL" \
+  --policy decoder_attn_ffn \
+  --bit-width 1.58 \
+  --learnable-scale 1 \
+  --init-from data/checkpoints/qat_ternary_long2/last.pt \
+  --prefix-sft-fracs 0.0,0.5,0.8,0.95 \
+  --steps 1500 \
+  --train-cache "$CACHE" \
+  --train-n 2000 \
+  --eval-n 50 \
+  --eval-every 500 \
+  --eval-both 0 \
+  --eval-fp16 1 \
+  --lr 1e-5 \
+  --warmup-steps 50 \
+  --lr-schedule cosine \
+  --batch-size 2 \
+  --max-new-tokens 128 \
+  --alpha-mode delay \
+  --alpha-warmup-frac 0.02 \
+  --distill-weight 0.05 \
+  --distill-temp 2.0 \
+  --frozen-teacher 1 \
+  --lazy-collate 1 \
+  --save-dir data/checkpoints/qat_ternary_prefix \
+  --save-every 500 \
+  --out artifacts/stage1 \
+  2>&1 | tee -a "$LOG"

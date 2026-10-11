@@ -60,13 +60,19 @@ def patch_outer_forward(model) -> None:
     cls._forward_patched = True
 
 
-def build_examples(utterances, processor, prompt: str = "") -> list[dict]:
+def build_examples(utterances, processor, prompt: str = "", prefix_fracs=None) -> list[dict]:
     """Build (audio, prefix_text, target) triples.
 
     Mirrors Qwen's official ``finetuning/qwen3_asr_sft.py``: the prefix template
     is rendered with a *dummy* audio placeholder (``audio=None``); the real audio
     is passed separately to the processor. Using the real audio here changes the
     rendered prefix and misaligns the label mask.
+
+    ``prefix_fracs`` (e.g. ``(0.0, 0.5, 0.8, 0.95)``) additionally creates
+    **prefix-continuation** samples for streaming robustness: the chat template
+    prefix is followed by the first ``frac`` of the transcript words and the
+    target is the remaining words — mimicking the streaming algorithm's
+    rolled-back self-prefix.
     """
     examples = []
     for utt in utterances:
@@ -77,7 +83,19 @@ def build_examples(utterances, processor, prompt: str = "") -> list[dict]:
         prefix = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
         if isinstance(prefix, list):
             prefix = prefix[0]
-        examples.append({"audio": utt.audio, "prefix_text": prefix, "target": utt.text})
+        if prefix_fracs:
+            words = utt.text.split()
+            for frac in prefix_fracs:
+                k = int(round(len(words) * frac))
+                partial = " ".join(words[:k])
+                target = " ".join(words[k:])
+                if not target:
+                    continue
+                examples.append(
+                    {"audio": utt.audio, "prefix_text": prefix + partial, "target": target}
+                )
+        else:
+            examples.append({"audio": utt.audio, "prefix_text": prefix, "target": utt.text})
     return examples
 
 
@@ -235,6 +253,11 @@ def parse_args() -> argparse.Namespace:
         "--init-from", default=None,
         help="Checkpoint path to initialize shadows from for a NEW phase (step counter starts at 0).",
     )
+    p.add_argument(
+        "--prefix-sft-fracs", default=None,
+        help="Comma-separated transcript fractions for prefix-continuation samples "
+             "(streaming robustness), e.g. '0.0,0.5,0.8,0.95'.",
+    )
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
 
@@ -273,8 +296,11 @@ def main() -> int:
 
     train_utts = load_train_utterances(args)
     eval_utts = list(iter_librispeech("clean", "test", sample_n=args.eval_n, sample_seed=0))
-    train_examples = build_examples(train_utts, processor)
-    print(f"train={len(train_examples)} eval={len(eval_utts)}", flush=True)
+    prefix_fracs = None
+    if args.prefix_sft_fracs:
+        prefix_fracs = tuple(float(x) for x in args.prefix_sft_fracs.split(",") if x.strip())
+    train_examples = build_examples(train_utts, processor, prefix_fracs=prefix_fracs)
+    print(f"train={len(train_examples)} eval={len(eval_utts)} prefix_fracs={prefix_fracs}", flush=True)
 
     results: dict = {"config": config_record, "eval_n": len(eval_utts), "frozen_teacher": teacher is not None}
 
