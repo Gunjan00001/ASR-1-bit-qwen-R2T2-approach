@@ -95,7 +95,7 @@ def main() -> int:
         unfixed_chunk_num=2,
         unfixed_token_num=5,
     )
-    prompt_raw = model._build_text_prompt(context="", force_language=None)
+    prompt_raw = wrapper._build_text_prompt(context="", force_language=None)
     state = streamer.init_state(prompt_raw=prompt_raw)
     step_samples = max(1, round(args.chunk_ms / 1000.0 * 16000))
     model.eval()
