@@ -50,7 +50,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
 echo "=== (1) pretrained fp16 baseline, 50 utts ===" | tee -a "$LOG"
 "$PY" scripts/eval_streaming.py \
   --model "$MODEL" --policy decoder_attn_ffn --bit-width 1.58 \
-  --chunk-ms 320 --n 50 --max-new-tokens 32 --conditions fp16 \
+  --chunk-ms 320 --n 50 --max-new-tokens 32 --unfixed-token-num 9999 --conditions fp16 \
   --out artifacts/stage1/streaming_pretrained_50.json \
   2>&1 | tee -a "$LOG"
 
@@ -58,7 +58,7 @@ echo "=== (2) ternary long2 (9.2 offline), quantized, 50 utts ===" | tee -a "$LO
 "$PY" scripts/eval_streaming.py \
   --model "$MODEL" --policy decoder_attn_ffn --bit-width 1.58 \
   --checkpoint data/checkpoints/qat_ternary_long2/last.pt \
-  --chunk-ms 320 --n 50 --max-new-tokens 32 --conditions quantized \
+  --chunk-ms 320 --n 50 --max-new-tokens 32 --unfixed-token-num 9999 --conditions quantized \
   --out artifacts/stage1/streaming_ternary_long2_quantized.json \
   2>&1 | tee -a "$LOG"
 
@@ -66,6 +66,6 @@ echo "=== (3) binary long3 (10.7 offline), quantized, 50 utts ===" | tee -a "$LO
 "$PY" scripts/eval_streaming.py \
   --model "$MODEL" --policy decoder_attn_ffn --bit-width 1.0 \
   --checkpoint data/checkpoints/qat_binary_long3/last.pt \
-  --chunk-ms 320 --n 50 --max-new-tokens 32 --conditions quantized \
+  --chunk-ms 320 --n 50 --max-new-tokens 32 --unfixed-token-num 9999 --conditions quantized \
   --out artifacts/stage1/streaming_binary_long3_quantized.json \
   2>&1 | tee -a "$LOG"

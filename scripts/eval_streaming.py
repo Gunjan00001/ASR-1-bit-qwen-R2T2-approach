@@ -42,6 +42,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-new-tokens", type=int, default=32)
     p.add_argument("--conditions", default="fp16,quantized",
                    help="Comma-separated subset of {fp16,quantized}.")
+    p.add_argument("--unfixed-token-num", type=int, default=5,
+                   help="Tokens rolled back for the prefix continuation. Large values (e.g. "
+                        "9999) disable the prefix — required for QAT models, which were never "
+                        "trained to continue partial text (see docs/ACTIVITY_LOG.md).")
     p.add_argument("--out", default=None)
     return p.parse_args()
 
@@ -70,6 +74,7 @@ def main() -> int:
         "step": step,
         "chunk_ms": args.chunk_ms,
         "n": len(utterances),
+        "unfixed_token_num": args.unfixed_token_num,
         "conditions": {},
     }
     wanted = {name.strip() for name in args.conditions.split(",") if name.strip()}
@@ -87,6 +92,7 @@ def main() -> int:
                     wrapper, utt.audio,
                     chunk_size_sec=args.chunk_ms / 1000.0,
                     step_sec=args.chunk_ms / 1000.0,
+                    unfixed_token_num=args.unfixed_token_num,
                 )
                 refs.append(utt.text)
                 hyps.append(trace.text)
