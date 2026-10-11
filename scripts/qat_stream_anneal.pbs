@@ -1,0 +1,110 @@
+#!/bin/bash
+#PBS -N asr1bit-stream-anneal
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=48gb
+#PBS -l walltime=06:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/stream_anneal.out
+#
+# WP1 annealing phase — recover offline quality after a streaming phase.
+#
+# Every streaming phase so far costs offline WER (DAgger 9.2→18.3; distillation
+# v1/v2 oscillate 24-35): the streaming half of the mix pulls the model away
+# from the full-audio task. This phase keeps a *low* streaming share (MIX,
+# default 0.25) so the streaming skill is retained while a gentle cosine cycle
+# (lr 5e-6) re-anneals the offline behaviour. Override the mix with
+# `-v MIX=0` for a standard-samples-only anneal (fastest offline recovery, but
+# it may forget the streaming policy — verify with the eval afterwards).
+#
+# Init: the distillation checkpoint. Submit:
+#   qsub scripts/qat_stream_anneal.pbs
+#   qsub -v CKPT=data/checkpoints/qat_stream_distill2/last.pt,MIX=0.25 \
+#     scripts/qat_stream_anneal.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+
+CKPT="${CKPT:-data/checkpoints/qat_stream_distill2/last.pt}"
+MIX="${MIX:-0.25}"
+STEPS="${STEPS:-3000}"
+LR="${LR:-5e-6}"
+SAVE_DIR="${SAVE_DIR:-data/checkpoints/qat_stream_anneal}"
+LOG="artifacts/stage1/qat_stream_anneal.log"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-0.6B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
+else
+  MODEL=Qwen/Qwen3-ASR-0.6B
+fi
+if [ -f /tmp/asr1bit/qat_clean_train.100_n8000.pt ]; then
+  CACHE=/tmp/asr1bit/qat_clean_train.100_n8000.pt
+else
+  CACHE="$ROOT/data/qat_clean_train.100_n8000.pt"
+fi
+
+PICK=$(for _ in 1 2 3; do
+  nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits
+  sleep 1
+done | awk -F', ' '$2 < 45000 {u[$1]+=$3; m[$1]=$2} END {for (g in u) print u[g], m[g], g}' \
+  | sort -n | head -1 | awk '{print $3}')
+[ -z "$PICK" ] && PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
+  | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
+PICK="${QAT_GPU:-$PICK}"
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | mix $MIX | steps $STEPS | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+"$PY" scripts/run_stage1_qat.py \
+  --model "$MODEL" \
+  --policy decoder_attn_ffn \
+  --bit-width 1.58 \
+  --learnable-scale 1 \
+  --init-from "$CKPT" \
+  --op-rollout 1 \
+  --op-distill 1 \
+  --op-rollout-n 350 \
+  --op-batch-size 6 \
+  --op-max-new-tokens 32 \
+  --op-chunk-ms 320 \
+  --op-chunk-stride 3 \
+  --op-max-rounds 16 \
+  --op-max-samples 2400 \
+  --op-mix-frac "$MIX" \
+  --op-refresh-every 0 \
+  --steps "$STEPS" \
+  --train-cache "$CACHE" \
+  --train-n 2400 \
+  --eval-n 50 \
+  --eval-every 1000 \
+  --eval-both 0 \
+  --eval-fp16 1 \
+  --lr "$LR" \
+  --warmup-steps 100 \
+  --lr-schedule cosine \
+  --batch-size 2 \
+  --max-new-tokens 128 \
+  --alpha-mode delay \
+  --alpha-warmup-frac 0.02 \
+  --distill-weight 0.05 \
+  --distill-temp 2.0 \
+  --frozen-teacher 1 \
+  --lazy-collate 1 \
+  --save-dir "$SAVE_DIR" \
+  --save-every 500 \
+  --out artifacts/stage1 \
+  2>&1 | tee -a "$LOG"

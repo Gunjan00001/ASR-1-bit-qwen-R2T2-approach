@@ -574,3 +574,34 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/streaming_opd_distill_quantized.json`,
   `eval_streaming_opd_distill.log`, `qat_stream_distill.log`,
   `qat_stream_distill2.log`.
+
+---
+
+## 2026-10-12 — Distillation v2: loops gone, **under-emission** found; three-way mix (v3) launched
+
+- **Did:** distillation v2 (job `11042`, metadata stripped, lr 7e-6, 5 000
+  steps, from the 9.2 base) + eval `11043` (`TAG=_distill2`).
+- **Result:** official algorithm **WER 349.89**, CER 287.14, **RTF 1.47**.
+  Offline recovered much better than v1 (16.3 @3000, 21.1 final vs v1's 27–35
+  band) — the metadata fix worked. Hypotheses show the new failure mode:
+  correct text that *stops early* ("SHE TAUGHT HER DAUGHTER … THAT LOVE FOR"
+  for a 28-word reference), or a single word ("Nothing."), and some mid-stream
+  garble. LSP: 438 revisions, committed@50 % 2.8 %.
+- **Why (under-emission):** the teacher's per-chunk continuations are 1–3 words
+  long, so the student only ever saw "finish this nearly-complete prefix and
+  stop". It never saw the *lazy* state its own inference can drift into (short
+  prefix + full audio), where it must emit the whole remainder — so it stops
+  instead of completing. The static prefix SFT had the complementary failure
+  (content right, never stops).
+- **Chose:** **three-way mix** (v3, job `11044`): (1) standard full-audio
+  samples (anchor, incl. frac 0.0), (2) gold-prefix completion samples
+  (`--prefix-sft-fracs 0.0,0.3,0.6,0.8,0.95` + silence) — "finish the
+  transcript from a partial prefix", (3) teacher-state distillation (700 utts,
+  up to 4 800 states) — the stop policy. Mix 40 % streaming, lr 5e-6,
+  5 000 steps, init from the v2 checkpoint (it already stops).
+- **Next:** eval v3; the failure mode to watch is over- vs under-emission. If
+  v3 lands near the static SFT's content quality with the distillation stop, the
+  last step is annealing offline quality (see `scripts/qat_stream_anneal.pbs`)
+  and then mirroring to binary.
+- **Artifacts:** `artifacts/stage1/streaming_opd_distill2_quantized.json`,
+  `eval_streaming_opd_distill2.log`, `qat_stream_distill3.log`.

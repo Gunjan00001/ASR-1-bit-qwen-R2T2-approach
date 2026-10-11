@@ -7,49 +7,32 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 04:15 IST)
+## Live status (updated 2026-10-12 05:00 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11042` | **WP1 — distillation v2** (metadata-stripped targets, lr 7e-6, 5 000 steps), GPU 1 | teacher rollout + training | pending | ~3 h |
-| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training, ~12 steps/min | ternary 10.70 @2000 (from 9.2; expected fresh-cycle dip) | walltime 06:20 IST → chain `qat_ternary_full2.pbs` |
+| `11044` | **WP1 — distillation v3** (three-way mix: standard + gold-prefix completion + teacher distillation), GPU 1 | running | pending | ~1 h (idle GPU: ~130–175 steps/min) |
+| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training ~12 steps/min | ternary 10.70 @2000 (from 9.2) | walltime 06:20 IST → chain `qat_ternary_full2.pbs` |
 | — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — no GPU with ≥45 GB free | — | submit when a GPU frees |
 | — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after WP2 |
 
 **WP1 streaming results so far (official prefix algorithm, 50-utt test-clean,
-320 ms, 32 tokens):**
+320 ms, 32 tokens; all init from the 9.2 offline ternary):**
 
-| Recipe (all init from the 9.2 offline ternary) | Official-algorithm WER | RTF | Notes |
+| Recipe | Official-algorithm WER | RTF | Failure mode |
 |---|---:|---:|---|
-| Static prefix SFT (earlier session) | 203.5 | — | correct transcripts then loops |
-| On-policy SFT, student prefixes (DAgger) | **920.55** | 4.49 | loops **worse** (training fits its own loops back) |
-| Streaming-state distillation v1 (`language X<asr_text>` kept) | **448.31** | **1.76** | **learns to stop** (RTF halved, short outputs) but content collapses: empty + garbled hypotheses; offline oscillated 27–35 |
-| Streaming-state distillation v2 (metadata stripped, lr 7e-6) | running (`11042`) | — | format conflict fixed — the two halves of the mix no longer disagree |
+| Static prefix SFT (earlier session) | 203.5 | — | correct content, never stops |
+| On-policy SFT, student prefixes (DAgger) | 920.55 | 4.49 | loops get **worse** (fits its own loops) |
+| Distillation v1 (`language X<asr_text>` kept) | 448.31 | 1.76 | stops ✓, content garbled (format conflict) |
+| Distillation v2 (metadata stripped, lr 7e-6) | **349.89** | **1.47** | **loops gone, stops ✓** but *under-emits*: truncates or outputs single words |
+| Distillation v3 (three-way mix) | running `11044` | — | targets the under-emission (gold-prefix completion) |
 
-**Root cause of the v1 content collapse:** the teacher's targets were wrapped in
-`language English<asr_text>…` while the standard samples teach plain
-transcripts → the 50/50 mix taught contradictory output formats. v2 strips the
-wrapper from both the target and the recorded prompt (rollout unchanged; see
-`build_distill_examples(strip_metadata=True)`).
-
-**WP1 phase 1 verdict (2026-10-12 02:30–03:05 IST): negative — DAgger on the
-student's own prefixes poisons the model.**
-
-| Measurement (50-utt test-clean, 320 ms) | Value |
-|---|---|
-| Offline ternary (started 9.2) | 18.33 final (19.70 @1000 → 18.75 @2000 → 18.33 @3000) |
-| Offline fp16 readout / binary readout | 62.2 / 100.0 |
-| **Official prefix algorithm (32 tokens)** | **WER 920.55**, CER 1052.73, RTF 4.49 |
-
-- **What worked:** the warm-up EOS training — chunks 0-2 now emit EOS instead of
-  `assistant\nassistant…` (`diag_opd_u0.json`).
-- **What failed:** from the first content chunk (≥1.28 s) the model degenerates
-  into `language'S'S'S…` (32 tokens, no EOS) and never recovers; a warm-up skip
-  does not change it (`diag_opd_u1_skip.json`).
-- **Root cause:** the rollout's own prefixes already contained repetition loops
-  (`WORDS WAS IT'S'T'T'T…`), so the training pairs were "(looping prefix) →
-  reference remainder" — fitting them teaches the loops as plausible
-  continuations. DAgger with a degenerate policy reinforces degeneracy.
+**v2 details:** offline 21.08 final (16.31 @3000 — a band of 16–21, much better
+than v1's 27–35); LSP margin 3: 438 revisions, committed@50 % 2.8 %.
+Under-emission root cause: the teacher's per-chunk continuations are 1–3 words,
+so the student only saw "finish a nearly-complete prefix and stop" — never the
+lazy state (short prefix + full audio) where the whole remainder is needed.
+v3 adds gold-prefix completion samples for exactly that state.
 
 **Streaming 320 ms (50 utts) — final picture:**
 
