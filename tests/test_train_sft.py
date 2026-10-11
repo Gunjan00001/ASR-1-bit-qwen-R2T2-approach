@@ -15,6 +15,7 @@ from asr1bit.train.sft import (
     continuation,
     gold_coverage,
     interleave_with_ratio,
+    is_degenerate,
     prompt_tail,
     select_evenly,
 )
@@ -275,9 +276,14 @@ class TestBuildOnpolicyExamples:
         examples = build_onpolicy_examples(samples, ["WORDS WAS IT THEIR COLOURS"])
         assert examples[0]["target"] == ""
 
-    def test_repetition_loop_targets_the_remainder(self):
+    def test_loop_prefix_target_is_the_remainder_when_unfiltered(self):
+        # The unfiltered behaviour (phase-1 recipe) fit these loop-prefix →
+        # remainder pairs, which taught the loop back; it is kept for the
+        # record and is off by default (docs/LAB_NOTES.md 2026-10-12).
         samples = [[self._sample(5, "HE NODS HIS HIS HIS HIS")]]
-        examples = build_onpolicy_examples(samples, ["HE NODS HIS CONSENT"])
+        examples = build_onpolicy_examples(
+            samples, ["HE NODS HIS CONSENT"], drop_degenerate=False
+        )
         assert examples[0]["target"] == " CONSENT"
 
     def test_partial_word_is_completed(self):
@@ -332,6 +338,68 @@ class TestDistillExamples:
         examples = build_distill_examples([[sample]])
         assert len(examples) == 1
         assert examples[0]["target"] == ""
+
+
+class TestDegenerateDetection:
+    def test_flags_subword_loops(self):
+        assert is_degenerate("language'S'S'S'S'S'S")
+        assert is_degenerate("WORDS WAS IT'S'T'T'T'T")
+
+    def test_flags_word_loops(self):
+        assert is_degenerate("HE NODS HIS HIS HIS HIS")
+        assert is_degenerate("THE WHOLE PROCEEDING WAS STANDSTANDSTANDSTAND")
+
+    def test_flags_periodic_units(self):
+        assert is_degenerate("abcabcabcabc")
+
+    def test_few_repeats_are_tolerated(self):
+        # Up to three trailing repeats can be legitimate speech; the detector
+        # needs ``min_repeats`` (default 4).
+        assert not is_degenerate("hello hello hello")
+        assert not is_degenerate("HI HI")
+
+    def test_normal_text_is_not_degenerate(self):
+        assert not is_degenerate("WORDS WAS IT THEIR COLOURS")
+        assert not is_degenerate("he nods his consent")
+        assert not is_degenerate("")
+
+    def test_single_character_is_not_flagged(self):
+        assert not is_degenerate("A")
+
+
+class TestDegenerateFilter:
+    def _sample(self, chunk_id, own_text, prompt=None):
+        return StreamingSample(
+            audio=np.zeros(4, dtype=np.float32),
+            prompt=prompt if prompt is not None else f"PROMPT {own_text}",
+            own_text=own_text,
+            chunk_id=chunk_id,
+            audio_sec=0.32 * (chunk_id + 1),
+        )
+
+    def test_looping_own_text_samples_are_dropped(self):
+        samples = [
+            [
+                self._sample(5, "HE NODS HIS HIS HIS HIS"),
+                self._sample(6, "HE NODS HIS CONSENT"),
+            ]
+        ]
+        kept = build_onpolicy_examples(samples, ["HE NODS HIS CONSENT"])
+        assert len(kept) == 1
+        assert kept[0]["target"] == ""
+
+    def test_filter_can_be_disabled(self):
+        samples = [[self._sample(5, "HE NODS HIS HIS HIS HIS")]]
+        kept = build_onpolicy_examples(
+            samples, ["HE NODS HIS CONSENT"], drop_degenerate=False
+        )
+        assert len(kept) == 1
+
+    def test_warmup_samples_are_never_dropped(self):
+        samples = [[self._sample(0, "", prompt="PROMPT")]]
+        kept = build_onpolicy_examples(samples, ["HE NODS"])
+        assert len(kept) == 1
+        assert kept[0]["target"] == ""
 
 
 class TestInterleaveWithRatio:

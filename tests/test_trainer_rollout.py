@@ -108,6 +108,7 @@ def _args(**overrides):
         "op_chunk_stride": 1,
         "op_max_samples": 100,
         "op_warmup_eos": 1,
+        "op_filter_degenerate": 1,
     }
     values.update(overrides)
     return argparse.Namespace(**values)

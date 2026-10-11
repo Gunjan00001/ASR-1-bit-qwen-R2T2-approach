@@ -247,7 +247,13 @@ def rollout_onpolicy_examples(
             samples,
             [utt.text for utt in utterances],
             warmup_target_eos=bool(args.op_warmup_eos),
+            drop_degenerate=bool(args.op_filter_degenerate),
         )
+    total_states = sum(len(utt_samples) for utt_samples in samples)
+    print(
+        f"rollout states {total_states} -> {len(examples)} examples after filtering",
+        flush=True,
+    )
     return select_evenly(examples, args.op_max_samples)
 
 
@@ -410,6 +416,9 @@ def parse_args() -> argparse.Namespace:
                    help="Re-run the rollout every N steps with the current model (0 = once).")
     p.add_argument("--op-warmup-eos", type=int, default=1,
                    help="1 = warm-up chunks (no prefix) train an immediate EOS.")
+    p.add_argument("--op-filter-degenerate", type=int, default=1,
+                   help="1 = drop on-policy states whose own text is already a repetition loop "
+                        "(guards against DAgger poisoning; distillation ignores this flag).")
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
 

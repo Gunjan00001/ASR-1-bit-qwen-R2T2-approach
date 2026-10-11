@@ -270,12 +270,43 @@ def continuation(prompt_text: str, remainder: Sequence[str]) -> str:
     return " ".join(remainder)
 
 
+def is_degenerate(
+    text: str, *, max_period: int = 16, min_repeats: int = 4
+) -> bool:
+    """Heuristic repetition-loop detector for streamed text.
+
+    True when the tail of ``text`` is a small unit repeated ``min_repeats`` or
+    more times (``'S'S'S'S…``, ``HIS HIS HIS HIS``). Used by
+    :func:`build_onpolicy_examples` to drop training states whose own text is
+    already a loop — fitting those teaches the loop back (see
+    ``docs/LAB_NOTES.md`` 2026-10-12).
+    """
+    if not text:
+        return False
+    tail = text.rstrip()
+    if len(tail) < 2:
+        return False
+    for period in range(1, max_period + 1):
+        unit = tail[-period:]
+        if not unit.strip():
+            continue
+        repeats = 0
+        index = len(tail)
+        while index >= period and tail[index - period : index] == unit:
+            repeats += 1
+            index -= period
+        if repeats >= min_repeats:
+            return True
+    return False
+
+
 def build_onpolicy_examples(
     samples: Sequence[Sequence[StreamingSample]],
     references: Sequence[str],
     *,
     warmup_chunk_num: int = 2,
     warmup_target_eos: bool = True,
+    drop_degenerate: bool = True,
     key: Callable[[str], str] | None = None,
 ) -> list[dict]:
     """Turn collected rollout states into SFT examples.
@@ -286,11 +317,17 @@ def build_onpolicy_examples(
     target so the model learns to stay silent — instead of runaway-generating —
     on the near-empty first chunks.
 
+    ``drop_degenerate`` skips states whose own text is already a repetition loop
+    (:func:`is_degenerate`): without it, DAgger training fits the loop patterns
+    back into the model (measured: official-algorithm WER 920.55 vs 203.5 for
+    the unfiltered phase-1 run, ``docs/LAB_NOTES.md`` 2026-10-12).
+
     Args:
         samples: Output of :func:`collect_streaming_samples`.
         references: Reference transcript per utterance (raw ``utt.text``).
         warmup_chunk_num: First N chunks are warm-up (empty prefix by design).
         warmup_target_eos: Whether warm-up chunks train an immediate EOS.
+        drop_degenerate: Drop non-warm-up states with looping own text.
         key: Optional alignment key function (default: case/punctuation-
             insensitive words).
     """
@@ -302,6 +339,8 @@ def build_onpolicy_examples(
             if warmup_target_eos and sample.chunk_id < warmup_chunk_num:
                 target = ""
             else:
+                if drop_degenerate and is_degenerate(sample.own_text):
+                    continue
                 covered = gold_coverage(sample.own_text.split(), gold_words, key=key)
                 remainder = gold_words[covered:]
                 if sample.own_text:
