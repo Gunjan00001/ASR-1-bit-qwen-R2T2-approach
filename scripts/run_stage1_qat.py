@@ -86,7 +86,7 @@ def build_examples(utterances, processor, prompt: str = "", prefix_fracs=None) -
         if prefix_fracs:
             words = utt.text.split()
             for frac in prefix_fracs:
-                k = int(round(len(words) * frac))
+                k = round(len(words) * frac)
                 partial = " ".join(words[:k])
                 target = " ".join(words[k:])
                 if not target:
