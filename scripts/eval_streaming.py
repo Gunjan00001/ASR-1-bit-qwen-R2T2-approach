@@ -40,6 +40,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--bit-width", type=float, default=1.58)
     p.add_argument("--chunk-ms", type=int, default=320)
     p.add_argument("--n", type=int, default=50)
+    p.add_argument("--config", default="clean", choices=["clean", "other"],
+                   help="LibriSpeech config: clean (default) or other (WP3 clean/other pair).")
     p.add_argument("--max-new-tokens", type=int, default=32)
     p.add_argument("--conditions", default="fp16,quantized",
                    help="Comma-separated subset of {fp16,quantized}.")
@@ -76,12 +78,15 @@ def main() -> int:
         step = None
         print("no checkpoint: evaluating the pretrained model", flush=True)
 
-    utterances = list(iter_librispeech("clean", "test", sample_n=args.n, sample_seed=0))
+    utterances = list(
+        iter_librispeech(args.config, "test", sample_n=args.n, sample_seed=0)
+    )
     model.eval()
     results = {
         "checkpoint": str(args.checkpoint) if args.checkpoint else None,
         "step": step,
         "chunk_ms": args.chunk_ms,
+        "config": args.config,
         "n": len(utterances),
         "unfixed_token_num": args.unfixed_token_num,
         "conditions": {},

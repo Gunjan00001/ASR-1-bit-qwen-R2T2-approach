@@ -10,6 +10,7 @@
 # 32-token budget, 320 ms chunks) on the on-policy streaming-SFT checkpoint,
 # reported with the LSP emission policy (margin 3 words) for the append-only
 # commit latency / revision count.
+# WP3: add `-v CFG=other` to run the test-other half of the clean/other pair.
 # Usage: qsub scripts/eval_streaming_opd.pbs   (optionally -v CKPT=..., EVAL_GPU=n)
 
 set -u
@@ -22,7 +23,10 @@ export PYTHONPATH="$ROOT/src"
 export TOKENIZERS_PARALLELISM=false
 export HF_HOME=/tmp/asr1bit/hf
 CKPT="${CKPT:-data/checkpoints/qat_stream_opd/last.pt}"
-LOG="artifacts/stage1/eval_streaming_opd.log"
+CFG="${CFG:-clean}"
+SUFFIX=""
+[ "$CFG" = "other" ] && SUFFIX="_other"
+LOG="artifacts/stage1/eval_streaming_opd${SUFFIX}.log"
 
 if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
   PY=/tmp/asr1bit/miniconda3/bin/python
@@ -46,7 +50,7 @@ PICK="${EVAL_GPU:-$PICK}"
 export CUDA_VISIBLE_DEVICES="$PICK"
 
 {
-  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | $(date) ==="
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | config $CFG | $(date) ==="
   nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
 } | tee "$LOG"
 
@@ -57,9 +61,10 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --bit-width 1.58 \
   --chunk-ms 320 \
   --n 50 \
+  --config "$CFG" \
   --max-new-tokens 32 \
   --unfixed-token-num 5 \
   --lsp-margin-words 3 \
   --conditions quantized \
-  --out artifacts/stage1/streaming_opd_quantized.json \
+  --out "artifacts/stage1/streaming_opd${SUFFIX}_quantized.json" \
   2>&1 | tee -a "$LOG"
