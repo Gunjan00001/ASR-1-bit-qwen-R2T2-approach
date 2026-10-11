@@ -7,36 +7,35 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 13:10 IST)
+## Live status (updated 2026-10-11 15:40 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10860` | **No-prefix streaming, 128-token budget**: pretrained + ternary + binary, 50 utts | running | — | **~60–90 m** |
-| `10859` | Decisive test: prefix-SFT + official algorithm | **done** | **WER 952 — still collapses** | — |
-| `10844` | No-prefix streaming (32 tokens) | **done** | pretrained 19.28; ternary **33.58**; binary **33.26** | — |
-| `10850` | Prefix-continuation SFT | **done** | offline ternary 11.0 | — |
+| `10860` | No-prefix streaming, **128-token budget**: pretrained + ternary + binary | pretrained done | **pretrained 2.54** (valid baseline) | **~40–60 m** |
+| `10865` | **Scaled streaming SFT**: full 28.5k cache, prefix + silence samples, 5000 steps | starting | — | **~1 h 20 m** |
+| `10844`/`10859` | No-prefix 32-token / prefix-SFT decisive test | done | ternary 33.58 / 33.26; prefix-SFT 952 (collapse) | — |
 
-**Best offline results (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
+**Streaming 320 ms (50 utts):**
+
+| Variant | Pretrained | Ternary | Binary |
+|---|---:|---:|---:|
+| Official prefix algorithm | **2.33** | 1296 (collapse) | — |
+| + prefix-SFT (1 500 steps) | — | 952 (collapse) | — |
+| No-prefix re-feed, 32 tokens | 19.28 | 33.58 | 33.26 |
+| No-prefix re-feed, **128 tokens** | **2.54** | running | running |
+
+The 128-token budget fixes the no-prefix variant's truncation (19.28 → 2.54 for
+the pretrained baseline), making it a valid streaming evaluation. The scaled
+streaming SFT (`10865`) adds prefix-continuation **and** near-empty-audio
+samples on the full cache to attack both collapse modes for the official
+algorithm.
+
+**Best offline (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
 
 | Configuration | WER |
 |---|---|
 | Ternary, all 196 decoder projections (8k, long2) | **9.2** (best 9.1) |
 | Binary, all 196 decoder projections (8k, long3) | **10.7** |
-| Ternary + prefix-continuation SFT | 11.0 |
-
-**Streaming (320 ms, 50 utts) — the critical path:**
-
-| Variant | Pretrained | Ternary | Binary |
-|---|---:|---:|---:|
-| Official prefix algorithm | **2.33** | 1296 (collapse) | — |
-| + prefix-SFT (1 500 steps) | — | **952 (still collapses)** | — |
-| No-prefix re-feed (32 tok) | 19.28 | **33.58** | **33.26** |
-| No-prefix re-feed (128 tok) | running | running | running |
-
-**Conclusion:** the QAT models are offline-strong but not streaming-robust
-under the official algorithm; a small prefix-SFT is insufficient. The proper
-fix is Stage 4 streaming SFT at scale (full 28.5 k cache ready: 100.6 h).
-The no-prefix re-feed variant is a stopgap giving usable numbers.
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
@@ -624,3 +623,21 @@ restarts at 0).
   on the critical path (Stage 4 brought forward, full 28.5 k cache ready).
 - **Evidence:** `artifacts/stage1/streaming_ternary_prefix_quantized.json`,
   `eval_streaming_prefix.log`, `docs/PROJECT_STATUS.md`.
+
+### 15:40 — 128-token streaming baseline valid; scaled streaming SFT launched
+
+- **No-prefix re-feed with a 128-token budget (`10860`):** pretrained baseline
+  **2.54 WER** (vs 19.28 with 32 tokens) — the truncation problem is fixed, so
+  this variant is a valid streaming evaluation. Ternary/binary conditions
+  running.
+- **Scaled streaming SFT (`10865`):** full 28.5 k cache, `--prefix-sft-fracs
+  0.0,0.5,0.8,0.95` + **near-empty-audio samples** (`--silence-samples-sec
+  0.5`, new option, empty target → EOS) to attack both collapse modes; 5 000
+  steps, lr 1e-5, anchor 0.05, init from the 9.2 offline ternary. ETA ~1 h 20 m,
+  after which the official-algorithm streaming test is re-run.
+- **Code:** `build_examples` gained `silence_sec`; runner gained
+  `--silence-samples-sec`.
+- **Note:** the persistent `gpu-send` session has become unresponsive after the
+  environment restarts; batch jobs and log files are the reliable interface.
+- **Evidence:** `artifacts/stage1/eval_streaming_noprefix128.log`,
+  `qat_stream_sft.log`.
