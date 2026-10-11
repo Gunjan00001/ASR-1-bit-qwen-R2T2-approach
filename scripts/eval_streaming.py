@@ -33,12 +33,15 @@ from asr1bit.train.qat import set_qat_alpha
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", default="Qwen/Qwen3-ASR-0.6B")
-    p.add_argument("--checkpoint", required=True)
+    p.add_argument("--checkpoint", default=None,
+                   help="QAT checkpoint to restore; omit to evaluate the pretrained model.")
     p.add_argument("--policy", default="decoder_attn_ffn")
     p.add_argument("--bit-width", type=float, default=1.58)
     p.add_argument("--chunk-ms", type=int, default=320)
     p.add_argument("--n", type=int, default=50)
     p.add_argument("--max-new-tokens", type=int, default=32)
+    p.add_argument("--conditions", default="fp16,quantized",
+                   help="Comma-separated subset of {fp16,quantized}.")
     p.add_argument("--out", default=None)
     return p.parse_args()
 
@@ -53,20 +56,27 @@ def main() -> int:
     patch_outer_forward(model)
     apply_layer_policy(model, args.policy, bit_width=args.bit_width, learnable_scale=True)
     model.to("cuda:0")
-    step = load_checkpoint(args.checkpoint, model)
-    print(f"restored checkpoint step {step}", flush=True)
+    if args.checkpoint:
+        step = load_checkpoint(args.checkpoint, model)
+        print(f"restored checkpoint step {step}", flush=True)
+    else:
+        step = None
+        print("no checkpoint: evaluating the pretrained model", flush=True)
 
     utterances = list(iter_librispeech("clean", "test", sample_n=args.n, sample_seed=0))
     model.eval()
     results = {
-        "checkpoint": str(args.checkpoint),
+        "checkpoint": str(args.checkpoint) if args.checkpoint else None,
         "step": step,
         "chunk_ms": args.chunk_ms,
         "n": len(utterances),
         "conditions": {},
     }
+    wanted = {name.strip() for name in args.conditions.split(",") if name.strip()}
     with torch.no_grad():
         for alpha, name in ((0.0, "fp16"), (1.0, "quantized")):
+            if name not in wanted:
+                continue
             set_qat_alpha(model, alpha)
             refs, hyps = [], []
             total_decode = 0.0
