@@ -61,7 +61,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --learnable-scale 1 \
   --resume data/checkpoints/qat_stream_opd/last.pt \
   --op-rollout 1 \
-  --op-rollout-n 700 \
+  --op-rollout-n 350 \
   --op-batch-size 6 \
   --op-max-new-tokens 32 \
   --op-chunk-ms 320 \
