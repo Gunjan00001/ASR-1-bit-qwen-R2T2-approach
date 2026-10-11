@@ -49,8 +49,8 @@ echo "=== ternary long2 (warm-up skip 0.5 s) ==="
   --checkpoint data/checkpoints/qat_ternary_long2/last.pt --bit-width 1.58 \
   --out artifacts/stage1/diag_stream_ternary_min05.json
 
-echo "=== ternary long2 (warm-up skip 1.0 s) ==="
+echo "=== ternary long2 (no-prefix re-feed, unfixed_token_num=9999) ==="
 "$PY" scripts/diag_stream_generation.py \
-  --model "$MODEL" --utterance 1 --chunk-ms 320 --min-decode-sec 1.0 \
+  --model "$MODEL" --utterance 1 --chunk-ms 320 --min-decode-sec 0.5 --unfixed-token-num 9999 \
   --checkpoint data/checkpoints/qat_ternary_long2/last.pt --bit-width 1.58 \
-  --out artifacts/stage1/diag_stream_ternary_min10.json
+  --out artifacts/stage1/diag_stream_ternary_noprefix.json

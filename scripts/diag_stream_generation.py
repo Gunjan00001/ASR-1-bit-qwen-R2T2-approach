@@ -37,6 +37,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--min-decode-sec", type=float, default=0.0,
                    help="Skip decoding until the accumulated audio reaches this duration "
                         "(warm-up skip for near-empty first chunks).")
+    p.add_argument("--unfixed-token-num", type=int, default=5,
+                   help="Tokens rolled back from the previous decode; large values disable "
+                        "the prefix continuation (no-prefix re-feed variant).")
     p.add_argument("--max-new-tokens", type=int, default=32)
     p.add_argument("--out", default=None)
     return p.parse_args()
@@ -107,7 +110,7 @@ def main() -> int:
         backends.TokenizerCodec(processor.tokenizer),
         chunk_size_sec=args.chunk_ms / 1000.0,
         unfixed_chunk_num=2,
-        unfixed_token_num=5,
+        unfixed_token_num=args.unfixed_token_num,
     )
     prompt_raw = wrapper._build_text_prompt(context="", force_language=None)
     state = streamer.init_state(prompt_raw=prompt_raw)
