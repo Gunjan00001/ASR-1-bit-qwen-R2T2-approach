@@ -7,39 +7,35 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 08:05 IST)
+## Live status (updated 2026-10-11 10:45 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10844` | **Streaming 320 ms (no-prefix variant)**: pretrained baseline + ternary long2 + binary long3, 50 utts | running | — | **~30–60 m** |
-| — | Full `train-clean-100` cache built | **done** | 28 539 utts, 100.6 h, 23 GB | — |
-| `10835` | Streaming (prefix variant) | done | pretrained **2.33**; ternary **1296** (collapse) | — |
+| `10859` | **Decisive streaming test**: prefix-trained ternary + official prefix algorithm, 50 utts (GPU 7) | running | — | **~10–45 m** |
+| `10844` | Streaming no-prefix variant: pretrained + ternary + binary | ternary done | pretrained **19.28**; ternary **33.58**; binary running | **~20–30 m** |
+| `10850` | Prefix-continuation SFT | **done** | offline ternary **11.0** (was 9.2; 1.8-pt cost) | — |
 
 **Best offline results (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
 
 | Configuration | WER |
 |---|---|
 | Ternary, all 196 decoder projections (8k, long2) | **9.2** (best 9.1) |
+| Ternary + prefix-continuation SFT | 11.0 (buys streaming capability) |
 | Binary, all 196 decoder projections (8k, long3) | **10.7** |
 
-**Streaming findings (2026-10-11):**
-1. The portable streamer works for the pretrained model: **2.33 WER, RTF 1.16**
-   (50 utts, 320 ms).
-2. QAT models (fp16 readout and quantized) **collapse in the prefix-continuation
-   streaming loop** (WER ~1300–1900, runaway generation). Root cause found via
-   per-chunk traces (`scripts/diag_stream_generation.py`):
-   - near-empty first chunks (0.32 s) trigger runaway "assistant" repetition
-     (the pretrained model emits `language None<asr_text>` + EOS);
-   - the model fails at the **first prefix-continuation** chunk (2.24 s):
-     instead of continuing the rolled-back text, it repeats tokens ("'T'T'T…").
-     QAT training never included partial-prefix continuation samples.
-3. **Workaround that works:** disable the prefix continuation
-   (`unfixed_token_num=9999`, no-prefix re-feed) — the ternary model then
-   produces the correct transcript ("WORDS WAS IT THEIR COLORS"). The proper
-   fix is Stage 4 streaming SFT (partial-prefix samples), per the plan.
+**Streaming numbers so far (50 utts, 320 ms):**
 
-**Recipe plateau:** continuations converge to ~9.2 (ternary) / ~10.7 (binary)
-on 8k data. The full 28.5k cache is ready for the next scale-up.
+| Variant | Pretrained | Ternary |
+|---|---|---|
+| Official prefix algorithm | **2.33** | collapses (~1300) — no prefix-continuation training |
+| No-prefix re-feed (unfixed_token_num=9999, 32 tokens) | 19.28 (truncation-degraded) | **33.58** |
+
+**Root cause recap:** QAT models were never trained to continue a partial
+self-prefix, so the official streaming algorithm (which re-feeds a rolled-back
+prefix) collapses. Fix in progress: `--prefix-sft-fracs` adds
+prefix-continuation samples (0/50/80/95 % of the transcript as prompt); the
+prefix-trained checkpoint is now being tested with the official algorithm
+(job `10859`).
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
@@ -594,3 +590,19 @@ restarts at 0).
 - **Evidence:** `artifacts/stage1/diag_stream_pretrained.json`,
   `diag_stream_ternary.json`, `diag_stream_ternary_min05.json`,
   `diag_stream_ternary_noprefix.json`.
+
+### 10:45 — No-prefix streaming measured; prefix-continuation SFT trained
+
+- **Streaming no-prefix variant (job `10844`, 50 utts, 320 ms):**
+  pretrained **19.28** (truncation-degraded vs 2.33 official), ternary long2
+  **33.58** (CER 30.0, RTF 4.07) — no collapse, but a +14.3 gap; the variant
+  also hurts the baseline, so it is only a stopgap.
+- **Prefix-continuation SFT (job `10850`, `--prefix-sft-fracs
+  0.0,0.5,0.8,0.95`):** 7 929 prefix samples from 2 000 utts; offline ternary
+  **11.0** (was 9.2 → 1.8-point cost for streaming capability).
+- **Decisive test running (`10859`):** prefix-trained checkpoint with the
+  **official prefix algorithm** (unfixed_token_num=5), 50 utts.
+- **Full cache ready:** 28 539 utts / 100.6 h / 23 GB
+  (`data/qat_clean_train.100_full.pt`).
+- **Evidence:** `artifacts/stage1/streaming_pretrained_50.json`,
+  `streaming_ternary_long2_quantized.json`, `qat_prefix_sft.log`.
