@@ -60,7 +60,9 @@ def patch_outer_forward(model) -> None:
     cls._forward_patched = True
 
 
-def build_examples(utterances, processor, prompt: str = "", prefix_fracs=None) -> list[dict]:
+def build_examples(
+    utterances, processor, prompt: str = "", prefix_fracs=None, silence_sec: float | None = None
+) -> list[dict]:
     """Build (audio, prefix_text, target) triples.
 
     Mirrors Qwen's official ``finetuning/qwen3_asr_sft.py``: the prefix template
@@ -73,6 +75,10 @@ def build_examples(utterances, processor, prompt: str = "", prefix_fracs=None) -
     prefix is followed by the first ``frac`` of the transcript words and the
     target is the remaining words — mimicking the streaming algorithm's
     rolled-back self-prefix.
+
+    ``silence_sec`` additionally creates a **near-empty-audio** sample per
+    utterance (audio truncated to ``silence_sec``, empty target) so the model
+    learns to emit EOS instead of hallucinating on the streaming warm-up chunks.
     """
     examples = []
     for utt in utterances:
@@ -96,6 +102,11 @@ def build_examples(utterances, processor, prompt: str = "", prefix_fracs=None) -
                 )
         else:
             examples.append({"audio": utt.audio, "prefix_text": prefix, "target": utt.text})
+        if silence_sec:
+            n = max(1, int(silence_sec * 16000))
+            examples.append(
+                {"audio": utt.audio[:n], "prefix_text": prefix, "target": ""}
+            )
     return examples
 
 
@@ -258,6 +269,11 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated transcript fractions for prefix-continuation samples "
              "(streaming robustness), e.g. '0.0,0.5,0.8,0.95'.",
     )
+    p.add_argument(
+        "--silence-samples-sec", type=float, default=None,
+        help="Also add a near-empty-audio sample per utterance (truncated to this many "
+             "seconds, empty target) so the model learns to emit EOS on warm-up chunks.",
+    )
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
 
@@ -299,8 +315,12 @@ def main() -> int:
     prefix_fracs = None
     if args.prefix_sft_fracs:
         prefix_fracs = tuple(float(x) for x in args.prefix_sft_fracs.split(",") if x.strip())
-    train_examples = build_examples(train_utts, processor, prefix_fracs=prefix_fracs)
-    print(f"train={len(train_examples)} eval={len(eval_utts)} prefix_fracs={prefix_fracs}", flush=True)
+    train_examples = build_examples(
+        train_utts, processor, prefix_fracs=prefix_fracs,
+        silence_sec=args.silence_samples_sec,
+    )
+    print(f"train={len(train_examples)} eval={len(eval_utts)} prefix_fracs={prefix_fracs} "
+          f"silence_sec={args.silence_samples_sec}", flush=True)
 
     results: dict = {"config": config_record, "eval_n": len(eval_utts), "frozen_teacher": teacher is not None}
 
