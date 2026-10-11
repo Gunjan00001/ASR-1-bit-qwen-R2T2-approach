@@ -1,0 +1,64 @@
+#!/bin/bash
+#PBS -N asr1bit-diag-opd
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=32gb
+#PBS -l walltime=01:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/diag_opd.out
+#
+# WP1 diagnostic: where does the on-policy-SFT model loop in the official
+# streaming algorithm? Per-chunk traces for the pretrained model (reference)
+# and the phase-1 checkpoint (utterances 0/1), plus a warm-up-skip trace that
+# isolates the near-empty first chunks from the self-prefix continuation.
+# Submit: qsub scripts/diag_stream_opd.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
+[ -d "$MODEL" ] || MODEL=Qwen/Qwen3-ASR-0.6B
+CKPT="${CKPT:-data/checkpoints/qat_stream_opd/last.pt}"
+
+PICK=$(for _ in 1 2 3; do
+  nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits
+  sleep 1
+done | awk -F', ' '$2 < 55000 {u[$1]+=$3; m[$1]=$2} END {for (g in u) print u[g], m[g], g}' \
+  | sort -n | head -1 | awk '{print $3}')
+[ -z "$PICK" ] && PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
+  | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
+PICK="${EVAL_GPU:-$PICK}"
+export CUDA_VISIBLE_DEVICES="$PICK"
+echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
+
+echo "=== pretrained (utt 0) ==="
+"$PY" scripts/diag_stream_generation.py \
+  --model "$MODEL" --utterance 0 --chunk-ms 320 \
+  --out artifacts/stage1/diag_opd_pretrained_u0.json
+
+echo "=== on-policy SFT phase 1 (utt 0) ==="
+"$PY" scripts/diag_stream_generation.py \
+  --model "$MODEL" --utterance 0 --chunk-ms 320 --checkpoint "$CKPT" --bit-width 1.58 \
+  --out artifacts/stage1/diag_opd_u0.json
+
+echo "=== on-policy SFT phase 1 (utt 1) ==="
+"$PY" scripts/diag_stream_generation.py \
+  --model "$MODEL" --utterance 1 --chunk-ms 320 --checkpoint "$CKPT" --bit-width 1.58 \
+  --out artifacts/stage1/diag_opd_u1.json
+
+echo "=== on-policy SFT phase 1 (utt 1, warm-up skip 1.28 s) ==="
+"$PY" scripts/diag_stream_generation.py \
+  --model "$MODEL" --utterance 1 --chunk-ms 320 --min-decode-sec 1.28 \
+  --checkpoint "$CKPT" --bit-width 1.58 \
+  --out artifacts/stage1/diag_opd_u1_skip.json

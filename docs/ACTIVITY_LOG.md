@@ -7,31 +7,38 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 00:40 IST)
+## Live status (updated 2026-10-12 03:45 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11030` | **WP1 phase 1** — on-policy streaming SFT (ternary, init 9.2), GPU 5 | **rollout done** — `on-policy rollout: 2400 examples | mix 4800 (2400 standard + 2400 on-policy)`; training step ~270 at **~34 steps/min** | pending | step 3000 at ~02:00 IST (+ final ablations) |
-| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training, ~12 steps/min | pending | 10 000 steps do **not** fit in 8 h at this rate (~step 5 500 at the walltime) → chain `qat_ternary_full2.pbs` (`--resume`, advances the cosine) |
-| `11027` | *(other project — `scenediff`, same account)* | — | — | — |
+| `11040` | **WP1 — streaming-state distillation** (teacher rollout, ternary, init 9.2), GPU 1 | teacher rollout running (350 utts) | pending | rollout ~1 h + 4 000 steps ~2.5 h → ~03:45 + 3.5 h |
+| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training, ~12 steps/min | pending | walltime 06:20 IST (~step 5 500) → chain `qat_ternary_full2.pbs` |
 | — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — no GPU with ≥45 GB free | — | submit when a GPU frees |
 | — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after WP2 |
 
-**WP1 rollout outcome (validated):** the batched replay of the official algorithm
-produced exactly the planned mix — 2 400 on-policy states from 350 utterances
-(≈8 kept states/utt: warm-up chunks + stride + last round) capped to the 2 400
-pool, interleaved 50/50 with the 2 400 standard samples. GPU 5 was far less
-contended than GPU 2: the on-policy training ran at ~34 steps/min (vs ~12 for
-WP2's batch-2 jobs), so the full 3 000-step cosine fits the 8 h window.
+**WP1 phase 1 verdict (2026-10-12 02:30–03:05 IST): negative — DAgger on the
+student's own prefixes poisons the model.**
 
-**Restart note:** the first WP1 submission (`11020`) was killed after 49 min —
-its 700-utterance rollout ran at ~460 s/round (~2.5 h for 16 rounds) and would
-have left too little walltime for training. Resubmitted as `11030` with 350
-rollout utterances and an 8 h walltime.
+| Measurement (50-utt test-clean, 320 ms) | Value |
+|---|---|
+| Offline ternary (started 9.2) | 18.33 final (19.70 @1000 → 18.75 @2000 → 18.33 @3000) |
+| Offline fp16 readout / binary readout | 62.2 / 100.0 |
+| **Official prefix algorithm (32 tokens)** | **WER 920.55**, CER 1052.73, RTF 4.49 (previous static SFT: 203.5) |
+| LSP margin 3 (same run) | 64 revisions; committed@50 % 13.8 %, committed@80 % 25.9 % |
 
-**Contention note:** most A100s were 70–100 % utilized by other users at submit
-time (measured 10–12 steps/min vs ~90 steps/min historically) — plan chained
-`--resume` continuations where the schedule does not fit one walltime.
+- **What worked:** the warm-up EOS training — chunks 0-2 now emit EOS instead of
+  `assistant\nassistant…` (`diag_opd_u0.json`).
+- **What failed:** from the first content chunk (≥1.28 s) the model degenerates
+  into `language'S'S'S…` (32 tokens, no EOS) and never recovers; a warm-up skip
+  does not change it (`diag_opd_u1_skip.json`).
+- **Root cause:** the rollout's own prefixes already contained repetition loops
+  (`WORDS WAS IT'S'T'T'T…`), so the training pairs were "(looping prefix) →
+  reference remainder" — fitting them teaches the loops as plausible
+  continuations. DAgger with a degenerate policy reinforces degeneracy.
+- **Replacement:** streaming-state distillation (`--op-distill`, job `11040`):
+  the frozen pretrained teacher (clean, EOS-terminated streaming policy)
+  generates the states and the student clones its continuations; non-EOS
+  (token-cap) generations are dropped. Phase-2 DAgger (`11038`) was killed.
 
 **Streaming 320 ms (50 utts) — final picture:**
 
@@ -798,3 +805,38 @@ tags through `0.2.39`).
 - **Evidence:** `src/asr1bit/train/sft.py`, `src/asr1bit/qwen/stream.py`,
   `scripts/run_stage1_qat.py`, `scripts/eval_streaming.py`,
   `artifacts/stage1/qat_stream_opd.log`, `artifacts/stage1/qat_ternary_full.log`.
+
+---
+
+### 03:45 — WP1 phase 1 negative (920.55 WER); root cause found; switched to teacher distillation
+
+- **Did:** collected the first WP1 result set end-to-end.
+  - `11030` phase-1 training finished its full 3 000-step cosine (2 h 04 m,
+    `qat_seconds` 7 367): offline ternary **18.33** (19.70 @1000 → 18.75 @2000 →
+    18.33 @3000), fp16 readout 62.2, binary readout 100.0;
+  - `11036` decisive eval (official algorithm, 32 tokens, 320 ms, LSP margin 3):
+    **WER 920.55**, CER 1052.73, RTF 4.49, wall 1 632 s; LSP: 64 revisions,
+    committed@50 % 13.8 %, committed@80 % 25.9 %;
+  - `11039` per-chunk traces (3 runs + pretrained reference).
+- **Result:** the warm-up fix worked (chunks 0–2 emit `''` + EOS instead of
+  `assistant\nassistant…`), but the model degenerates at the first content chunk
+  (≥1.28 s) into `language'S'S'S…` and never stops; WER is *worse* than the old
+  static-SFT checkpoint (203.5). Warm-up skip: no change.
+- **Root cause:** DAgger poisoning — the student's own rollout prefixes already
+  contained repetition loops (`WORDS WAS IT'S'T'T'T…`), so training
+  "(looping prefix) → reference remainder" taught the loops as plausible
+  continuations. Fixing the cold start is necessary but not sufficient.
+- **Fix / next:** **streaming-state distillation** (`--op-distill`): the frozen
+  pretrained teacher (verified clean streaming policy, 2.33 official-algorithm
+  WER) drives the rollout; the student clones its continuation at each state;
+  non-EOS generations are dropped. Implementation: `build_transformers_batch_generate_fn`
+  (EOS flags), `StreamingSample.continuation/eos`, `build_distill_examples`,
+  `--op-distill` in the runner, new tests (suite 288 passed, ruff clean).
+  Launched `11040` (init 9.2, 350-utt teacher rollout, 50/50 mix, 4 000 steps,
+  lr 1e-5; checkpoint `data/checkpoints/qat_stream_distill/`). Killed the
+  phase-2 DAgger job `11038` (its rollout would see even more degenerate
+  prefixes). ETA: rollout ≈1 h, then ≈2.5 h of training.
+- **Evidence:** `artifacts/stage1/streaming_opd_quantized.json`,
+  `eval_streaming_opd.log`, `diag_opd_*.json`,
+  `stage1_decoder_attn_ffn_bw1.58_gNone_lr1e-05_adamw_delay_ls1_n2400.json`,
+  `qat_stream_distill.log`.

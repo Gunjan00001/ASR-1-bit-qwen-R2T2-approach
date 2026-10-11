@@ -9,6 +9,7 @@ import numpy as np
 from asr1bit.qwen.stream import WhitespaceTokenCodec
 from asr1bit.train.sft import (
     StreamingSample,
+    build_distill_examples,
     build_onpolicy_examples,
     collect_streaming_samples,
     continuation,
@@ -196,6 +197,27 @@ class TestCollectStreamingSamples:
         assert samples[0][1].own_text == "he"
         assert samples[0][2].own_text == "he his"
 
+    def test_tuple_results_record_continuation_and_eos(self):
+        class _TupleDecoder:
+            def __call__(self, prompts, audios):
+                return [(" he nods", True) for _ in prompts]
+
+        samples = collect_streaming_samples(
+            _TupleDecoder(),
+            WhitespaceTokenCodec(),
+            "PROMPT ",
+            [_tone(3000)],
+            chunk_size_sec=1.0,
+            sample_rate=1000,
+            unfixed_chunk_num=2,
+            unfixed_token_num=1,
+        )
+        assert samples[0][0].continuation == " he nods"
+        assert samples[0][0].eos is True
+        # The prefix chain still advances on the text part ("he nods" -> rollback
+        # one token -> "he") for the third chunk.
+        assert samples[0][2].prompt == "PROMPT he"
+
 
 class TestPromptTail:
     def test_strips_the_own_text(self):
@@ -277,6 +299,39 @@ class TestBuildOnpolicyExamples:
         examples = build_onpolicy_examples(samples, ["A B", "A C"])
         assert len(examples) == 2
         assert examples[1]["target"] == " C"
+
+
+class TestDistillExamples:
+    def _sample(self, chunk_id, continuation_text, eos=True, prompt=None, own_text=""):
+        return StreamingSample(
+            audio=np.zeros(8, dtype=np.float32),
+            prompt=prompt if prompt is not None else f"PROMPT {continuation_text}",
+            own_text=own_text,
+            chunk_id=chunk_id,
+            audio_sec=0.32 * (chunk_id + 1),
+            continuation=continuation_text,
+            eos=eos,
+        )
+
+    def test_target_is_the_teacher_continuation_verbatim(self):
+        sample = self._sample(4, " he nods his", prompt="PROMPT he")
+        examples = build_distill_examples([[sample]])
+        assert len(examples) == 1
+        assert examples[0]["prefix_text"] == "PROMPT he"
+        assert examples[0]["target"] == " he nods his"
+        assert examples[0]["audio"] is sample.audio
+
+    def test_generations_without_eos_are_dropped(self):
+        truncated = self._sample(2, " assistant assistant", eos=False)
+        assert build_distill_examples([[truncated]]) == []
+
+    def test_empty_warmup_continuation_is_kept(self):
+        # The teacher answers a near-empty chunk with EOS and no text: the empty
+        # target (plus the collator's EOS) is exactly the stop signal we need.
+        sample = self._sample(0, "", eos=True, prompt="PROMPT")
+        examples = build_distill_examples([[sample]])
+        assert len(examples) == 1
+        assert examples[0]["target"] == ""
 
 
 class TestInterleaveWithRatio:

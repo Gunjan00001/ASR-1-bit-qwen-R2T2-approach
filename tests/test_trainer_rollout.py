@@ -15,6 +15,7 @@ import types
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from asr1bit.data.load import Utterance
 
@@ -44,6 +45,8 @@ class _FakeProcessor:
 
 
 class _FakeTokenizer:
+    eos_token_id = 2
+
     def encode(self, text):
         return text.split()
 
@@ -72,6 +75,7 @@ class _FakeInputs:
 class _FakeInner:
     device = "cpu"
     dtype = "float32"
+    eos_id = 2
 
     def __init__(self):
         self.calls = 0
@@ -79,7 +83,9 @@ class _FakeInner:
     def generate(self, **kwargs):
         self.calls += 1
         batch = kwargs["input_ids"].shape[0]
-        return types.SimpleNamespace(sequences=np.zeros((batch, 8), dtype=int))
+        sequences = np.zeros((batch, 8), dtype=int)
+        sequences[:, -1] = self.eos_id
+        return types.SimpleNamespace(sequences=sequences)
 
 
 class _FakeWrapper:
@@ -94,6 +100,7 @@ class _FakeWrapper:
 
 def _args(**overrides):
     values = {
+        "op_distill": 0,
         "op_max_new_tokens": 16,
         "op_chunk_ms": 1000,
         "op_batch_size": 2,
@@ -122,7 +129,7 @@ class TestRolloutOnPolicyExamples:
         module = _load_trainer()
         wrapper = _FakeWrapper()
         utterances = [_utterance("HE NODS HIS CONSENT NOW PLEASE", 2.5)]
-        examples = module.rollout_onpolicy_examples(_args(), wrapper, wrapper.model, utterances)
+        examples = module.rollout_onpolicy_examples(_args(), wrapper, utterances)
         # 2.5 s at 1 s chunks -> three chunk states; warm-up chunks train EOS,
         # the third continues the model's own rolled-back prefix ("he").
         assert len(examples) == 3
@@ -137,7 +144,7 @@ class TestRolloutOnPolicyExamples:
         wrapper = _FakeWrapper()
         utterances = [_utterance("HE NODS", 10.0)]
         examples = module.rollout_onpolicy_examples(
-            _args(op_max_rounds=3, op_chunk_stride=3), wrapper, wrapper.model, utterances
+            _args(op_max_rounds=3, op_chunk_stride=3), wrapper, utterances
         )
         assert len(examples) == 3  # warm-up 0/1 + the truncated last round
 
@@ -146,11 +153,11 @@ class TestRolloutOnPolicyExamples:
         wrapper = _FakeWrapper()
         utterances = [_utterance("HE NODS " * 20, 30.0)]
         capped = module.rollout_onpolicy_examples(
-            _args(op_max_samples=4, op_chunk_stride=1), wrapper, wrapper.model, utterances
+            _args(op_max_samples=4, op_chunk_stride=1), wrapper, utterances
         )
         assert len(capped) == 4
         again = module.rollout_onpolicy_examples(
-            _args(op_max_samples=4, op_chunk_stride=1), wrapper, wrapper.model, utterances
+            _args(op_max_samples=4, op_chunk_stride=1), wrapper, utterances
         )
         assert [e["prefix_text"] for e in capped] == [e["prefix_text"] for e in again]
 
@@ -159,3 +166,25 @@ class TestRolloutOnPolicyExamples:
         keep = module.build_op_keep(_args(op_chunk_stride=3, op_max_rounds=8))
         assert [chunk for chunk in range(8) if keep(chunk, False)] == [0, 1, 3, 6, 7]
         assert keep(4, True)  # a genuinely final chunk is always kept
+
+    def test_distill_mode_clones_the_teacher_continuation(self):
+        module = _load_trainer()
+        student = _FakeWrapper()
+        teacher = _FakeWrapper(continuation=" he nods his consent")
+        utterances = [_utterance("HE NODS HIS CONSENT", 2.5)]
+        examples = module.rollout_onpolicy_examples(
+            _args(op_distill=1), student, utterances, teacher_wrapper=teacher
+        )
+        assert examples
+        assert all(e["target"] == " he nods his consent" for e in examples)
+        # The student model is only used for the prompt/codec, never generation.
+        assert student.model.calls == 0
+        assert teacher.model.calls > 0
+
+    def test_distill_mode_requires_a_teacher(self):
+        module = _load_trainer()
+        wrapper = _FakeWrapper()
+        with pytest.raises(ValueError):
+            module.rollout_onpolicy_examples(
+                _args(op_distill=1), wrapper, [_utterance("HE NODS", 2.5)]
+            )

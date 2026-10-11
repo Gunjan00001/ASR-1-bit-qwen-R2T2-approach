@@ -16,6 +16,7 @@ from asr1bit.qwen.backends import (
     StreamTrace,
     TokenizerCodec,
     build_transformers_batch_decode_fn,
+    build_transformers_batch_generate_fn,
     build_transformers_decode_fn,
     environment_report,
     load_model,
@@ -41,6 +42,8 @@ class _FakeProcessor:
 
 
 class _FakeTokenizer:
+    eos_token_id = 2
+
     def encode(self, text):
         return text.split()
 
@@ -70,6 +73,7 @@ class _FakeInputs:
 class _FakeInner:
     device = "cpu"
     dtype = "float32"
+    emit_eos = True
 
     def __init__(self):
         self.generate_kwargs = None
@@ -78,7 +82,10 @@ class _FakeInner:
         self.generate_kwargs = kwargs
         inputs = kwargs.get("input_ids")
         batch = inputs.shape[0] if inputs is not None else 1
-        return types.SimpleNamespace(sequences=np.zeros((batch, 9), dtype=int))
+        sequences = np.zeros((batch, 9), dtype=int)
+        if self.emit_eos:
+            sequences[:, -1] = 2
+        return types.SimpleNamespace(sequences=sequences)
 
 
 class _FakeTransformersModel:
@@ -239,6 +246,21 @@ class TestBuildTransformersBatchDecodeFn:
         model = _FakeTransformersModel()
         decode_fn = build_transformers_decode_fn(model)
         assert decode_fn("P", np.zeros(SAMPLE_RATE, dtype=np.float32)) == " continued"
+
+
+class TestBuildTransformersBatchGenerateFn:
+    def test_reports_eos_true_when_the_generation_stopped(self):
+        model = _FakeTransformersModel()
+        generate_batch = build_transformers_batch_generate_fn(model, max_new_tokens=5)
+        out = generate_batch(["P"], [np.zeros(SAMPLE_RATE, dtype=np.float32)])
+        assert out == [(" continued", True)]
+
+    def test_reports_eos_false_when_the_generation_hit_the_cap(self):
+        model = _FakeTransformersModel()
+        model.model.emit_eos = False
+        generate_batch = build_transformers_batch_generate_fn(model, max_new_tokens=5)
+        out = generate_batch(["P"], [np.zeros(SAMPLE_RATE, dtype=np.float32)])
+        assert out == [(" continued", False)]
 
 
 class TestPortableStreaming:

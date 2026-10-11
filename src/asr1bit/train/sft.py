@@ -44,7 +44,14 @@ BatchDecodeFn = Callable[[Sequence[str], Sequence[np.ndarray]], Sequence[str]]
 
 @dataclass
 class StreamingSample:
-    """One on-policy training state recorded during a streaming rollout."""
+    """One streaming state recorded during a rollout.
+
+    ``continuation`` is the text the *rollout model* generated at this state and
+    ``eos`` whether that generation stopped on the EOS token (False = it hit the
+    token cap). For on-policy SFT the targets are built from the reference
+    (:func:`build_onpolicy_examples`); for streaming-state distillation the
+    continuation itself is the target (:func:`build_distill_examples`).
+    """
 
     audio: np.ndarray
     prompt: str
@@ -52,6 +59,16 @@ class StreamingSample:
     chunk_id: int
     audio_sec: float
     final: bool = False
+    continuation: str = ""
+    eos: bool = False
+
+
+def _split_result(result) -> tuple[str, bool]:
+    """Normalize a rollout decode result: ``str`` or ``(text, eos)``."""
+    if isinstance(result, tuple):
+        text, eos = result
+        return str(text or ""), bool(eos)
+    return str(result or ""), False
 
 
 def collect_streaming_samples(
@@ -128,13 +145,14 @@ def collect_streaming_samples(
 
         for batch_start in range(0, len(records), batch_size):
             sub_records = records[batch_start : batch_start + batch_size]
-            continuations = decode_batch(
+            results_batch = decode_batch(
                 [record["prompt"] for record in sub_records],
                 [record["feed"] for record in sub_records],
             )
-            for record, continuation in zip(sub_records, continuations):
+            for record, result in zip(sub_records, results_batch):
                 state = record["state"]
                 prefix = record["prefix"]
+                continuation, eos = _split_result(result)
                 if keep(state["chunk_id"], record["final"]):
                     results[state["index"]].append(
                         StreamingSample(
@@ -144,6 +162,8 @@ def collect_streaming_samples(
                             chunk_id=state["chunk_id"],
                             audio_sec=record["end"] / float(sample_rate),
                             final=record["final"],
+                            continuation=continuation,
+                            eos=eos,
                         )
                     )
                 state["raw"] = prefix + (continuation or "")
@@ -292,6 +312,39 @@ def build_onpolicy_examples(
                     target = " ".join(remainder)
             examples.append(
                 {"audio": sample.audio, "prefix_text": sample.prompt, "target": target}
+            )
+    return examples
+
+
+def build_distill_examples(
+    samples: Sequence[Sequence[StreamingSample]],
+    *,
+    require_eos: bool = True,
+) -> list[dict]:
+    """Streaming-state distillation examples from a *teacher* rollout.
+
+    Behavior cloning at the exact states the streaming algorithm produces at
+    inference: the target is the rollout model's own continuation for that
+    prompt/audio (teacher = the frozen pretrained model, whose streaming policy
+    is clean and EOS-terminated). ``require_eos`` drops generations that hit the
+    token cap, so every kept sample teaches "…continuation… then stop" (the
+    collator appends the EOS token itself).
+
+    Unlike :func:`build_onpolicy_examples` there is no reference alignment: the
+    teacher's continuation is the target verbatim (its leading space is part of
+    the tokenization).
+    """
+    examples: list[dict] = []
+    for utt_samples in samples:
+        for sample in utt_samples:
+            if require_eos and not sample.eos:
+                continue
+            examples.append(
+                {
+                    "audio": sample.audio,
+                    "prefix_text": sample.prompt,
+                    "target": sample.continuation,
+                }
             )
     return examples
 

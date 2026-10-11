@@ -500,3 +500,48 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/qat_stream_opd.log`,
   `artifacts/stage1/qat_ternary_full.log`, `tests/test_train_sft.py`,
   `tests/test_trainer_rollout.py`.
+
+---
+
+## 2026-10-12 — WP1 phase 1 result: DAgger on the student's own prefixes POISONS the model
+
+- **Did:** ran on-policy streaming SFT (job `11030`): 350-utterance rollout with
+  the 9.2 ternary student → 2 400 on-policy states + 2 400 standard samples,
+  3 000 steps at lr 1e-5 cosine (anchor 0.05). Then the decisive official-
+  algorithm eval (`11036`) and a per-chunk diagnostic (`11039`).
+- **Result (50-utt test-clean):**
+  - offline ternary **18.33** (from 9.2; still descending: 19.70 @1000 →
+    18.75 @2000 → 18.33 @3000), fp16 readout 62.2, binary readout 100.0;
+  - **official algorithm (unfixed 5, 32 tokens, 320 ms): WER 920.55**,
+    CER 1052.73, RTF 4.49 — *worse* than the previous static-SFT checkpoint
+    (203.5). LSP margin 3: 64 revisions, committed@50 % 13.8 %.
+- **Failed:** the model now loops from the first *content* chunk:
+  chunk 0-2 emit `''` + EOS (the warm-up-EOS training **worked** — the
+  `assistant\nassistant…` runaway is gone), but chunk 3 (≥1.28 s) degenerates
+  into `language'S'S'S'S…` (32 tokens, no EOS) and never recovers
+  (`artifacts/stage1/diag_opd_u0.json`, `diag_opd_u1.json`,
+  `diag_opd_u1_skip.json`). A warm-up skip does not help: the loop is in the
+  content continuation, not the cold start.
+- **Why (root cause):** the rollout's own prefixes were themselves degenerate —
+  the base model produces `WORDS WAS IT'S'T'T'T…`-style loops at mid-stream
+  chunks, so the training pairs were "(looping prefix) → reference remainder".
+  Fitting those pairs teaches the *loop patterns* as plausible continuations:
+  DAgger on a degenerate policy poisons the student instead of repairing it.
+  The 18.3 offline value shows the fresh cosine had not annealed either (the 8k
+  history needed ~8 000 steps for the same recovery).
+- **Chose:** replace the DAgger recipe with **streaming-state distillation**
+  (`--op-distill`): the frozen pretrained teacher drives the rollout (its
+  streaming policy is clean and EOS-terminated — verified trace:
+  `diag_opd_pretrained_u0.json`, 2.33 WER with the official algorithm) and the
+  student clones the teacher's own continuation at each state; generations that
+  hit the token cap are dropped, so every sample ends in a stop. Same 50/50 mix
+  with standard samples, 4 000 steps from the 9.2 base (`11040`, running).
+  Alternatives rejected: another DAgger iteration (its rollout sees even more
+  degenerate prefixes — job `11038` was killed after 1 h), inference controls
+  (measured worse), longer static prefix SFT (203.5).
+- **Next:** the distillation result decides between (a) single-digit official-
+  algorithm WER → anneal + scale, or (b) a filtered-DAgger hybrid (drop
+  degenerate own-prefixes, oversample warm-up EOS) with the distillation mix.
+- **Artifacts:** `artifacts/stage1/streaming_opd_quantized.json`,
+  `eval_streaming_opd.log`, `diag_opd_*.json`, `qat_stream_opd.log`,
+  `stage1_decoder_attn_ffn_bw1.58_gNone_lr1e-05_adamw_delay_ls1_n2400.json`.

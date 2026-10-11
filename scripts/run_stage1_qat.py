@@ -40,6 +40,7 @@ from asr1bit.train.qat import (
     set_qat_alpha,
 )
 from asr1bit.train.sft import (
+    build_distill_examples,
     build_onpolicy_examples,
     collect_streaming_samples,
     interleave_with_ratio,
@@ -189,17 +190,29 @@ def build_op_keep(args: argparse.Namespace):
 
 
 def rollout_onpolicy_examples(
-    args: argparse.Namespace, wrapper, model, utterances
+    args: argparse.Namespace, wrapper, utterances, *, teacher_wrapper=None
 ) -> list[dict]:
-    """Replay the official streaming algorithm with the *current* model.
+    """Build streaming training examples by replaying the official algorithm.
 
-    Returns ``(audio, prefix_text, target)`` examples whose prompts are the
-    model's own rolled-back generations (on-policy), with the reference
-    remainder as the target.
+    Two modes:
+    - **on-policy SFT** (default): the *current* model generates the prefixes and
+      the target is the reference remainder (own-prefix distribution);
+    - **streaming-state distillation** (``--op-distill``): the *frozen pretrained
+      teacher* generates them and the target is the teacher's own continuation —
+      behavior cloning of a clean streaming policy at exactly the inference
+      states (the student's own states can be degenerate loops, which DAgger
+      would reinforce).
     """
-    decode_batch = backends.build_transformers_batch_decode_fn(
-        wrapper, max_new_tokens=args.op_max_new_tokens
-    )
+    if args.op_distill:
+        if teacher_wrapper is None:
+            raise ValueError("--op-distill requires --frozen-teacher 1 (teacher rollout)")
+        decode_batch = backends.build_transformers_batch_generate_fn(
+            teacher_wrapper, max_new_tokens=args.op_max_new_tokens
+        )
+    else:
+        decode_batch = backends.build_transformers_batch_decode_fn(
+            wrapper, max_new_tokens=args.op_max_new_tokens
+        )
     codec = backends.TokenizerCodec(wrapper.processor.tokenizer)
     prompt_raw = wrapper._build_text_prompt(context="", force_language=None)
     audios = [utt.audio for utt in utterances]
@@ -227,12 +240,41 @@ def rollout_onpolicy_examples(
         max_rounds=args.op_max_rounds or None,
         progress=progress,
     )
-    examples = build_onpolicy_examples(
-        samples,
-        [utt.text for utt in utterances],
-        warmup_target_eos=bool(args.op_warmup_eos),
-    )
+    if args.op_distill:
+        examples = build_distill_examples(samples)
+    else:
+        examples = build_onpolicy_examples(
+            samples,
+            [utt.text for utt in utterances],
+            warmup_target_eos=bool(args.op_warmup_eos),
+        )
     return select_evenly(examples, args.op_max_samples)
+
+
+def collect_op_examples(
+    args: argparse.Namespace,
+    wrapper,
+    model,
+    teacher_wrapper,
+    op_utterances,
+    *,
+    restore_alpha: float | None = None,
+) -> list[dict]:
+    """Roll out and return streaming examples, restoring the training state."""
+    if args.op_distill:
+        with torch.no_grad():
+            return rollout_onpolicy_examples(
+                args, wrapper, op_utterances, teacher_wrapper=teacher_wrapper
+            )
+    set_precision(model, args.bit_width, 1.0)
+    model.eval()
+    try:
+        with torch.no_grad():
+            return rollout_onpolicy_examples(args, wrapper, op_utterances)
+    finally:
+        model.train()
+        if restore_alpha is not None:
+            set_precision(model, args.bit_width, restore_alpha)
 
 
 def shadow_state(model) -> dict:
@@ -351,6 +393,9 @@ def parse_args() -> argparse.Namespace:
              "them with the standard samples (Stage 4).",
     )
     p.add_argument("--op-rollout-n", type=int, default=600, help="Utterances for the on-policy rollout.")
+    p.add_argument("--op-distill", type=int, default=0,
+                   help="1 = streaming-state distillation: the frozen pretrained teacher drives the "
+                        "rollout and the student clones its continuations (requires --frozen-teacher 1).")
     p.add_argument("--op-batch-size", type=int, default=6, help="Utterances decoded per rollout call.")
     p.add_argument("--op-max-new-tokens", type=int, default=32,
                    help="Per-chunk generation cap during the rollout (match the streaming eval).")
@@ -390,6 +435,7 @@ def main() -> int:
     patch_outer_forward(model)
 
     teacher = None
+    teacher_wrapper = None
     if args.frozen_teacher:
         if not args.distill_weight:
             raise ValueError("--frozen-teacher requires --distill-weight > 0")
@@ -491,16 +537,20 @@ def main() -> int:
     op_examples: list[dict] = []
     if args.op_rollout:
         op_utterances = train_utts[: args.op_rollout_n]
-        print(f"=== on-policy rollout ({len(op_utterances)} utts, {args.op_chunk_ms} ms chunks) ===", flush=True)
-        set_precision(model, args.bit_width, 1.0)
-        model.eval()
-        with torch.no_grad():
-            op_examples = rollout_onpolicy_examples(args, wrapper, model, op_utterances)
-        model.train()
+        mode = (
+            "streaming-state distillation (teacher rollout)"
+            if args.op_distill
+            else "on-policy rollout"
+        )
+        print(
+            f"=== {mode} ({len(op_utterances)} utts, {args.op_chunk_ms} ms chunks) ===",
+            flush=True,
+        )
+        op_examples = collect_op_examples(args, wrapper, model, teacher_wrapper, op_utterances)
         train_examples = interleave_with_ratio(standard_examples, op_examples, args.op_mix_frac)
         print(
-            f"on-policy rollout: {len(op_examples)} examples | mix {len(train_examples)} "
-            f"({len(standard_examples)} standard + {len(op_examples)} on-policy)",
+            f"{mode}: {len(op_examples)} examples | mix {len(train_examples)} "
+            f"({len(standard_examples)} standard + {len(op_examples)} streaming)",
             flush=True,
         )
 
@@ -587,13 +637,10 @@ def main() -> int:
             and args.op_refresh_every
             and (step + 1) % args.op_refresh_every == 0
         ):
-            print(f"=== on-policy rollout refresh @ step {step + 1} ===", flush=True)
-            set_precision(model, args.bit_width, 1.0)
-            model.eval()
-            with torch.no_grad():
-                op_examples = rollout_onpolicy_examples(args, wrapper, model, op_utterances)
-            model.train()
-            set_precision(model, args.bit_width, alpha)
+            print(f"=== streaming rollout refresh @ step {step + 1} ===", flush=True)
+            op_examples = collect_op_examples(
+                args, wrapper, model, teacher_wrapper, op_utterances, restore_alpha=alpha
+            )
             train_examples = interleave_with_ratio(standard_examples, op_examples, args.op_mix_frac)
             print(
                 "OPREFRESH "

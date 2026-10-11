@@ -374,3 +374,18 @@ Dated, append-only. Record what changed, why, and alternatives rejected.
   cosine cycles (lr 1e-5, anchor 0.05) instead of a full re-run of stages 1–3 —
   cheapest test of whether data volume breaks the 8k plateau; the warm-start
   stages can be re-run on the full cache later if the continuation wins.
+- **2026-10-12 — WP1: streaming-state distillation replaces DAgger on the
+  student's own prefixes.** Phase-1 on-policy SFT (student-generated prefixes)
+  fixed the cold-start runaway (chunks 0–2 now emit EOS) but *poisoned* the
+  model: the student's rollout prefixes contained repetition loops, so the
+  training pairs "(looping prefix) → reference remainder" taught the loops back
+  (official-algorithm WER 920.55, worse than the previous static SFT's 203.5;
+  per-chunk traces in `artifacts/stage1/diag_opd_*.json`). New recipe:
+  the **frozen pretrained teacher** drives the rollout (clean, EOS-terminated
+  streaming policy — verified at 2.33 official-algorithm WER) and the student
+  clones the teacher's own continuation at each state; generations without EOS
+  are dropped so every sample ends in a stop (`--op-distill`). Same ≥50 %
+  standard-sample mix (offline protection): the mix rule and the warm-up-EOS
+  signal from the previous entry stand. Rejected: another DAgger iteration
+  (poisoning compounds), filtered-DAgger only (kept as a fallback if
+  distillation underperforms).

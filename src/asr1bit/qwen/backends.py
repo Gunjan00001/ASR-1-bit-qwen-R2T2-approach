@@ -29,6 +29,7 @@ __all__ = [
     "StreamTrace",
     "TokenizerCodec",
     "build_transformers_batch_decode_fn",
+    "build_transformers_batch_generate_fn",
     "build_transformers_decode_fn",
     "environment_report",
     "load_model",
@@ -139,20 +140,24 @@ def offline_transcribe(
     return results[0].text
 
 
-def build_transformers_batch_decode_fn(
+def build_transformers_batch_generate_fn(
     model: Any, max_new_tokens: int | None = None, **generate_kwargs: Any
-) -> Callable[[Sequence[str], Sequence[np.ndarray]], list[str]]:
-    """Build a batched ``decode_batch(prompts, audios) -> continuations``.
+) -> Callable[[Sequence[str], Sequence[np.ndarray]], list[tuple[str, bool]]]:
+    """Build ``generate_batch(prompts, audios) -> [(continuation, eos), ...]``.
 
-    Same semantics as :func:`build_transformers_decode_fn`, but every prompt is
-    decoded in one ``generate`` call (used by the on-policy streaming SFT
-    rollout, where all utterances' chunk-``k`` decodes can be batched).
+    Like :func:`build_transformers_batch_decode_fn` but also reports whether the
+    generation ended with the tokenizer's EOS token — needed by streaming-state
+    distillation to drop generations that hit the token cap instead of stopping.
     """
     inner = model.model
     processor = model.processor
+    tokenizer = processor.tokenizer
     limit = max_new_tokens if max_new_tokens is not None else getattr(model, "max_new_tokens", 512)
+    eos_id = getattr(tokenizer, "eos_token_id", None)
 
-    def decode_batch(prompts: Sequence[str], audios: Sequence[np.ndarray]) -> list[str]:
+    def generate_batch(
+        prompts: Sequence[str], audios: Sequence[np.ndarray]
+    ) -> list[tuple[str, bool]]:
         inputs = processor(
             text=list(prompts),
             audio=[np.asarray(audio, dtype=np.float32) for audio in audios],
@@ -162,13 +167,33 @@ def build_transformers_batch_decode_fn(
         inputs = inputs.to(inner.device).to(inner.dtype)
         generated = inner.generate(**inputs, max_new_tokens=limit, **generate_kwargs)
         prompt_len = inputs["input_ids"].shape[1]
-        return list(
-            processor.batch_decode(
-                generated.sequences[:, prompt_len:],
-                skip_special_tokens=True,
-                clean_up_tokenization_spaces=False,
-            )
+        continuations = processor.batch_decode(
+            generated.sequences[:, prompt_len:],
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=False,
         )
+        eos_flags = [
+            bool(eos_id is not None and eos_id in row.tolist())
+            for row in generated.sequences[:, prompt_len:]
+        ]
+        return list(zip(continuations, eos_flags))
+
+    return generate_batch
+
+
+def build_transformers_batch_decode_fn(
+    model: Any, max_new_tokens: int | None = None, **generate_kwargs: Any
+) -> Callable[[Sequence[str], Sequence[np.ndarray]], list[str]]:
+    """Build a batched ``decode_batch(prompts, audios) -> continuations``.
+
+    Same semantics as :func:`build_transformers_decode_fn`, but every prompt is
+    decoded in one ``generate`` call (used by the on-policy streaming SFT
+    rollout, where all utterances' chunk-``k`` decodes can be batched).
+    """
+    generate_batch = build_transformers_batch_generate_fn(model, max_new_tokens, **generate_kwargs)
+
+    def decode_batch(prompts: Sequence[str], audios: Sequence[np.ndarray]) -> list[str]:
+        return [continuation for continuation, _ in generate_batch(prompts, audios)]
 
     return decode_batch
 
