@@ -1,0 +1,39 @@
+{
+  "checkpoint": null,
+  "step": null,
+  "chunk_ms": 320,
+  "n": 10,
+  "conditions": {
+    "fp16": {
+      "alpha": 0.0,
+      "wer": 3.5897435897435894,
+      "cer": 1.0204081632653061,
+      "rtf_decode": 1.1568237488517574,
+      "wall_sec": 91.5338962841779,
+      "hypotheses": [
+        "I have great things to tell you, Se\u00f1or,\" said Donna Stefania to her husband, \"the cream in substance of which is this: the fainting girl before you is your daughter, and the boy is your grandson.\"",
+        "When I was a young man, I thought Paul was making too much of his call.",
+        "But a word further concerning the expedition in general.",
+        "Though the discipline of the former parliamentary army was not contemptible, a more exact plan was introduced, and rigorously executed by these new commanders.",
+        "If. It only were not so dark here and so terribly lonely.",
+        "The bond of union thus effected could never be severed, and although Ben Zuf's achievements had fairly earned him the right of retirement, he firmly declined all honors or any pension that might part him from his superior officer.",
+        "Words. Was it their colors?",
+        "Without his scrapbooks, his chemicals, and his homely untidiness, he was an uncomfortable man.",
+        "Let us hear the suspicions. I will look after the proofs.",
+        "To the young American here or elsewhere, the paths to fortune are innumerable and all open. There is invitation in the air and success in all his wide horizon."
+      ],
+      "references": [
+        "I HAVE GREAT THINGS TO TELL YOU SENOR SAID DONA ESTAFANIA TO HER HUSBAND THE CREAM AND SUBSTANCE OF WHICH IS THIS THE FAINTING GIRL BEFORE YOU IS YOUR DAUGHTER AND THAT BOY IS YOUR GRANDSON",
+        "WHEN I WAS A YOUNG MAN I THOUGHT PAUL WAS MAKING TOO MUCH OF HIS CALL",
+        "BUT A WORD FURTHER CONCERNING THE EXPEDITION IN GENERAL",
+        "THOUGH THE DISCIPLINE OF THE FORMER PARLIAMENTARY ARMY WAS NOT CONTEMPTIBLE A MORE EXACT PLAN WAS INTRODUCED AND RIGOROUSLY EXECUTED BY THESE NEW COMMANDERS",
+        "IF IT ONLY WERE NOT SO DARK HERE AND SO TERRIBLY LONELY",
+        "THE BOND OF UNION THUS EFFECTED COULD NEVER BE SEVERED AND ALTHOUGH BEN ZOOF'S ACHIEVEMENTS HAD FAIRLY EARNED HIM THE RIGHT OF RETIREMENT HE FIRMLY DECLINED ALL HONORS OR ANY PENSION THAT MIGHT PART HIM FROM HIS SUPERIOR OFFICER",
+        "WORDS WAS IT THEIR COLOURS",
+        "WITHOUT HIS SCRAPBOOKS HIS CHEMICALS AND HIS HOMELY UNTIDINESS HE WAS AN UNCOMFORTABLE MAN",
+        "LET US HEAR THE SUSPICIONS I WILL LOOK AFTER THE PROOFS",
+        "TO THE YOUNG AMERICAN HERE OR ELSEWHERE THE PATHS TO FORTUNE ARE INNUMERABLE AND ALL OPEN THERE IS INVITATION IN THE AIR AND SUCCESS IN ALL HIS WIDE HORIZON"
+      ]
+    }
+  }
+}

@@ -7,14 +7,13 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 05:55 IST)
+## Live status (updated 2026-10-11 06:40 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10826` | **Ternary long3**: from 9.2, lr 5e-6, 3000 steps (GPU 6) | starting | — | **~1 h 10 m** |
-| `10827` | **Binary long4**: from 10.7, lr 2.5e-6, 3000 steps (GPU 5) | starting | — | **~1 h 10 m** |
-| `10821` | **Streaming 320 ms eval** (primary metric, GPU 7) | running (~40 % of condition 1) | first WER pending | **~2–2.5 h** |
-| `10825` | persistent GPU session | — | — | — |
+| `10835` | **Streaming 320 ms, quantized** (pretrained baseline + ternary long2 + binary long3, 50 utts, GPU 6) | condition 1 running | pretrained 10-utt check: **3.59 WER, RTF 1.16** | **~30–45 m** |
+| `10833` | Pretrained streaming diagnostic | **done** | **portable path works** | — |
+| `10826`/`10827` | Round-4 continuations | killed | plateaued (ternary ~9.3–10.3, binary ~10.7–11.8) | — |
 
 **Best results (50-utt test-clean offline; fp16 baseline 2.44; naive ≈ 100):**
 
@@ -22,19 +21,23 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 |---|---|
 | Ternary, all 196 decoder projections (8k, long2) | **9.2** (best 9.1) |
 | Binary, all 196 decoder projections (8k, long3) | **10.7** |
-| Previous bests | ternary 10.6/11.4; binary 11.1/12.9 |
 | FFN-only ternary | 25.7 best / 32.8 final |
 | Naive attn+FFN | ~98–108 |
 
-**Progression of the best numbers:** naive ~100 → 32.8 (FFN-only) → 16.2 → 11.4
-→ **9.2** ternary; binary 17.5 → 12.9 → 11.1 → **10.7**.
+**Streaming-path findings (important):**
+1. The portable `ChunkedStreamer` **works**: the pretrained model at 320 ms
+   scores **3.59 WER / RTF 1.16** (10 utts) with correct transcriptions.
+2. The **fp16 readout of QAT-trained shadows is not a valid streaming
+   baseline** — its drift (offline 37.7) turns into runaway generation in
+   streaming (WER 1860, RTF 6.0). The meaningful metric is the model at its
+   **trained precision** (ternary/binary).
+3. The streaming evaluation therefore compares: pretrained fp16 baseline vs
+   ternary/binary quantized readouts on the **same 50 utts** (job `10835`).
 
-**fp16 shadow drift keeps shrinking with each continuation**
-(ternary long2: 37.7; binary long3: 31.7) — lower lr + anchor tame it.
-
-**Reading the continuations:** a fresh cosine cycle perturbs the checkpoint for
-the first ~2 000 steps, then descends past the previous best as the LR decays.
-Gentler lr (5e-6–1e-5) avoids most of the transient.
+**Recipe plateau:** four continuation rounds converge to ~9.2 (ternary) /
+~10.7 (binary) on 8k data; further rounds do not improve. Next levers: more
+data (28.5k full `train.clean-100` / `train.360`), the 1.7B model, or the
+remaining Stage 2 stack (co-training/stochastic precision).
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
@@ -538,3 +541,26 @@ restarts at 0).
   `docs/PROJECT_STATUS.md` + README updated with the new bests.
 - **Evidence:** `stage1_decoder_attn_ffn_bw1.58_gNone_lr1e-05_..._n8000.json`,
   `docs/figures/*.png`.
+
+### 06:40 — Streaming path diagnosed; recipe plateaued; quantized streaming eval launched
+
+- **Streaming diagnostic (job `10833`, pretrained model, portable streamer,
+  320 ms, 10 utts):** **WER 3.59, CER 1.02, RTF 1.16** with correct
+  transcriptions → the portable path is sound.
+- **Key finding:** the first streaming attempt (fp16 readout of a QAT model)
+  scored **WER 1860 / RTF 6.0** — the drifted fp16 readout causes runaway
+  generation in streaming. **The fp16 readout of QAT shadows is not a valid
+  streaming baseline**; the meaningful metric is the trained precision
+  (ternary/binary).
+- **Recipe plateau:** round-4 continuations (ternary long3 lr 5e-6, binary
+  long4 lr 2.5e-6) hovered at 9.3–10.3 / 10.7–11.8 — no improvement past
+  **9.2 / 10.7**. Killed; further rounds are not worth it on 8k data.
+- **Launched `10835`:** streaming 320 ms on the same 50 utts for (1) pretrained
+  fp16 baseline, (2) ternary long2 quantized (9.2), (3) binary long3 quantized
+  (10.7) — the primary-metric comparison.
+- **Next levers after this:** more data (28.5k full `train-clean-100` /
+  `train.360`), the 1.7B model, or the remaining Stage 2 stack (co-training /
+  stochastic precision).
+- **Evidence:** `artifacts/stage1/streaming_pretrained.json`,
+  `artifacts/stage1/eval_streaming.log` (WER 1860 line),
+  `docs/figures/wer_trajectories.png`.
