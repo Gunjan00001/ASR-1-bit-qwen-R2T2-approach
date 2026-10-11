@@ -7,35 +7,36 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 10:45 IST)
+## Live status (updated 2026-10-11 13:10 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10859` | **Decisive streaming test**: prefix-trained ternary + official prefix algorithm, 50 utts (GPU 7) | running | — | **~10–45 m** |
-| `10844` | Streaming no-prefix variant: pretrained + ternary + binary | ternary done | pretrained **19.28**; ternary **33.58**; binary running | **~20–30 m** |
-| `10850` | Prefix-continuation SFT | **done** | offline ternary **11.0** (was 9.2; 1.8-pt cost) | — |
+| `10860` | **No-prefix streaming, 128-token budget**: pretrained + ternary + binary, 50 utts | running | — | **~60–90 m** |
+| `10859` | Decisive test: prefix-SFT + official algorithm | **done** | **WER 952 — still collapses** | — |
+| `10844` | No-prefix streaming (32 tokens) | **done** | pretrained 19.28; ternary **33.58**; binary **33.26** | — |
+| `10850` | Prefix-continuation SFT | **done** | offline ternary 11.0 | — |
 
 **Best offline results (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
 
 | Configuration | WER |
 |---|---|
 | Ternary, all 196 decoder projections (8k, long2) | **9.2** (best 9.1) |
-| Ternary + prefix-continuation SFT | 11.0 (buys streaming capability) |
 | Binary, all 196 decoder projections (8k, long3) | **10.7** |
+| Ternary + prefix-continuation SFT | 11.0 |
 
-**Streaming numbers so far (50 utts, 320 ms):**
+**Streaming (320 ms, 50 utts) — the critical path:**
 
-| Variant | Pretrained | Ternary |
-|---|---|---|
-| Official prefix algorithm | **2.33** | collapses (~1300) — no prefix-continuation training |
-| No-prefix re-feed (unfixed_token_num=9999, 32 tokens) | 19.28 (truncation-degraded) | **33.58** |
+| Variant | Pretrained | Ternary | Binary |
+|---|---:|---:|---:|
+| Official prefix algorithm | **2.33** | 1296 (collapse) | — |
+| + prefix-SFT (1 500 steps) | — | **952 (still collapses)** | — |
+| No-prefix re-feed (32 tok) | 19.28 | **33.58** | **33.26** |
+| No-prefix re-feed (128 tok) | running | running | running |
 
-**Root cause recap:** QAT models were never trained to continue a partial
-self-prefix, so the official streaming algorithm (which re-feeds a rolled-back
-prefix) collapses. Fix in progress: `--prefix-sft-fracs` adds
-prefix-continuation samples (0/50/80/95 % of the transcript as prompt); the
-prefix-trained checkpoint is now being tested with the official algorithm
-(job `10859`).
+**Conclusion:** the QAT models are offline-strong but not streaming-robust
+under the official algorithm; a small prefix-SFT is insufficient. The proper
+fix is Stage 4 streaming SFT at scale (full 28.5 k cache ready: 100.6 h).
+The no-prefix re-feed variant is a stopgap giving usable numbers.
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
@@ -606,3 +607,20 @@ restarts at 0).
   (`data/qat_clean_train.100_full.pt`).
 - **Evidence:** `artifacts/stage1/streaming_pretrained_50.json`,
   `streaming_ternary_long2_quantized.json`, `qat_prefix_sft.log`.
+
+### 13:10 — Decisive streaming test: prefix-SFT insufficient; no-prefix 128-token run launched
+
+- **Decisive test (`10859`):** prefix-continuation SFT (1 500 steps) + official
+  prefix algorithm → **WER 952** (repetition loops: "HAVE HAVE HAVE…",
+  "AT AT AT…"). The short prefix phase reduced the collapse (1296 → 952) but
+  did **not** fix it. Proper streaming SFT at scale is required (Stage 4).
+- **No-prefix re-feed (32 tokens, `10844`) complete:** pretrained 19.28,
+  ternary **33.58**, binary **33.26** (same variant; no collapse).
+- **Launched `10860`:** no-prefix re-feed with a 128-token budget (avoids
+  truncation) for pretrained + ternary + binary — the most defensible
+  chunked-re-feed streaming numbers available with the current models.
+- **Docs:** `docs/PROJECT_STATUS.md` gained a full streaming section (variants,
+  root causes, conclusions) and the future plan now puts streaming robustness
+  on the critical path (Stage 4 brought forward, full 28.5 k cache ready).
+- **Evidence:** `artifacts/stage1/streaming_ternary_prefix_quantized.json`,
+  `eval_streaming_prefix.log`, `docs/PROJECT_STATUS.md`.

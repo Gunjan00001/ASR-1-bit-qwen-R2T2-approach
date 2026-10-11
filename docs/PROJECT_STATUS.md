@@ -24,7 +24,8 @@
   - **Ternary, all 196 decoder projections: 9.2 final / 9.1 best WER**
   - **Binary, all 196 decoder projections: 10.7 WER**
   - (fp16 pretrained reference on the same 50-utt sample: **2.44**)
-  - Both are still improving with each continuation round (round 4 running).
+  - Offline recovery plateaued after four continuation rounds; **streaming
+    robustness is now the critical path** — see the streaming section below.
 
 ---
 
@@ -50,9 +51,47 @@ number on a ternary-trained row is a readout only (not a trained binary model).
 
 *Primary metric note:* the Stage 0 gate is defined on **streaming 320 ms**
 clean/other (fp16: 2.24 / 4.61, `X = +1.5`). The numbers above are **offline**
-on a 50-utt clean subsample; the streaming evaluation of quantized models is a
-pending work package (vLLM cannot serve BitLinear; the portable transformers
-path is used).
+on a 50-utt clean subsample. Streaming evaluation of quantized models is an
+open work package — see the dedicated section below for what was found.
+
+---
+
+## Streaming evaluation (320 ms) — status and findings
+
+Streaming uses the portable `ChunkedStreamer` (vLLM cannot serve BitLinear).
+Measured on the same 50-utt sample, 320 ms chunks:
+
+| Variant | Pretrained fp16 | Ternary QAT (offline 9.2) | Binary QAT (offline 10.7) |
+|---|---:|---:|---:|
+| **Official prefix algorithm** (`unfixed_token_num=5`) | **2.33** | **collapse (1296)** | — |
+| Same + prefix-continuation SFT (1 500 steps) | — | **collapse (952)** | — |
+| **No-prefix re-feed** (`unfixed_token_num=9999`, 32 tokens) | 19.28 | **33.58** | **33.26** |
+| No-prefix re-feed, 128-token budget | running | running | running |
+
+**Root causes (per-chunk traces, `scripts/diag_stream_generation.py`):**
+
+1. **Near-empty first chunks:** the pretrained model answers a 0.32 s chunk with
+   `language None<asr_text>` + EOS; the QAT model runaway-generates
+   `assistant\nassistant…` (32 tokens, no EOS).
+2. **Prefix continuation:** the official algorithm re-feeds a rolled-back copy of
+   the model's own text as the prompt. The QAT model was never trained on that
+   pattern and falls into token repetition (`'T'T'T…`, `HAVE HAVE…`). The
+   pretrained model handles it natively.
+3. A short prefix-continuation SFT phase (1 500 steps, 4 transcript fractions,
+   2 k utts) **reduced but did not fix** the collapse (1296 → 952): the model
+   still degenerates when continuing its own partial text.
+
+**What this means:**
+
+- The quantized models are **offline-strong** (9.2 / 10.7) but **not
+  streaming-robust** under the official algorithm.
+- The **no-prefix re-feed variant** (regenerate the full transcript per chunk)
+  gives usable numbers — ternary 33.6 / binary 33.3 vs the same-variant
+  pretrained 19.3 — at the cost of a degraded baseline (truncation) and higher
+  RTF (~4).
+- Fixing the official algorithm is **Stage 4 work** (streaming SFT at scale with
+  stable-prefix/LSP targets), exactly as the plan anticipated. The full 28.5 k
+  `train-clean-100` cache (100.6 h) is built and ready for that phase.
 
 ---
 
@@ -181,40 +220,36 @@ python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_f
 
 ## Future plan
 
-**Stage 2 — finish accuracy recovery (immediate)**
-1. ~~Longer runs on the 8k cache~~ **done**: ternary 11.4 (best 10.6), binary
-   12.9. A second binary continuation (from 12.9, lr 1e-5, 4 000 steps) is
-   running; same for ternary is the next candidate.
-2. **Anchor tuning**: w=0.05 already cut fp16 drift (readout 37–65 vs 85–230);
-   a trust-region form is still open for preserving the fp path fully.
-3. **Co-training / stochastic precision** (alternate fp and quantized steps).
-4. **Re-run the best recipe on `test-other`** for a clean/other pair.
+**Streaming robustness (the critical path — Stage 4 brought forward)**
+1. The quantized models are offline-strong (9.2 / 10.7) but collapse under the
+   official prefix-continuation streaming algorithm. A 1 500-step prefix-SFT
+   reduced but did not fix it (1296 → 952).
+2. Next: **proper streaming SFT at scale** — prefix-continuation samples on the
+   full 28.5 k `train-clean-100` cache (100.6 h, built), blended with the
+   standard objective, longer training (5–10 k steps), low lr + anchor.
+3. Then re-run the official-algorithm streaming evaluation; target a
+   single-digit streaming WER (pretrained baseline: 2.33 on 50 utts).
+4. If prefix continuation remains unstable, evaluate the LSP (stable-prefix)
+   emission policy (Stage 4 / T4.4) which is the plan's designated fix.
 
-**Streaming evaluation (unblocks the Stage 1 gate)**
-5. Evaluate quantized models with the portable `ChunkedStreamer` at 320 ms on
-   the fixed subsample; report WER vs the fp16 streaming baselines
-   (2.24 / 4.61) and the `+1.5` bar.
+**Stage 2 — accuracy recovery (offline, done for now)**
+5. Ternary 9.2 / binary 10.7 offline; continuation rounds plateaued on 8k data.
+   The full 28.5 k cache is the next scale-up for the offline recipe.
 
 **Stage 3 — scale to 1.7B**
 6. Memory stack (LoRA / partial QAT), checkpoint/resume (ready), run + eval.
 
-**Stage 4 — streaming parity (LSP)**
-7. Forced-aligner alignment builder → stable-prefix targets → streaming SFT →
-   append-only LSP emission policy → eval vs R2T2 published numbers.
-
 **Stage 5 — edge deployment**
-8. Pack 1-bit/2-bit weights, GGUF export, CPU SIMD kernels, RTF < 1 and
+7. Pack 1-bit/2-bit weights, GGUF export, CPU SIMD kernels, RTF < 1 and
    constant memory.
 
 **Stage 6 — final evaluation & writeup**
-9. Full matrix (chunk sizes 160/320/1000 ms, clean/other), tables/plots, report.
+8. Full matrix (chunk sizes 160/320/1000 ms, clean/other), tables/plots, report.
 
 **Known open risks**
-- Ternary 11.4 / binary 12.9 offline is a ~6–8× improvement over naive QAT, but
-  still ~8 points from the `+1.5` target (3.74 on streaming 320 ms). Closing it
-  needs the remaining recovery stack (co-training, trust region) plus the
-  streaming evaluation.
-- The fp16 readout still drifts (37–65); must be solved for the plan's
+- Streaming robustness is now the primary gap: offline 9.2 vs the `+1.5`
+  target (3.74) is ~5.5 points, but the official streaming algorithm currently
+  fails entirely for QAT models.
+- The fp16 readout still drifts (31–50); must be solved for the plan's
   "co-train" story.
-- Binary long2 and future restarts must avoid regressing the 12.9 checkpoint —
-  all checkpoints are kept on disk for safety.
+- All checkpoints and caches are kept on disk; nothing is lost between rounds.
