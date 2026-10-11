@@ -339,6 +339,42 @@ class TestDistillExamples:
         assert len(examples) == 1
         assert examples[0]["target"] == ""
 
+    def test_metadata_is_stripped_from_the_target(self):
+        sample = self._sample(2, "language English<asr_text>If.", eos=True, prompt="PROMPT\n")
+        examples = build_distill_examples([[sample]])
+        assert examples[0]["target"] == "If."
+
+    def test_empty_metadata_target_becomes_eos_only(self):
+        sample = self._sample(0, "language None<asr_text>", eos=True, prompt="PROMPT\n")
+        examples = build_distill_examples([[sample]])
+        assert examples[0]["target"] == ""
+
+    def test_plain_continuation_is_untouched(self):
+        sample = self._sample(4, " it only were not so.", eos=True, prompt="PROMPT\nIf.")
+        examples = build_distill_examples([[sample]])
+        assert examples[0]["target"] == " it only were not so."
+
+    def test_metadata_is_stripped_from_the_recorded_prompt(self):
+        prompt_raw = "TEMPLATE\n"
+        sample = self._sample(
+            4, " were not so.", eos=True, prompt="TEMPLATE\nlanguage English<asr_text>If it only"
+        )
+        examples = build_distill_examples([[sample]], prompt_raw=prompt_raw)
+        assert examples[0]["prefix_text"] == "TEMPLATE\nIf it only"
+        assert examples[0]["target"] == " were not so."
+
+    def test_prompt_is_kept_when_prompt_raw_is_unknown(self):
+        sample = self._sample(
+            4, " x", eos=True, prompt="TEMPLATE\nlanguage English<asr_text>If"
+        )
+        examples = build_distill_examples([[sample]])
+        assert examples[0]["prefix_text"] == "TEMPLATE\nlanguage English<asr_text>If"
+
+    def test_metadata_handling_can_be_disabled(self):
+        sample = self._sample(2, "language English<asr_text>If.", eos=True, prompt="PROMPT\n")
+        examples = build_distill_examples([[sample]], strip_metadata=False)
+        assert examples[0]["target"] == "language English<asr_text>If."
+
 
 class TestDegenerateDetection:
     def test_flags_subword_loops(self):

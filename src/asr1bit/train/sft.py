@@ -32,6 +32,8 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from asr1bit.qwen.stream import (
+    ASR_TEXT_TAG,
+    LANG_PREFIX,
     SAMPLE_RATE,
     TokenCodec,
     parse_stream_output,
@@ -355,10 +357,32 @@ def build_onpolicy_examples(
     return examples
 
 
+def _clean_stream_text(text: str) -> str:
+    """Drop a leading ``language X<asr_text>`` block from raw model text.
+
+    The pretrained model emits the structured ``language English<asr_text>...``
+    form; the QAT student is trained on plain transcripts everywhere else (the
+    standard samples), so distillation targets must use the same plain format or
+    the two halves of the mix teach contradictory output formats.
+    """
+    if ASR_TEXT_TAG not in text:
+        return text
+    tag_index = text.index(ASR_TEXT_TAG)
+    language_index = text.rfind(LANG_PREFIX.strip(), 0, tag_index)
+    if language_index >= 0:
+        line_start = text.rfind("\n", 0, language_index)
+        cut = line_start + 1 if line_start >= 0 else 0
+    else:
+        cut = 0
+    return text[:cut] + text[tag_index + len(ASR_TEXT_TAG) :]
+
+
 def build_distill_examples(
     samples: Sequence[Sequence[StreamingSample]],
     *,
+    prompt_raw: str | None = None,
     require_eos: bool = True,
+    strip_metadata: bool = True,
 ) -> list[dict]:
     """Streaming-state distillation examples from a *teacher* rollout.
 
@@ -369,21 +393,25 @@ def build_distill_examples(
     token cap, so every kept sample teaches "…continuation… then stop" (the
     collator appends the EOS token itself).
 
-    Unlike :func:`build_onpolicy_examples` there is no reference alignment: the
-    teacher's continuation is the target verbatim (its leading space is part of
-    the tokenization).
+    ``strip_metadata`` removes the teacher's ``language X<asr_text>`` wrapper
+    from both the recorded prompt (its prefix part, relative to ``prompt_raw``)
+    and the target, keeping the distillation format identical to the standard
+    samples (plain transcript text). The rollout itself still uses the teacher's
+    natural, metadata-bearing prompts — only the *training records* are cleaned.
     """
     examples: list[dict] = []
     for utt_samples in samples:
         for sample in utt_samples:
             if require_eos and not sample.eos:
                 continue
+            prompt = sample.prompt
+            target = sample.continuation
+            if strip_metadata:
+                target = _clean_stream_text(target)
+                if prompt_raw is not None and prompt.startswith(prompt_raw):
+                    prompt = prompt_raw + _clean_stream_text(prompt[len(prompt_raw) :])
             examples.append(
-                {
-                    "audio": sample.audio,
-                    "prefix_text": sample.prompt,
-                    "target": sample.continuation,
-                }
+                {"audio": sample.audio, "prefix_text": prompt, "target": target}
             )
     return examples
 

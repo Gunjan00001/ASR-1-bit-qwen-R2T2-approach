@@ -241,7 +241,7 @@ def rollout_onpolicy_examples(
         progress=progress,
     )
     if args.op_distill:
-        examples = build_distill_examples(samples)
+        examples = build_distill_examples(samples, prompt_raw=prompt_raw)
     else:
         examples = build_onpolicy_examples(
             samples,
