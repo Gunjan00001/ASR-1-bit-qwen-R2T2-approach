@@ -7,37 +7,28 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 15:40 IST)
+## Live status (updated 2026-10-11 21:30 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10860` | No-prefix streaming, **128-token budget**: pretrained + ternary + binary | pretrained done | **pretrained 2.54** (valid baseline) | **~40–60 m** |
-| `10865` | **Scaled streaming SFT**: full 28.5k cache, prefix + silence samples, 5000 steps | starting | — | **~1 h 20 m** |
-| `10844`/`10859` | No-prefix 32-token / prefix-SFT decisive test | done | ternary 33.58 / 33.26; prefix-SFT 952 (collapse) | — |
+| `10980` | Repetition controls on the scaled-SFT model (official algorithm) | penalty done; **ngram=4 running** | penalty 438.2 (worse); ngram pending | **~50 m** |
+| — | All training jobs | done | — | — |
 
-**Streaming 320 ms (50 utts):**
+**Streaming 320 ms (50 utts) — final picture:**
 
 | Variant | Pretrained | Ternary | Binary |
 |---|---:|---:|---:|
-| Official prefix algorithm | **2.33** | 1296 (collapse) | — |
-| + prefix-SFT (1 500 steps) | — | 952 (collapse) | — |
+| Official prefix algorithm | **2.33** | collapse 1296 → 952 (short SFT) → **203.5** (scaled SFT) | — |
+| Official + repetition_penalty=1.3 | — | 438.2 (worse) | — |
 | No-prefix re-feed, 32 tokens | 19.28 | 33.58 | 33.26 |
-| **No-prefix re-feed, 128 tokens** | **2.54** | **9.43** (CER 3.86) | running |
+| **No-prefix re-feed, 128 tokens (reported)** | **2.54** | **9.43** | — |
 
-**The 128-token chunked re-feed is the current valid streaming evaluation:**
-with a sufficient token budget the variant fixes its truncation problem
-(pretrained 19.28 → 2.54) and the ternary model scores **9.43** — essentially
-its offline quality (9.2), i.e. **+6.9 absolute vs the same-variant pretrained
-baseline**. RTF is high (~9.7) because every chunk regenerates the full
-transcript; the official-algorithm efficiency returns once prefix continuation
-is trained (scaled streaming SFT `10865` running).
+**Offline (50-utt test-clean; fp16 baseline 2.44):** ternary **9.2** (best 9.1);
+binary **10.7**; ternary+streaming-SFT ~12.
 
-**Best offline (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
-
-| Configuration | WER |
-|---|---|
-| Ternary, all 196 decoder projections (8k, long2) | **9.2** (best 9.1) |
-| Binary, all 196 decoder projections (8k, long3) | **10.7** |
+**Conclusion:** the official prefix algorithm needs research-grade Stage 4 work
+(on-policy streaming SFT / LSP emission); the chunked re-feed variant (9.43 vs
+2.54) is the reported streaming metric.
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
