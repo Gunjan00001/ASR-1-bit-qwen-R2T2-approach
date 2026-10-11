@@ -675,17 +675,17 @@ restarts at 0).
   by repetition loops ("ILLILL…", "HIS HIS…", "STANDSTAND…") that never stop —
   the model completes the text but does not terminate.
 - **Repetition controls (`10980`):** `repetition_penalty=1.3` → WER **438.2**
-  (worse; penalizes legitimate repeats). `no_repeat_ngram_size=4` did not
-  complete within the job walltime (generations remain long), so no number —
-  but the mechanism is the same and the penalty result already shows inference
-  controls are not the fix.
+  (worse; penalizes legitimate repeats). `no_repeat_ngram_size=4` → WER
+  **264.5** (also worse; new loop patterns). **Both inference controls fail** —
+  the collapse is a training-side problem.
 - **Conclusion:** the official prefix-continuation algorithm needs
   research-grade Stage 4 work (on-policy streaming SFT / LSP emission), not a
   simple SFT add-on or inference trick. The **chunked re-feed variant
-  (9.43 ternary / 2.54 pretrained) is the reported streaming metric** until
-  then.
+  (ternary 9.43 / binary 10.28 vs pretrained 2.54) is the reported streaming
+  metric** until then.
 - **Evidence:** `artifacts/stage1/streaming_ternary_sft_quantized.json`,
-  `streaming_sft_reppen13.json`, `eval_streaming_reppen.log`.
+  `streaming_sft_reppen13.json`, `streaming_sft_ngram4.json`,
+  `eval_streaming_reppen.log`.
 
 ### 22:55 — Session close-out: final numbers and handoff
 
@@ -695,28 +695,32 @@ restarts at 0).
 |---|---|
 | Ternary, all 196 decoder projections (8k, long2) | **9.2** (best 9.1) |
 | Binary, all 196 decoder projections (8k, long3) | **10.7** |
-| Ternary + streaming SFT | ~12 |
+| Ternary + short prefix-SFT | 11.0 |
+| Ternary + scaled streaming SFT | 11.7 |
 
 **Streaming 320 ms (50 utts):**
 
-| Variant | Pretrained | Ternary |
-|---|---:|---:|
-| Official prefix algorithm | 2.33 | collapse (203.5 after scaled SFT) |
-| **Chunked re-feed, no-prefix, 128 tokens (reported)** | **2.54** | **9.43** |
+| Variant | Pretrained | Ternary | Binary |
+|---|---:|---:|---:|
+| Official prefix algorithm | 2.33 | collapse (1296 → 952 → **203.5** after scaled SFT) | — |
+| Official + repetition_penalty 1.3 | — | 438.2 | — |
+| Official + no_repeat_ngram 4 | — | 264.5 | — |
+| **Chunked re-feed, no-prefix, 128 tokens (reported)** | **2.54** | **9.43** | **10.28** |
 
-**Handoff — next work packages (in order):**
-1. **On-policy streaming SFT**: build prefix-continuation samples from the
-   model's *own* partial generations (not gold transcripts) so training matches
-   the inference distribution; blend ≥50 % standard samples to protect offline
-   quality. Re-test the official algorithm.
-2. **LSP emission policy** (Stage 4/T4.4): explicit stable-prefix commit and
-   stop handling; the plan's designated fix for the official algorithm.
-3. **Stage 3 scale-up to 1.7B** with the established recipe (checkpoint/resume
-   ready).
-4. **Full evaluation matrix** (chunk sizes 160/320/1000 ms, clean/other) and
-   the final writeup.
+**Handoff:** see `docs/HANDOFF.md` (start-here guide for the next agent),
+`docs/GPU_ACCESS.md` (cluster access), and the work packages below.
 
-**Assets left on disk:** caches (4 k / 8 k / 28.5 k utterances), ~15 QAT
+**Next work packages (in order):**
+1. **On-policy streaming SFT**: prefix-continuation samples from the model's
+   *own* partial generations, blended ≥50 % standard samples. Re-test the
+   official algorithm.
+2. **LSP emission policy** (Stage 4/T4.4): stable-prefix commit + stop handling.
+3. **Offline scale-up** on the full 28.5 k cache (built, 100.6 h).
+4. **`test-other`** evaluation for the clean/other pair.
+5. **fp16 shadow-drift** trust-region fix.
+6. **Stage 3 scale-up to 1.7B**, then the full evaluation matrix + writeup.
+
+**Assets left on disk:** caches (4 k / 8 k / 28.5 k utterances), 22 QAT
 checkpoints (`data/checkpoints/`), all artifacts under `artifacts/stage1/`,
-figures in `docs/figures/`. Everything is committed and pushed (`stage-1`, tags
-through `0.2.39`).
+figures in `docs/figures/`. Everything is committed and pushed (`stage-1`,
+tags through `0.2.39`).

@@ -67,8 +67,9 @@ Measured on the same 50-utt sample, 320 ms chunks:
 | Same + short prefix-SFT (1 500 steps) | — | collapse (952) | — |
 | Same + **scaled streaming SFT** (5 000 steps, full cache, prefix+silence) | — | **203.5** (still loops) | — |
 | Same + repetition_penalty=1.3 | — | 438.2 (worse) | — |
+| Same + no_repeat_ngram_size=4 | — | 264.5 (worse) | — |
 | No-prefix re-feed (`unfixed_token_num=9999`, 32 tokens) | 19.28 | 33.58 | 33.26 |
-| **No-prefix re-feed, 128-token budget** | **2.54** | **9.43** (CER 3.86) | running |
+| **No-prefix re-feed, 128-token budget** | **2.54** | **9.43** (CER 3.86) | **10.28** (CER 4.52) |
 
 **Root causes (per-chunk traces, `scripts/diag_stream_generation.py`):**
 
@@ -87,18 +88,19 @@ Measured on the same 50-utt sample, 320 ms chunks:
 
 - The quantized models are **offline-strong** (9.2 / 10.7). Under the **valid
   chunked re-feed evaluation** (no-prefix, 128-token budget), ternary scores
-  **9.43 WER** — essentially its offline quality — with a **+6.9 gap** to the
-  same-variant pretrained baseline (2.54). This is the current streaming result.
+  **9.43** and binary **10.28** WER — essentially their offline quality — with
+  a **+6.9 / +7.7 gap** to the same-variant pretrained baseline (2.54). This is
+  the current streaming result.
 - The **official prefix algorithm** remains broken for QAT models: even after a
   scaled streaming SFT (5 000 steps, full cache, prefix + silence samples) the
   WER is 203.5 — the transcripts are largely correct but the model then falls
   into repetition loops and never stops. Inference controls do not fix it
-  (repetition_penalty=1.3: 438.2, worse).
+  (repetition_penalty=1.3: 438.2; no_repeat_ngram_size=4: 264.5 — both worse).
 - The official algorithm's prefix-continuation requirement is a **research-grade
   Stage 4 item**: it needs on-policy streaming training (train on the model's
   own partial generations) and/or the LSP emission policy, not a simple SFT
-  add-on. Until then, the chunked re-feed variant (9.43, RTF ~9.7) is the
-  reported streaming number.
+  add-on. Until then, the chunked re-feed variant (9.43 / 10.28, RTF ~10) is
+  the reported streaming number.
 
 ---
 

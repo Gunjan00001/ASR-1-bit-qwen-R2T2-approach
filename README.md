@@ -23,18 +23,21 @@ implemented and tested (203 tests); loss controllability proven (ternary QAT
 memorizes exactly). A working recovery recipe was found and scaled up on the
 A100 cluster:
 
-| Configuration (50-utt `test-clean`, offline) | WER |
+| Configuration (50-utt `test-clean`) | WER |
 |---|---:|
 | fp16 pretrained reference | **2.44** |
-| Ternary, all 196 decoder projections (8k data) | **9.2** (best 9.1) |
-| Binary, all 196 decoder projections (8k data) | **10.7** |
+| Ternary, all 196 decoder projections (8k data, offline) | **9.2** (best 9.1) |
+| Binary, all 196 decoder projections (8k data, offline) | **10.7** |
+| Streaming 320 ms, chunked re-feed (ternary / binary) | **9.43 / 10.28** |
 | Naive QAT (for comparison) | ~100 |
 
 ![WER trajectories](docs/figures/wer_trajectories.png)
 
 Full report, graphs and the future plan: **[`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)**.
-Operating rules for agents/developers: [`rules.md`](rules.md); step-by-step work
-log: [`docs/ACTIVITY_LOG.md`](docs/ACTIVITY_LOG.md).
+**Next agent: start with [`docs/HANDOFF.md`](docs/HANDOFF.md)** (state, recipe,
+what's left, pitfalls) and [`docs/GPU_ACCESS.md`](docs/GPU_ACCESS.md) (cluster
+access). Operating rules: [`rules.md`](rules.md); step-by-step work log:
+[`docs/ACTIVITY_LOG.md`](docs/ACTIVITY_LOG.md).
 
 ## Development
 

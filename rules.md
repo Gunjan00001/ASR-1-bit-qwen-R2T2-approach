@@ -65,6 +65,8 @@ agreed; keep the numbering stable.
 
 ## R6 — Environment gotchas (verified on `jiit-gpu01`)
 
+Full guide: **`docs/GPU_ACCESS.md`**.
+
 - Driver 525 / CUDA 12.3 → only `+cu126` torch builds work.
 - Stage conda/model/data on node-local `/tmp/asr1bit` for speed; the shared
   BeeGFS filesystem stalls under heavy multi-job load.
@@ -72,8 +74,13 @@ agreed; keep the numbering stable.
   `scripts/install_fast_tokenizer.py` into the model directory or every process
   pays a multi-minute slow-tokenizer rebuild (looks like a hang).
 - `datasets>=5` requires `numpy>=2`.
-- GPU work from the login node is impossible (no driver); use the persistent
-  session (`gpu-send`) or batch jobs.
+- GPU work from the login node is impossible (no driver). **Batch jobs
+  (`qsub scripts/*.pbs`) are the reliable path.** The persistent `gpu-send`
+  session is currently **dead** (its job is no longer in the queue) — restart
+  with `gpu-session reset && gpu-session start && gpu-session wait` if you want
+  interactive probes, and never load models in it (32 GB cgroup, silent OOM).
+- GPU selection is dynamic in every launcher; override with
+  `qsub -v QAT_GPU=<i>` (training) or `-v EVAL_GPU=<i>` (evaluation).
 
 ## R7 — Project conventions
 
