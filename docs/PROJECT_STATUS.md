@@ -20,11 +20,11 @@
   audit: per-tensor binary error 0.648 ≈ the Gaussian closed form 0.60).
 - **A working recovery recipe was found (Stage 2a/2b) and scaled up on 8k data:**
   FFN warm start → attention rollout with a **frozen pretrained-teacher anchor**
-  → warm-restart cosine; binary via **progressive precision**.
-  - **Ternary, all 196 decoder projections: 11.4 final / 10.6 best WER**
-  - **Binary, all 196 decoder projections: 12.9 WER**
+  → repeated warm-restart cosine cycles; binary via **progressive precision**.
+  - **Ternary, all 196 decoder projections: 9.2 final / 9.1 best WER**
+  - **Binary, all 196 decoder projections: 10.7 WER**
   - (fp16 pretrained reference on the same 50-utt sample: **2.44**)
-  - The binary long run is being continued (from 12.9) to push lower.
+  - Both are still improving with each continuation round (round 4 running).
 
 ---
 
@@ -44,6 +44,8 @@ number on a ternary-trained row is a readout only (not a trained binary model).
 | Stage 2b attn+FFN binary (4k data) | 2 000 | 99.8 | 30.5 | 17.5 |
 | **Ternary long (8k data)** | 8 000 | 50.7 | **11.4 (best 10.6)** | 100.0 |
 | **Binary long (8k data)** | 6 000 | 37.2 | 21.3 | **12.9** |
+| **Ternary long2 (8k, lr 1e-5)** | 4 000 | 37.7 | **9.2 (best 9.1)** | 100.4 |
+| **Binary long3 (8k, lr 5e-6)** | 3 000 | 31.7 | 22.4 | **10.7** |
 | Zero-shot naive (no training) | 0 | — | ~100 | ~100 |
 
 *Primary metric note:* the Stage 0 gate is defined on **streaming 320 ms**

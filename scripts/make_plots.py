@@ -67,6 +67,8 @@ def fig_wer_trajectories() -> dict:
         "Stage 2b attn+FFN rollout (binary)": ("qat_binary_rollout", "binary_wer", "#2ca02c", "-"),
         "Ternary long (8k data, 8000 steps)": ("qat_ternary_long", "ternary_wer", "#9467bd", "-"),
         "Binary long (8k data, 6000 steps)": ("qat_binary_long", "binary_wer", "#8c564b", "-"),
+        "Ternary long2 (8k, lr 1e-5)": ("qat_ternary_long2", "ternary_wer", "#e377c2", "-"),
+        "Binary long3 (8k, lr 5e-6)": ("qat_binary_long3", "binary_wer", "#7f7f7f", "-"),
     }
     ffn_resume = ("qat_ternary_ffn_resume", "ternary_wer", "#ff7f0e")
 
@@ -117,6 +119,8 @@ def fig_final_wer() -> dict:
         "Stage 2b attn+FFN\n(binary, 4k)": {"ternary": 30.51, "binary": 17.48},
         "Ternary long\n(8k, 8000 steps)": {"ternary": 11.44, "binary": 100.0},
         "Binary long\n(8k, 6000 steps)": {"ternary": 21.29, "binary": 12.92},
+        "Ternary long2\n(8k, 4000 steps)": {"ternary": 9.22, "binary": 100.42},
+        "Binary long3\n(8k, 3000 steps)": {"ternary": 22.35, "binary": 10.70},
     }
     labels = list(finals)
     ternary = [finals[k].get("ternary", 0) for k in labels]

@@ -7,38 +7,34 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 05:20 IST)
+## Live status (updated 2026-10-11 05:55 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `10813` | **Ternary long2**: from 11.4, lr 1e-5, 4000 steps (GPU 6) | step ~3500/4000 @ ~90/min | 10.4 @2000 → 9.7 @2500 → **9.6 @3000** | **~20 m** |
-| `10821` | **Streaming 320 ms eval** (primary metric, GPU 7 pinned) | running | first WER pending | **~1–2 h** |
-| `10815` | **Binary long3** | **done** | **10.7 final** (CER 4.6), fp16 31.7 | — |
-| `10812` | persistent GPU session (new) | — | — | — |
+| `10826` | **Ternary long3**: from 9.2, lr 5e-6, 3000 steps (GPU 6) | starting | — | **~1 h 10 m** |
+| `10827` | **Binary long4**: from 10.7, lr 2.5e-6, 3000 steps (GPU 5) | starting | — | **~1 h 10 m** |
+| `10821` | **Streaming 320 ms eval** (primary metric, GPU 7) | running (~40 % of condition 1) | first WER pending | **~2–2.5 h** |
+| `10825` | persistent GPU session | — | — | — |
 
 **Best results (50-utt test-clean offline; fp16 baseline 2.44; naive ≈ 100):**
 
 | Configuration | WER |
 |---|---|
-| Ternary, all 196 decoder projections (8k, long2) | **9.6** (in progress) |
+| Ternary, all 196 decoder projections (8k, long2) | **9.2** (best 9.1) |
 | Binary, all 196 decoder projections (8k, long3) | **10.7** |
-| Previous bests | ternary 10.6/11.4; binary 11.1 |
+| Previous bests | ternary 10.6/11.4; binary 11.1/12.9 |
 | FFN-only ternary | 25.7 best / 32.8 final |
 | Naive attn+FFN | ~98–108 |
 
-**Binary long3 trajectory:** 12.2 → 12.1 → 11.0 → 11.2 → 11.3 → 11.2 → **10.7**
-(final). The fp16 readout keeps improving with each continuation
-(99.8 → 37.2 → 36.2 → **31.7**) — shadow drift is being tamed.
+**Progression of the best numbers:** naive ~100 → 32.8 (FFN-only) → 16.2 → 11.4
+→ **9.2** ternary; binary 17.5 → 12.9 → 11.1 → **10.7**.
 
-**New:** streaming 320 ms evaluation (`scripts/eval_streaming.py`, job `10821`)
-on the binary long2 and ternary long checkpoints; fp16 and quantized readouts on
-the same 50 utts → exact `+X` vs the Stage 0 fp16 streaming baselines
-(2.24 / 4.61). Pinned to GPU 7 via `EVAL_GPU` (the utilization-based picker is
-noisy; 3-sample averaging added).
+**fp16 shadow drift keeps shrinking with each continuation**
+(ternary long2: 37.7; binary long3: 31.7) — lower lr + anchor tame it.
 
 **Reading the continuations:** a fresh cosine cycle perturbs the checkpoint for
 the first ~2 000 steps, then descends past the previous best as the LR decays.
-A gentler lr (1e-5) avoids most of the transient.
+Gentler lr (5e-6–1e-5) avoids most of the transient.
 
 **Session-cgroup rule:** never load model + checkpoint in the 32 GB interactive
 session (OOM kills silently). Batch jobs only (rules.md R5).
@@ -526,3 +522,19 @@ restarts at 0).
   (`10821`).
 - **Evidence:** `stage1_decoder_attn_ffn_bw1.0_gNone_lr5e-06_..._n8000.json`,
   `qat_ternary_long2.log`.
+
+### 05:50 — Ternary long2 final 9.2 (best 9.1); round-4 continuations launched
+
+- **Result (50-utt test-clean; pretrained 2.44):** ternary long2 (lr 1e-5,
+  4 000 steps) **9.2 final / 9.1 best**, CER 3.7, fp16 readout 37.7. The
+  trajectory: 11.1 → 14.9 → 11.5 → 10.4 → 9.7 → 9.1 → 9.2.
+- **Best numbers now:** ternary **9.2** (from 10.6), binary **10.7** (from
+  11.1). Overall progression: naive ~100 → 32.8 (FFN-only) → 16.2 → 11.4 →
+  **9.2** ternary; binary 17.5 → 12.9 → 11.1 → **10.7**.
+- **Launched round 4:** `10826` ternary long3 (from 9.2, lr 5e-6, 3 000 steps,
+  GPU 6) and `10827` binary long4 (from 10.7, lr 2.5e-6, 3 000 steps, GPU 5);
+  staggered submission avoided the GPU race this time.
+- **Docs/figures:** `make_plots.py` now includes long2/long3; figures and
+  `docs/PROJECT_STATUS.md` + README updated with the new bests.
+- **Evidence:** `stage1_decoder_attn_ffn_bw1.58_gNone_lr1e-05_..._n8000.json`,
+  `docs/figures/*.png`.

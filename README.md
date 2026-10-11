@@ -26,8 +26,8 @@ A100 cluster:
 | Configuration (50-utt `test-clean`, offline) | WER |
 |---|---:|
 | fp16 pretrained reference | **2.44** |
-| Ternary, all 196 decoder projections (8k data) | **11.4** (best 10.6) |
-| Binary, all 196 decoder projections (8k data) | **12.9** |
+| Ternary, all 196 decoder projections (8k data) | **9.2** (best 9.1) |
+| Binary, all 196 decoder projections (8k data) | **10.7** |
 | Naive QAT (for comparison) | ~100 |
 
 ![WER trajectories](docs/figures/wer_trajectories.png)
