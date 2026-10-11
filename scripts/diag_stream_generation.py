@@ -34,6 +34,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--bit-width", type=float, default=1.58)
     p.add_argument("--utterance", type=int, default=0)
     p.add_argument("--chunk-ms", type=int, default=320)
+    p.add_argument("--min-decode-sec", type=float, default=0.0,
+                   help="Skip decoding until the accumulated audio reaches this duration "
+                        "(warm-up skip for near-empty first chunks).")
     p.add_argument("--max-new-tokens", type=int, default=32)
     p.add_argument("--out", default=None)
     return p.parse_args()
@@ -65,6 +68,17 @@ def main() -> int:
     chunk_index = {"i": 0}
 
     def decode_fn(prompt: str, audio: np.ndarray) -> str:
+        if audio.shape[0] / 16000.0 < args.min_decode_sec:
+            traces.append({
+                "chunk": chunk_index["i"],
+                "audio_sec": round(float(audio.shape[0]) / 16000.0, 2),
+                "prompt_chars": len(prompt),
+                "generated_tokens": 0,
+                "eos": False,
+                "text": "<skipped: warm-up>",
+            })
+            chunk_index["i"] += 1
+            return ""
         inputs = processor(
             text=[prompt], audio=[np.asarray(audio, dtype=np.float32)],
             return_tensors="pt", padding=True,
