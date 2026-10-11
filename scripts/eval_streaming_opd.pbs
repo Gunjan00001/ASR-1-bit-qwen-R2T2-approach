@@ -24,9 +24,10 @@ export TOKENIZERS_PARALLELISM=false
 export HF_HOME=/tmp/asr1bit/hf
 CKPT="${CKPT:-data/checkpoints/qat_stream_opd/last.pt}"
 CFG="${CFG:-clean}"
+TAG="${TAG:-}"
 SUFFIX=""
 [ "$CFG" = "other" ] && SUFFIX="_other"
-LOG="artifacts/stage1/eval_streaming_opd${SUFFIX}.log"
+LOG="artifacts/stage1/eval_streaming_opd${TAG}${SUFFIX}.log"
 
 if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
   PY=/tmp/asr1bit/miniconda3/bin/python
@@ -50,7 +51,7 @@ PICK="${EVAL_GPU:-$PICK}"
 export CUDA_VISIBLE_DEVICES="$PICK"
 
 {
-  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | config $CFG | $(date) ==="
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | config $CFG | tag ${TAG:-none} | $(date) ==="
   nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
 } | tee "$LOG"
 
@@ -66,5 +67,5 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --unfixed-token-num 5 \
   --lsp-margin-words 3 \
   --conditions quantized \
-  --out "artifacts/stage1/streaming_opd${SUFFIX}_quantized.json" \
+  --out "artifacts/stage1/streaming_opd${TAG}${SUFFIX}_quantized.json" \
   2>&1 | tee -a "$LOG"

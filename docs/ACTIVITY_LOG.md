@@ -7,14 +7,30 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 03:45 IST)
+## Live status (updated 2026-10-12 04:15 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11040` | **WP1 — streaming-state distillation** (teacher rollout, ternary, init 9.2), GPU 1 | teacher rollout running (350 utts) | pending | rollout ~1 h + 4 000 steps ~2.5 h → ~03:45 + 3.5 h |
-| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training, ~12 steps/min | pending | walltime 06:20 IST (~step 5 500) → chain `qat_ternary_full2.pbs` |
+| `11042` | **WP1 — distillation v2** (metadata-stripped targets, lr 7e-6, 5 000 steps), GPU 1 | teacher rollout + training | pending | ~3 h |
+| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training, ~12 steps/min | ternary 10.70 @2000 (from 9.2; expected fresh-cycle dip) | walltime 06:20 IST → chain `qat_ternary_full2.pbs` |
 | — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — no GPU with ≥45 GB free | — | submit when a GPU frees |
 | — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after WP2 |
+
+**WP1 streaming results so far (official prefix algorithm, 50-utt test-clean,
+320 ms, 32 tokens):**
+
+| Recipe (all init from the 9.2 offline ternary) | Official-algorithm WER | RTF | Notes |
+|---|---:|---:|---|
+| Static prefix SFT (earlier session) | 203.5 | — | correct transcripts then loops |
+| On-policy SFT, student prefixes (DAgger) | **920.55** | 4.49 | loops **worse** (training fits its own loops back) |
+| Streaming-state distillation v1 (`language X<asr_text>` kept) | **448.31** | **1.76** | **learns to stop** (RTF halved, short outputs) but content collapses: empty + garbled hypotheses; offline oscillated 27–35 |
+| Streaming-state distillation v2 (metadata stripped, lr 7e-6) | running (`11042`) | — | format conflict fixed — the two halves of the mix no longer disagree |
+
+**Root cause of the v1 content collapse:** the teacher's targets were wrapped in
+`language English<asr_text>…` while the standard samples teach plain
+transcripts → the 50/50 mix taught contradictory output formats. v2 strips the
+wrapper from both the target and the recorded prompt (rollout unchanged; see
+`build_distill_examples(strip_metadata=True)`).
 
 **WP1 phase 1 verdict (2026-10-12 02:30–03:05 IST): negative — DAgger on the
 student's own prefixes poisons the model.**
@@ -23,8 +39,7 @@ student's own prefixes poisons the model.**
 |---|---|
 | Offline ternary (started 9.2) | 18.33 final (19.70 @1000 → 18.75 @2000 → 18.33 @3000) |
 | Offline fp16 readout / binary readout | 62.2 / 100.0 |
-| **Official prefix algorithm (32 tokens)** | **WER 920.55**, CER 1052.73, RTF 4.49 (previous static SFT: 203.5) |
-| LSP margin 3 (same run) | 64 revisions; committed@50 % 13.8 %, committed@80 % 25.9 % |
+| **Official prefix algorithm (32 tokens)** | **WER 920.55**, CER 1052.73, RTF 4.49 |
 
 - **What worked:** the warm-up EOS training — chunks 0-2 now emit EOS instead of
   `assistant\nassistant…` (`diag_opd_u0.json`).
@@ -35,10 +50,6 @@ student's own prefixes poisons the model.**
   (`WORDS WAS IT'S'T'T'T…`), so the training pairs were "(looping prefix) →
   reference remainder" — fitting them teaches the loops as plausible
   continuations. DAgger with a degenerate policy reinforces degeneracy.
-- **Replacement:** streaming-state distillation (`--op-distill`, job `11040`):
-  the frozen pretrained teacher (clean, EOS-terminated streaming policy)
-  generates the states and the student clones its continuations; non-EOS
-  (token-cap) generations are dropped. Phase-2 DAgger (`11038`) was killed.
 
 **Streaming 320 ms (50 utts) — final picture:**
 
@@ -840,3 +851,31 @@ tags through `0.2.39`).
   `eval_streaming_opd.log`, `diag_opd_*.json`,
   `stage1_decoder_attn_ffn_bw1.58_gNone_lr1e-05_adamw_delay_ls1_n2400.json`,
   `qat_stream_distill.log`.
+
+---
+
+### 04:15 — Distillation v1: stop behaviour learned (RTF 1.76) but content collapses (448.31) — format conflict fixed, v2 launched
+
+- **Did:** ran streaming-state distillation v1 (`11040`): the frozen pretrained
+  teacher drove the 350-utt rollout (3 min — short generations), 2 400 teacher
+  states + 2 400 standard samples, 4 000 steps at lr 1e-5 from the 9.2 base
+  (offline trajectory 33.58 @1000 → 35.81 @2000 → 26.59 @3000 → 32.52 @4000);
+  then the decisive eval (`11041`, tag `_distill`).
+- **Result:** official algorithm **WER 448.31** (vs 920.55 for DAgger, 203.5 for
+  the earlier static SFT), CER 432.32, **RTF 1.76** (was 4.49) — the model now
+  *stops* (short EOS-terminated generations) but the content collapses: empty
+  hypotheses and garbled continuations (e.g. "…THAT LIPHER O", "").
+  LSP: 331 revisions, committed@50 % 7.1 %.
+- **Root cause (found by inspection of the targets):** the teacher's outputs are
+  wrapped in `language English<asr_text>…`, the standard samples teach plain
+  transcripts — the 50/50 mix taught contradictory output formats, and the
+  student ended up in a confused middle (offline oscillated 27–35 all run).
+- **Fix:** `build_distill_examples(strip_metadata=True)` removes the wrapper from
+  the target and (relative to `prompt_raw`) from the recorded prompt; the
+  rollout keeps the teacher's natural prompts. Launched **v2** (`11042`):
+  metadata stripped, lr 7e-6, 5 000 steps (`scripts/qat_stream_distill2.pbs`,
+  checkpoint `data/checkpoints/qat_stream_distill2/`).
+- **ETA:** v2 ≈ 3 h (teacher rollout ~3 min + 5 000 steps).
+- **Evidence:** `artifacts/stage1/streaming_opd_distill_quantized.json`,
+  `eval_streaming_opd_distill.log`, `qat_stream_distill.log`,
+  `qat_stream_distill2.log`.

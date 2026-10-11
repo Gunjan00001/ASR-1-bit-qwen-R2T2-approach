@@ -1,0 +1,102 @@
+#!/bin/bash
+#PBS -N asr1bit-stream-distill2
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=48gb
+#PBS -l walltime=08:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/stream_distill2.out
+#
+# WP1 — streaming-state distillation, corrected format + gentler cycle.
+#
+# Run 1 (job 11040) learned the stop behaviour (RTF 1.76 vs 4.49) but content
+# collapsed: official-algorithm WER 448.31, with empty and garbled hypotheses.
+# Root cause: the teacher's `language X<asr_text>` wrapper was kept in the
+# distillation targets while the standard samples teach plain transcripts, so
+# the two halves of the mix contradicted each other (and the offline WER
+# oscillated 27-35 all run). `build_distill_examples` now strips the metadata
+# from the targets and from the recorded prompt (rollout unchanged).
+# This rerun also gentles the cycle (lr 7e-6, 5 000 steps) so the offline half
+# has time to anneal.
+# Init: best offline ternary (9.2). Submit: qsub scripts/qat_stream_distill2.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage1/qat_stream_distill2.log"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-0.6B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
+else
+  MODEL=Qwen/Qwen3-ASR-0.6B
+fi
+if [ -f /tmp/asr1bit/qat_clean_train.100_n8000.pt ]; then
+  CACHE=/tmp/asr1bit/qat_clean_train.100_n8000.pt
+else
+  CACHE="$ROOT/data/qat_clean_train.100_n8000.pt"
+fi
+
+PICK=$(for _ in 1 2 3; do
+  nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits
+  sleep 1
+done | awk -F', ' '$2 < 45000 {u[$1]+=$3; m[$1]=$2} END {for (g in u) print u[g], m[g], g}' \
+  | sort -n | head -1 | awk '{print $3}')
+[ -z "$PICK" ] && PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
+  | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
+PICK="${QAT_GPU:-$PICK}"
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | cache $CACHE | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+"$PY" scripts/run_stage1_qat.py \
+  --model "$MODEL" \
+  --policy decoder_attn_ffn \
+  --bit-width 1.58 \
+  --learnable-scale 1 \
+  --init-from data/checkpoints/qat_ternary_long2/last.pt \
+  --op-rollout 1 \
+  --op-distill 1 \
+  --op-rollout-n 350 \
+  --op-batch-size 6 \
+  --op-max-new-tokens 32 \
+  --op-chunk-ms 320 \
+  --op-chunk-stride 3 \
+  --op-max-rounds 16 \
+  --op-max-samples 2400 \
+  --op-mix-frac 0.5 \
+  --op-refresh-every 0 \
+  --steps 5000 \
+  --train-cache "$CACHE" \
+  --train-n 2400 \
+  --eval-n 50 \
+  --eval-every 1000 \
+  --eval-both 0 \
+  --eval-fp16 1 \
+  --lr 7e-6 \
+  --warmup-steps 100 \
+  --lr-schedule cosine \
+  --batch-size 2 \
+  --max-new-tokens 128 \
+  --alpha-mode delay \
+  --alpha-warmup-frac 0.02 \
+  --distill-weight 0.05 \
+  --distill-temp 2.0 \
+  --frozen-teacher 1 \
+  --lazy-collate 1 \
+  --save-dir data/checkpoints/qat_stream_distill2 \
+  --save-every 500 \
+  --out artifacts/stage1 \
+  2>&1 | tee -a "$LOG"
