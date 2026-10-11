@@ -64,7 +64,9 @@ Measured on the same 50-utt sample, 320 ms chunks:
 | Variant | Pretrained fp16 | Ternary QAT (offline 9.2) | Binary QAT (offline 10.7) |
 |---|---:|---:|---:|
 | **Official prefix algorithm** (`unfixed_token_num=5`) | **2.33** | **collapse (1296)** | — |
-| Same + prefix-continuation SFT (1 500 steps) | — | **collapse (952)** | — |
+| Same + short prefix-SFT (1 500 steps) | — | collapse (952) | — |
+| Same + **scaled streaming SFT** (5 000 steps, full cache, prefix+silence) | — | **203.5** (still loops) | — |
+| Same + repetition_penalty=1.3 | — | 438.2 (worse) | — |
 | No-prefix re-feed (`unfixed_token_num=9999`, 32 tokens) | 19.28 | 33.58 | 33.26 |
 | **No-prefix re-feed, 128-token budget** | **2.54** | **9.43** (CER 3.86) | running |
 
@@ -86,14 +88,17 @@ Measured on the same 50-utt sample, 320 ms chunks:
 - The quantized models are **offline-strong** (9.2 / 10.7). Under the **valid
   chunked re-feed evaluation** (no-prefix, 128-token budget), ternary scores
   **9.43 WER** — essentially its offline quality — with a **+6.9 gap** to the
-  same-variant pretrained baseline (2.54). RTF is high (~9.7) because every
-  chunk regenerates the full transcript.
-- The **official prefix algorithm** requires prefix-continuation training; a
-  short prefix-SFT reduced but did not fix the collapse (1296 → 952). A scaled
-  streaming SFT (full 28.5 k cache, prefix + silence samples) is running and
-  will be re-tested with the official algorithm.
-- The no-prefix re-feed is the current stopgap for reporting streaming numbers;
-  the target remains the official algorithm at single-digit WER with normal RTF.
+  same-variant pretrained baseline (2.54). This is the current streaming result.
+- The **official prefix algorithm** remains broken for QAT models: even after a
+  scaled streaming SFT (5 000 steps, full cache, prefix + silence samples) the
+  WER is 203.5 — the transcripts are largely correct but the model then falls
+  into repetition loops and never stops. Inference controls do not fix it
+  (repetition_penalty=1.3: 438.2, worse).
+- The official algorithm's prefix-continuation requirement is a **research-grade
+  Stage 4 item**: it needs on-policy streaming training (train on the model's
+  own partial generations) and/or the LSP emission policy, not a simple SFT
+  add-on. Until then, the chunked re-feed variant (9.43, RTF ~9.7) is the
+  reported streaming number.
 
 ---
 
@@ -223,16 +228,20 @@ python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_f
 ## Future plan
 
 **Streaming robustness (the critical path — Stage 4 brought forward)**
-1. The quantized models are offline-strong (9.2 / 10.7) but collapse under the
-   official prefix-continuation streaming algorithm. A 1 500-step prefix-SFT
-   reduced but did not fix it (1296 → 952).
-2. Next: **proper streaming SFT at scale** — prefix-continuation samples on the
-   full 28.5 k `train-clean-100` cache (100.6 h, built), blended with the
-   standard objective, longer training (5–10 k steps), low lr + anchor.
-3. Then re-run the official-algorithm streaming evaluation; target a
-   single-digit streaming WER (pretrained baseline: 2.33 on 50 utts).
-4. If prefix continuation remains unstable, evaluate the LSP (stable-prefix)
-   emission policy (Stage 4 / T4.4) which is the plan's designated fix.
+1. The quantized models are offline-strong (9.2 / 10.7). The **valid streaming
+   number is 9.43** (ternary) under the chunked re-feed variant (no-prefix,
+   128-token budget; pretrained 2.54 → **+6.9**).
+2. The **official prefix algorithm** remains broken despite a scaled streaming
+   SFT (203.5 WER; correct transcripts followed by repetition loops). Inference
+   controls do not fix it (repetition_penalty made it worse: 438).
+3. Next for the official algorithm — research-grade work:
+   - **on-policy streaming SFT**: build prefixes from the model's *own*
+     generations (not gold transcripts), so training matches the inference
+     distribution;
+   - **LSP emission policy** (Stage 4 / T4.4) with explicit stop handling;
+   - longer streaming SFT (10–20 k steps) with a balanced mix (keep ≥50 %
+     standard samples to limit the offline cost, currently ~3 points).
+4. Interim reporting uses the chunked re-feed number (9.43, RTF ~9.7).
 
 **Stage 2 — accuracy recovery (offline, done for now)**
 5. Ternary 9.2 / binary 10.7 offline; continuation rounds plateaued on 8k data.

@@ -676,3 +676,19 @@ restarts at 0).
   still collapses, the LSP emission policy (Stage 4 / T4.4) is the next lever.
 - **Evidence:** `data/checkpoints/qat_stream_sft/last.pt`,
   `qat_stream_sft.log`.
+
+### 20:10 — Official-algorithm tests: scaled SFT 203.5; repetition controls fail
+
+- **Scaled streaming SFT + official prefix algorithm (`10875`):** WER **203.5**
+  (CER 865). Inspection shows the transcripts are **largely correct** followed
+  by repetition loops ("ILLILL…", "HIS HIS…", "STANDSTAND…") that never stop —
+  the model completes the text but does not terminate.
+- **Repetition controls (`10980`):** `repetition_penalty=1.3` → WER **438.2**
+  (worse; penalizes legitimate repeats). `no_repeat_ngram_size=4` still running.
+- **Conclusion:** the official prefix-continuation algorithm needs
+  research-grade Stage 4 work (on-policy streaming SFT / LSP emission), not a
+  simple SFT add-on or inference trick. The **chunked re-feed variant
+  (9.43 ternary / 2.54 pretrained) is the reported streaming metric** until
+  then.
+- **Evidence:** `artifacts/stage1/streaming_ternary_sft_quantized.json`,
+  `streaming_sft_reppen13.json`, `eval_streaming_reppen.log`.
