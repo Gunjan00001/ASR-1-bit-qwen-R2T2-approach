@@ -7,27 +7,31 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 23:45 IST)
+## Live status (updated 2026-10-12 00:40 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11030` | **WP1 phase 1** — on-policy streaming SFT (ternary, init 9.2), GPU 5 | rollout running (350 utts) | pending | rollout ~1 h, training 3 000 steps ~5 h → ~6 h total (8 h walltime) |
-| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training, ~12 steps/min | pending | 10 000 steps do **not** fit in 8 h at this rate → chain `qat_ternary_full2.pbs` (`--resume`, advances the cosine) |
+| `11030` | **WP1 phase 1** — on-policy streaming SFT (ternary, init 9.2), GPU 5 | **rollout done** — `on-policy rollout: 2400 examples | mix 4800 (2400 standard + 2400 on-policy)`; training step ~270 at **~34 steps/min** | pending | step 3000 at ~02:00 IST (+ final ablations) |
+| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training, ~12 steps/min | pending | 10 000 steps do **not** fit in 8 h at this rate (~step 5 500 at the walltime) → chain `qat_ternary_full2.pbs` (`--resume`, advances the cosine) |
 | `11027` | *(other project — `scenediff`, same account)* | — | — | — |
-| — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — no GPU with ≥45 GB free (all others 60-80 GB used) | — | submit when a GPU frees |
+| — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — no GPU with ≥45 GB free | — | submit when a GPU frees |
 | — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after WP2 |
 
-**Restart note:** the first WP1 submission (`11020`) was killed after 49 min — its
-700-utterance rollout ran at ~460 s/round (~2.5 h for 16 rounds), which would
-have left only ~3 h for training. Resubmitted as `11030` with 350 rollout
-utterances (≈2 800 kept states — still enough for the 2 400 pool) and an 8 h
-walltime, so the full 3 000-step cosine fits. The GPU picker then found GPU 5
-with ~60 GB free.
+**WP1 rollout outcome (validated):** the batched replay of the official algorithm
+produced exactly the planned mix — 2 400 on-policy states from 350 utterances
+(≈8 kept states/utt: warm-up chunks + stride + last round) capped to the 2 400
+pool, interleaved 50/50 with the 2 400 standard samples. GPU 5 was far less
+contended than GPU 2: the on-policy training ran at ~34 steps/min (vs ~12 for
+WP2's batch-2 jobs), so the full 3 000-step cosine fits the 8 h window.
 
-**Contention note:** all 8 A100s were 70–100 % utilized by other users at
-submit time, so measured rates are ~6–9× below the usual (10–12 steps/min vs
-~90 steps/min at batch 2) — plan chained `--resume` continuations, not
-single-job walltimes.
+**Restart note:** the first WP1 submission (`11020`) was killed after 49 min —
+its 700-utterance rollout ran at ~460 s/round (~2.5 h for 16 rounds) and would
+have left too little walltime for training. Resubmitted as `11030` with 350
+rollout utterances and an 8 h walltime.
+
+**Contention note:** most A100s were 70–100 % utilized by other users at submit
+time (measured 10–12 steps/min vs ~90 steps/min historically) — plan chained
+`--resume` continuations where the schedule does not fit one walltime.
 
 **Streaming 320 ms (50 utts) — final picture:**
 
