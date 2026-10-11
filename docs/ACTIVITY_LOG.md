@@ -7,13 +7,19 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 22:25 IST)
+## Live status (updated 2026-10-11 22:40 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11020` | **WP1 phase 1** — on-policy streaming SFT (ternary, init 9.2), GPU 1 | on-policy rollout running | pending | ~2 h total |
-| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | loading cache | pending | ~3 h |
-| — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — no GPU with ≥35 GB free at submit time | — | when a GPU frees |
+| `11020` | **WP1 phase 1** — on-policy streaming SFT (ternary, init 9.2), GPU 1 | on-policy rollout running (~17 decode calls/min) | pending | rollout ~1.5–2.5 h, then 3 000 steps (~5 h at the current contention) — chain `qat_stream_opd_ext.pbs` (`--resume`) if the walltime cuts it |
+| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training, ~10 steps/min | pending | 10 000 steps do **not** fit in 8 h at this rate → chain `qat_ternary_full2.pbs` (`--resume`, advances the cosine) |
+| — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — every GPU was ≥49 GB used by other users; all 8 at 70–100 % utilization | — | submit when a GPU frees |
+| — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after WP2 |
+
+**Contention note:** all 8 A100s were 70–100 % utilized by other users at
+submit time, so measured rates are ~6–9× below the usual (10 steps/min vs
+~90 steps/min at batch 2) — plan chained `--resume` continuations, not
+single-job walltimes.
 
 **Streaming 320 ms (50 utts) — final picture:**
 

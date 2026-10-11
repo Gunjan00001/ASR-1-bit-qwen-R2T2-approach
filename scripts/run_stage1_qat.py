@@ -206,9 +206,9 @@ def rollout_onpolicy_examples(
     started = time.perf_counter()
 
     def progress(done: int, total: int) -> None:
-        if done == total or done % 50 == 0:
+        if done == total or (done > 0 and done % 50 == 0):
             elapsed = time.perf_counter() - started
-            eta = elapsed / max(1, done) * (total - done)
+            eta = elapsed / done * (total - done)
             print(
                 f"rollout {done}/{total} utts ({elapsed:.0f}s elapsed, ~{eta:.0f}s left)",
                 flush=True,
