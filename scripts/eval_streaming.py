@@ -46,6 +46,10 @@ def parse_args() -> argparse.Namespace:
                    help="Tokens rolled back for the prefix continuation. Large values (e.g. "
                         "9999) disable the prefix — required for QAT models, which were never "
                         "trained to continue partial text (see docs/ACTIVITY_LOG.md).")
+    p.add_argument("--repetition-penalty", type=float, default=None,
+                   help="generate() repetition penalty (breaks streaming repetition loops).")
+    p.add_argument("--no-repeat-ngram", type=int, default=None,
+                   help="generate() no_repeat_ngram_size (breaks streaming repetition loops).")
     p.add_argument("--out", default=None)
     return p.parse_args()
 
@@ -78,6 +82,12 @@ def main() -> int:
         "conditions": {},
     }
     wanted = {name.strip() for name in args.conditions.split(",") if name.strip()}
+    generate_kwargs: dict = {}
+    if args.repetition_penalty:
+        generate_kwargs["repetition_penalty"] = args.repetition_penalty
+    if args.no_repeat_ngram:
+        generate_kwargs["no_repeat_ngram_size"] = args.no_repeat_ngram
+    results["generate_kwargs"] = generate_kwargs
     with torch.no_grad():
         for alpha, name in ((0.0, "fp16"), (1.0, "quantized")):
             if name not in wanted:
@@ -93,6 +103,7 @@ def main() -> int:
                     chunk_size_sec=args.chunk_ms / 1000.0,
                     step_sec=args.chunk_ms / 1000.0,
                     unfixed_token_num=args.unfixed_token_num,
+                    generate_kwargs=generate_kwargs or None,
                 )
                 refs.append(utt.text)
                 hyps.append(trace.text)

@@ -136,8 +136,15 @@ def offline_transcribe(
     return results[0].text
 
 
-def build_transformers_decode_fn(model: Any, max_new_tokens: int | None = None) -> Callable[[str, np.ndarray], str]:
-    """Build a ``decode_fn(prompt, audio) -> continuation`` for the transformers backend."""
+def build_transformers_decode_fn(
+    model: Any, max_new_tokens: int | None = None, **generate_kwargs: Any
+) -> Callable[[str, np.ndarray], str]:
+    """Build a ``decode_fn(prompt, audio) -> continuation`` for the transformers backend.
+
+    ``generate_kwargs`` are forwarded to ``generate`` (e.g.
+    ``repetition_penalty=1.3`` or ``no_repeat_ngram_size=4`` to break
+    repetition loops in streaming).
+    """
     inner = model.model
     processor = model.processor
     limit = max_new_tokens if max_new_tokens is not None else getattr(model, "max_new_tokens", 512)
@@ -150,7 +157,7 @@ def build_transformers_decode_fn(model: Any, max_new_tokens: int | None = None) 
             padding=True,
         )
         inputs = inputs.to(inner.device).to(inner.dtype)
-        generated = inner.generate(**inputs, max_new_tokens=limit)
+        generated = inner.generate(**inputs, max_new_tokens=limit, **generate_kwargs)
         prompt_len = inputs["input_ids"].shape[1]
         decoded = processor.batch_decode(
             generated.sequences[:, prompt_len:],
@@ -218,10 +225,15 @@ def stream_transcribe_portable(
     unfixed_chunk_num: int = 2,
     unfixed_token_num: int = 5,
     language: str | None = None,
+    generate_kwargs: dict[str, Any] | None = None,
 ) -> StreamTrace:
-    """Stream with :class:`ChunkedStreamer` over the transformers backend."""
+    """Stream with :class:`ChunkedStreamer` over the transformers backend.
+
+    ``generate_kwargs`` are forwarded to the underlying ``generate`` calls
+    (e.g. repetition controls for models that loop on self-prefixes).
+    """
     audio = np.asarray(audio, dtype=np.float32)
-    base_decode = build_transformers_decode_fn(model)
+    base_decode = build_transformers_decode_fn(model, **(generate_kwargs or {}))
     durations: list[float] = []
 
     def timed_decode(prompt: str, accumulated: np.ndarray) -> str:
