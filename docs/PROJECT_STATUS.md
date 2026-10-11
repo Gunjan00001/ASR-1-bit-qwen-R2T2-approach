@@ -65,8 +65,8 @@ Measured on the same 50-utt sample, 320 ms chunks:
 |---|---:|---:|---:|
 | **Official prefix algorithm** (`unfixed_token_num=5`) | **2.33** | **collapse (1296)** | — |
 | Same + prefix-continuation SFT (1 500 steps) | — | **collapse (952)** | — |
-| **No-prefix re-feed** (`unfixed_token_num=9999`, 32 tokens) | 19.28 | **33.58** | **33.26** |
-| No-prefix re-feed, 128-token budget | running | running | running |
+| No-prefix re-feed (`unfixed_token_num=9999`, 32 tokens) | 19.28 | 33.58 | 33.26 |
+| **No-prefix re-feed, 128-token budget** | **2.54** | **9.43** (CER 3.86) | running |
 
 **Root causes (per-chunk traces, `scripts/diag_stream_generation.py`):**
 
@@ -83,15 +83,17 @@ Measured on the same 50-utt sample, 320 ms chunks:
 
 **What this means:**
 
-- The quantized models are **offline-strong** (9.2 / 10.7) but **not
-  streaming-robust** under the official algorithm.
-- The **no-prefix re-feed variant** (regenerate the full transcript per chunk)
-  gives usable numbers — ternary 33.6 / binary 33.3 vs the same-variant
-  pretrained 19.3 — at the cost of a degraded baseline (truncation) and higher
-  RTF (~4).
-- Fixing the official algorithm is **Stage 4 work** (streaming SFT at scale with
-  stable-prefix/LSP targets), exactly as the plan anticipated. The full 28.5 k
-  `train-clean-100` cache (100.6 h) is built and ready for that phase.
+- The quantized models are **offline-strong** (9.2 / 10.7). Under the **valid
+  chunked re-feed evaluation** (no-prefix, 128-token budget), ternary scores
+  **9.43 WER** — essentially its offline quality — with a **+6.9 gap** to the
+  same-variant pretrained baseline (2.54). RTF is high (~9.7) because every
+  chunk regenerates the full transcript.
+- The **official prefix algorithm** requires prefix-continuation training; a
+  short prefix-SFT reduced but did not fix the collapse (1296 → 952). A scaled
+  streaming SFT (full 28.5 k cache, prefix + silence samples) is running and
+  will be re-tested with the official algorithm.
+- The no-prefix re-feed is the current stopgap for reporting streaming numbers;
+  the target remains the official algorithm at single-digit WER with normal RTF.
 
 ---
 

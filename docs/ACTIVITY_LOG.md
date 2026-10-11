@@ -22,13 +22,15 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 | Official prefix algorithm | **2.33** | 1296 (collapse) | — |
 | + prefix-SFT (1 500 steps) | — | 952 (collapse) | — |
 | No-prefix re-feed, 32 tokens | 19.28 | 33.58 | 33.26 |
-| No-prefix re-feed, **128 tokens** | **2.54** | running | running |
+| **No-prefix re-feed, 128 tokens** | **2.54** | **9.43** (CER 3.86) | running |
 
-The 128-token budget fixes the no-prefix variant's truncation (19.28 → 2.54 for
-the pretrained baseline), making it a valid streaming evaluation. The scaled
-streaming SFT (`10865`) adds prefix-continuation **and** near-empty-audio
-samples on the full cache to attack both collapse modes for the official
-algorithm.
+**The 128-token chunked re-feed is the current valid streaming evaluation:**
+with a sufficient token budget the variant fixes its truncation problem
+(pretrained 19.28 → 2.54) and the ternary model scores **9.43** — essentially
+its offline quality (9.2), i.e. **+6.9 absolute vs the same-variant pretrained
+baseline**. RTF is high (~9.7) because every chunk regenerates the full
+transcript; the official-algorithm efficiency returns once prefix continuation
+is trained (scaled streaming SFT `10865` running).
 
 **Best offline (50-utt test-clean; fp16 baseline 2.44; naive ≈ 100):**
 
@@ -641,3 +643,21 @@ restarts at 0).
   environment restarts; batch jobs and log files are the reliable interface.
 - **Evidence:** `artifacts/stage1/eval_streaming_noprefix128.log`,
   `qat_stream_sft.log`.
+
+### 17:05 — Valid streaming number: ternary 9.43 (pretrained 2.54, +6.9)
+
+- **Result (`10860`, no-prefix re-feed, 128-token budget, 50 utts, 320 ms):**
+  pretrained **2.54** (CER 0.79, RTF 3.37); ternary quantized **9.43**
+  (CER 3.86, RTF 9.72). The ternary streaming number essentially matches its
+  offline quality (9.2) — **+6.9 absolute** vs the same-variant baseline.
+- **Interpretation:** with a sufficient token budget, the chunked re-feed
+  evaluation is valid and our model streams at 9.4 WER. The cost is RTF
+  (~9.7) because every chunk regenerates the full transcript; restoring the
+  official prefix algorithm (normal RTF) is what the scaled streaming SFT
+  targets.
+- **Streaming SFT (`10865`)** is at step ~4 300/5 000 with offline recovering
+  (20.2 → 15.5 → 14.5 → 12.2 as the LR decays). Its official-algorithm test
+  runs next.
+- **Docs:** streaming tables in `docs/PROJECT_STATUS.md` and this log updated.
+- **Evidence:** `artifacts/stage1/streaming_ternary_noprefix128.json`,
+  `streaming_pretrained_noprefix128.json`.
