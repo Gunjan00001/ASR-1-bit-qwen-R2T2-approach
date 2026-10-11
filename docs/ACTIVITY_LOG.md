@@ -661,3 +661,18 @@ restarts at 0).
 - **Docs:** streaming tables in `docs/PROJECT_STATUS.md` and this log updated.
 - **Evidence:** `artifacts/stage1/streaming_ternary_noprefix128.json`,
   `streaming_pretrained_noprefix128.json`.
+
+### 18:05 — Streaming SFT finished (step 5000); decisive test queued
+
+- **Result:** `qat_stream_sft/last.pt` saved at step 5000; offline ternary
+  recovered to ~12 as the cosine decayed (20.2 → 15.5 → 14.5 → 12.2 → ~12).
+  The 39 706-example mix (4 prefix fractions + silence) cost ~3 offline points
+  versus the 9.2 baseline.
+- **Note:** the 128-token streaming job (`10860`) hit its 4 h walltime after
+  the ternary condition; the binary 128-token number was not collected.
+- **Decisive test queued (`10875`):** official prefix algorithm on the
+  scaled-SFT checkpoint. If the model now continues prefixes without
+  degenerating, streaming returns to normal RTF at single-digit WER; if it
+  still collapses, the LSP emission policy (Stage 4 / T4.4) is the next lever.
+- **Evidence:** `data/checkpoints/qat_stream_sft/last.pt`,
+  `qat_stream_sft.log`.
