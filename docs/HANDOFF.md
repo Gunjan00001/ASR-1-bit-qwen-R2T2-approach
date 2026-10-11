@@ -7,35 +7,34 @@
 
 ---
 
-## 0. Latest session (2026-10-12) — WP1: first result negative, switched to teacher distillation
+## 0. Latest session (2026-10-12) — WP1: two recipes measured, distillation v2 running
 
-- **WP1 code is in**: on-policy streaming SFT (`src/asr1bit/train/sft.py` +
-  `--op-rollout*` in `scripts/run_stage1_qat.py`), **streaming-state
-  distillation** (`--op-distill`), and the LSP emission policy
-  (`LSPState`/`update_lsp`/`emit_stable`/`flush_lsp` in
-  `src/asr1bit/qwen/stream.py`, reported by
-  `scripts/eval_streaming.py --lsp-margin-words`). 288 tests, ruff clean.
-- **Result so far — read `docs/LAB_NOTES.md` (2026-10-12) before repeating it:**
-  on-policy SFT with the student's *own* prefixes fixed the cold-start runaway
-  (chunks 0–2 emit EOS) but **poisoned** the model — the student's rollout
-  prefixes contained repetition loops, so "(looping prefix) → reference
-  remainder" training taught the loops back: official-algorithm **WER 920.55**
-  (previous static SFT 203.5), offline ternary 18.33 (from 9.2). The phase-2
-  DAgger job was killed.
-- **Running:** `11040` **streaming-state distillation** (`scripts/qat_stream_distill.pbs`,
-  GPU 1): the frozen pretrained teacher drives the rollout (clean 2.33-WER
-  streaming policy) and the student clones its continuations; 350-utt rollout +
-  4 000 steps at lr 1e-5 from the 9.2 base → checkpoint
-  `data/checkpoints/qat_stream_distill/`. ETA ~3.5 h from 03:45 IST.
-  Also running: `11022` WP2 ternary on the full 28 539-utt cache (GPU 2,
-  walltime 06:20 IST → chain `qat_ternary_full2.pbs`).
-- **Next steps:** (1) decisive eval on the distillation checkpoint
-  (`qsub scripts/eval_streaming_opd.pbs -v CKPT=data/checkpoints/qat_stream_distill/last.pt`);
-  (2) if it streams at single-digit WER, anneal (another fresh cycle or longer
-  descent) and mirror the recipe to binary; (3) if it still loops, the fallback
-  is filtered-DAgger (drop degenerate own-prefixes, oversample warm-up EOS) —
-  and the offline cost of every streaming phase must be watched (phase 1 left
-  18.3 vs 9.2 offline: the cosine needs the full cycle to anneal).
+- **WP1 code is in**: on-policy streaming SFT (`--op-rollout*`),
+  **streaming-state distillation** (`--op-distill` + `build_distill_examples`,
+  metadata-stripped targets), filtered-DAgger guard (`is_degenerate`,
+  `--op-filter-degenerate`), and the LSP emission policy
+  (`LSPState`/`update_lsp`/`emit_stable`/`flush_lsp`, reported by
+  `eval_streaming.py --lsp-margin-words`). 300+ tests, ruff clean.
+- **Results (official prefix algorithm, 50-utt test-clean, 320 ms, 32 tokens),
+  all from the 9.2 offline ternary — read `docs/LAB_NOTES.md` 2026-10-12 first:**
+
+  | recipe | WER | RTF | outcome |
+  |---|---:|---:|---|
+  | static prefix SFT (earlier session) | 203.5 | — | correct text, loops |
+  | DAgger on the student's own prefixes | 920.55 | 4.49 | loops get *worse* |
+  | distillation v1 (metadata kept) | 448.31 | **1.76** | **stops**, content garbled |
+  | distillation v2 (metadata stripped) | running `11042` | — | format conflict fixed |
+
+- **Running:** `11042` distillation v2 (GPU 1, lr 7e-6, 5 000 steps → ETA ~3 h
+  from 04:15 IST; checkpoint `data/checkpoints/qat_stream_distill2/`), and
+  `11022` WP2 ternary on the full cache (GPU 2, walltime 06:20 IST → chain
+  `qat_ternary_full2.pbs`; ternary 10.70 @2000 from 9.2 = expected dip).
+- **Next steps:** (1) eval v2
+  (`qsub -v CKPT=data/checkpoints/qat_stream_distill2/last.pt,TAG=_distill2 scripts/eval_streaming_opd.pbs`);
+  (2) if the streaming WER is usable, add an offline-annealing phase (standard
+  samples only or a low op-share) and mirror the recipe to binary; (3) if v2
+  fails, try mix 0.3–0.4 / different anchor / warm-up over-sampling before
+  abandoning the state-distillation route.
 
 ---
 

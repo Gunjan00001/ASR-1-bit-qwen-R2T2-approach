@@ -545,3 +545,32 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/streaming_opd_quantized.json`,
   `eval_streaming_opd.log`, `diag_opd_*.json`, `qat_stream_opd.log`,
   `stage1_decoder_attn_ffn_bw1.58_gNone_lr1e-05_adamw_delay_ls1_n2400.json`.
+
+---
+
+## 2026-10-12 — Distillation v1: the stop transfers; the output *format* did not. Metadata conflict found.
+
+- **Did:** streaming-state distillation v1 (job `11040`): frozen pretrained
+  teacher rollout over 350 utts → 2 400 teacher states + 2 400 standard
+  samples, 4 000 steps at lr 1e-5 from the 9.2 base; decisive eval `11041`.
+- **Result:** official algorithm **WER 448.31** (DAgger 920.55, static SFT
+  203.5), CER 432.32, **RTF 1.76** (was 4.49). The model learned to *stop* —
+  short, EOS-terminated generations, no 32-token loops — but the content
+  collapsed (empty hypotheses, garbled continuations). Offline oscillated
+  33.6 → 35.8 → 26.6 → 32.5 across the run.
+- **Why (format conflict):** the teacher's continuations are wrapped in
+  `language English<asr_text>…`; the standard samples teach plain transcripts.
+  A 50/50 mix therefore contained contradictory targets for the same prompt
+  template, and the student settled in a confused middle (neither format).
+- **Chose:** keep the recipe, fix the format — `build_distill_examples` now
+  strips the metadata block from the target and (relative to `prompt_raw`) from
+  the recorded prompt, while the rollout keeps the teacher's natural prompts
+  (the teacher stays in-distribution; the student's records match its own
+  inference format). v2 = metadata stripped + lr 7e-6 + 5 000 steps (`11042`).
+- **Next:** if v2 streams at usable WER, anneal offline quality (fresh
+  standard-heavy phase) and mirror the recipe to binary. If v2 still fails,
+  the remaining suspects are the mix weight (try 0.3–0.4), the anchor weight,
+  and warm-up EOS over-sampling.
+- **Artifacts:** `artifacts/stage1/streaming_opd_distill_quantized.json`,
+  `eval_streaming_opd_distill.log`, `qat_stream_distill.log`,
+  `qat_stream_distill2.log`.
