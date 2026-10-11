@@ -2,7 +2,7 @@
 #PBS -N asr1bit-stream-opd
 #PBS -q gpu
 #PBS -l select=1:ncpus=4:ngpus=1:mem=48gb
-#PBS -l walltime=06:00:00
+#PBS -l walltime=08:00:00
 #PBS -j oe
 #PBS -o /home/jiit_992401210050/stream_opd.out
 #
@@ -15,6 +15,11 @@
 # and trains the continuation of the reference remainder — blended 50/50 with
 # standard offline samples to protect offline quality.
 # Init: best offline ternary (9.2). Submit: qsub scripts/qat_stream_opd.pbs
+#
+# Rollout sizing: 350 utterances (≈2 800 kept states) — measured ~460 s per
+# rollout round under the current cluster contention (all 8 A100s 70-100 % busy
+# by other users), so 700 utts would eat most of the walltime; training steps
+# matter more here than a larger pool of the same distribution.
 
 set -u
 unset CUDA_VISIBLE_DEVICES
@@ -66,7 +71,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --learnable-scale 1 \
   --init-from data/checkpoints/qat_ternary_long2/last.pt \
   --op-rollout 1 \
-  --op-rollout-n 700 \
+  --op-rollout-n 350 \
   --op-batch-size 6 \
   --op-max-new-tokens 32 \
   --op-chunk-ms 320 \

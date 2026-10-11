@@ -7,17 +7,25 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-11 22:40 IST)
+## Live status (updated 2026-10-11 23:45 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11020` | **WP1 phase 1** — on-policy streaming SFT (ternary, init 9.2), GPU 1 | on-policy rollout running (~17 decode calls/min) | pending | rollout ~1.5–2.5 h, then 3 000 steps (~5 h at the current contention) — chain `qat_stream_opd_ext.pbs` (`--resume`) if the walltime cuts it |
-| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training, ~10 steps/min | pending | 10 000 steps do **not** fit in 8 h at this rate → chain `qat_ternary_full2.pbs` (`--resume`, advances the cosine) |
-| — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — every GPU was ≥49 GB used by other users; all 8 at 70–100 % utilization | — | submit when a GPU frees |
+| `11030` | **WP1 phase 1** — on-policy streaming SFT (ternary, init 9.2), GPU 5 | rollout running (350 utts) | pending | rollout ~1 h, training 3 000 steps ~5 h → ~6 h total (8 h walltime) |
+| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training, ~12 steps/min | pending | 10 000 steps do **not** fit in 8 h at this rate → chain `qat_ternary_full2.pbs` (`--resume`, advances the cosine) |
+| `11027` | *(other project — `scenediff`, same account)* | — | — | — |
+| — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — no GPU with ≥45 GB free (all others 60-80 GB used) | — | submit when a GPU frees |
 | — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after WP2 |
 
+**Restart note:** the first WP1 submission (`11020`) was killed after 49 min — its
+700-utterance rollout ran at ~460 s/round (~2.5 h for 16 rounds), which would
+have left only ~3 h for training. Resubmitted as `11030` with 350 rollout
+utterances (≈2 800 kept states — still enough for the 2 400 pool) and an 8 h
+walltime, so the full 3 000-step cosine fits. The GPU picker then found GPU 5
+with ~60 GB free.
+
 **Contention note:** all 8 A100s were 70–100 % utilized by other users at
-submit time, so measured rates are ~6–9× below the usual (10 steps/min vs
+submit time, so measured rates are ~6–9× below the usual (10–12 steps/min vs
 ~90 steps/min at batch 2) — plan chained `--resume` continuations, not
 single-job walltimes.
 
