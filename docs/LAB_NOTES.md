@@ -930,3 +930,37 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/qat_stream_aligned.log`,
   `artifacts/stage1/stage1_decoder_attn_ffn_bw1.58_gNone_lr3e-06_adamw_delay_ls1_n2400.json`,
   `artifacts/stage4/aligner_probe.json`.
+
+---
+
+## 2026-10-12 (night) — CONFIRMED: aligned targets give **12.61 clean / 22.50 other** on the official algorithm, with **zero loops**
+
+- **Did:** full 50-utt official-algorithm evals of the aligned-target checkpoint
+  (`11143` clean, `11145` other) with the LSP loop policy enabled.
+- **Result:**
+
+  | config (50 utts, 320 ms, 32 tokens) | raw WER | policy WER | CER | RTF | loop truncations |
+  |---|---:|---:|---:|---:|---:|
+  | clean | 12.71 | **12.61** | 5.68 | 2.32 | **0** |
+  | other | 22.27 | **22.50** | 12.31 | 1.54 | **0** |
+
+  For context: previous best official-algorithm numbers were 144.60 (distill3 +
+  loop policy) clean and — for other — nothing usable; the fp16 pretrained
+  baseline is 2.33 clean / ~4.6 other (vLLM protocol), and the `+1.5` target
+  is therefore ~3.8 / ~6.1. The gap is now **~9 / ~16 points** instead of
+  "collapse", and — qualitatively — **the loops are gone entirely** (0
+  truncations, CER 5.68 clean).
+- **Why it matters beyond the number:** the streaming WER (12.61) is now
+  *better than the checkpoint's own offline WER* (14.62). The aligned targets
+  teach the "emit what you heard, then stop" discipline that the offline
+  full-transcript objective does not; the streaming model is no longer a
+  degraded copy of the offline one.
+- **What limits it now:** base model quality. The aligned run started from
+  adapt5 (offline 14.6); the project's best offline checkpoint is the full-cache
+  ternary (7.5). The obvious next scaling: aligned targets from the 7.5 base,
+  more aligned utterances (2 400 → 8 000+), longer schedule.
+- **Stage 3 in parallel:** the anchor-free 1.7B attention rollout (`11146`) is
+  training (step ~500) — the memory workaround holds.
+- **Artifacts:** `artifacts/stage1/streaming_opd_aligned_quantized.json`,
+  `eval_streaming_opd_aligned.log`, `streaming_opd_aligned_other_quantized.json`,
+  `eval_streaming_opd_aligned_other.log`, `qat_stream_aligned.log`.
