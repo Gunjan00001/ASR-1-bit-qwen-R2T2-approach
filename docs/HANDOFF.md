@@ -7,38 +7,41 @@
 
 ---
 
-## 0. Latest session (2026-10-12) — WP1: streaming policy fixed; the remaining gap is offline quality
+## 0. Latest session (2026-10-12) — WP1 streaming: policy fixed, balance is the open problem; WP2 offline 7.5
 
 - **WP1 code**: on-policy streaming SFT (`--op-rollout*`), **streaming-state
-  distillation** (`--op-distill`, `build_distill_examples`, metadata-stripped),
-  filtered-DAgger guard (`is_degenerate`, `--op-filter-degenerate`), LSP emission
-  (`LSPState`/`update_lsp`/`emit_stable`/`flush_lsp`, `eval_streaming.py
-  --lsp-margin-words`). ~300 tests, ruff clean.
-- **Results (official prefix algorithm, 50-utt test-clean, 320 ms, 32 tokens) —
-  read `docs/LAB_NOTES.md` 2026-10-12 before repeating any of this:**
+  distillation** (`--op-distill`, metadata-stripped), filtered-DAgger guard
+  (`--op-filter-degenerate`), LSP emission (`--lsp-margin-words`), annealing
+  (`scripts/qat_stream_anneal.pbs`) and **in-training streaming evals**
+  (`--stream-eval-every N --stream-eval-n 10` → `STREAM {...}` log lines).
+  300 tests, ruff clean.
+- **WP2 result:** the full 28 539-utt cache broke the offline plateau —
+  **ternary 7.52 best / 7.63 final** from 9.2 (`data/checkpoints/qat_ternary_full/`).
+  `scripts/qat_binary_full.pbs` now inits from it (progressive precision).
 
-  | recipe | WER | RTF | outcome |
-  |---|---:|---:|---|
-  | static prefix SFT (earlier session) | 203.5 | — | content OK, never stops |
-  | DAgger on the student's own prefixes | 920.55 | 4.49 | loops get *worse* |
-  | distillation v1 (metadata kept) | 448.31 | 1.76 | stops, content garbled |
-  | distillation v2 (metadata stripped) | 349.89 | 1.47 | loops gone, stops, under-emits |
-  | **distillation v3 (three-way mix)** | **278.18** | 2.44 | **streaming policy correct** (trace u0 perfect); residual failures = offline content |
-  | v3 + offline anneal | running `11059` | — | recovers offline while keeping 25 % streaming |
+- **Streaming results (official prefix algorithm, 50-utt test-clean, 320 ms, 32
+  tokens) — read `docs/LAB_NOTES.md` 2026-10-12 before repeating any of this:**
 
-- **Key insight (per-chunk traces `diag_opd_distill3_*.json`):** the streaming
-  *policy* now behaves like the pretrained teacher (short EOS-terminated
-  fragments, final text correct); what still costs WER is the *offline* quality
-  the streaming phases erode (offline 21–26 vs the 9.2 baseline). Annealing with
-  a small streaming share (`scripts/qat_stream_anneal.pbs`, `-v MIX=0.25,OPMAX=800`)
-  is the current step.
-- **Running:** `11059` anneal (checkpoint `data/checkpoints/qat_stream_anneal3/`,
-  ~1 h) and `11046` WP2 ternary full-cache resume (steps 5 000→10 000, ~7 h).
-- **Next:** eval the annealed checkpoint
-  (`qsub -v CKPT=data/checkpoints/qat_stream_anneal3/last.pt,TAG=_anneal3 scripts/eval_streaming_opd.pbs`);
-  if offline recovers without losing the streaming policy, mirror the recipe to
-  binary and start the write-up. Also pending: `scripts/qat_binary_full.pbs`
-  (WP2 binary, needs a free GPU) and the Stage-3 scaffold `qat_17b_ffn.pbs`.
+  | recipe | WER | outcome |
+  |---|---:|---|
+  | static prefix SFT (earlier session) | 203.5 | content OK, never stops |
+  | DAgger on the student's own prefixes | 920.55 | loops get *worse* |
+  | distillation v1 (metadata kept) | 448.31 | stops, content garbled |
+  | distillation v2 (metadata stripped) | 349.89 | loops gone, stops, under-emits |
+  | distillation v3 (three-way mix) | **278.18** | streaming policy correct; residual = offline content |
+  | v3 + 25 % anneal | 358.90 | offline 15.3 but loops return |
+  | v4 (three-way mix on the 7.5 base) | running `11063` → `STREAM` curve | — |
+
+- **The open problem is the stop/offline balance, not the policy:** 40–50 %
+  streaming share ⇒ stops but offline ~21–26; 25 % ⇒ offline 15.3 but loops.
+  v4 attacks it with a better base (7.5) + live streaming evals so the trade-off
+  curve is visible. If both curves cannot descend together, the fallbacks are a
+  stronger anchor on the streaming samples, a precision-split model, or
+  explicit LSP-based stop handling.
+- **Next steps:** (1) read v4's `STREAM` lines
+  (`grep STREAM artifacts/stage1/qat_stream_distill4.log`); if promising, extend
+  or mirror the recipe to binary; (2) launch `scripts/qat_binary_full.pbs` when
+  a GPU frees; (3) the Stage-3 scaffold `scripts/qat_17b_ffn.pbs` after that.
 
 ---
 
