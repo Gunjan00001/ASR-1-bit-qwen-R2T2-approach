@@ -113,6 +113,7 @@ def main() -> int:
             total_audio = 0.0
             started = time.perf_counter()
             lsp_revisions = 0
+            lsp_truncations = 0
             lsp_progress: dict[float, list[float]] = {}
             lsp_enabled = args.lsp_margin_words is not None or bool(args.lsp_truncate_loops)
             for utt in utterances:
@@ -138,6 +139,7 @@ def main() -> int:
                 total_audio += trace.audio_sec
                 if lsp_state is not None:
                     lsp_revisions += trace.revisions
+                    lsp_truncations += lsp_state.loop_truncations
                     raw_hyps.append(trace.chunks[-1] if trace.chunks else trace.text)
                     for fraction in (0.5, 0.8):
                         cutoff = fraction * trace.audio_sec
@@ -160,12 +162,11 @@ def main() -> int:
                 "references": refs,
             }
             if lsp_enabled:
-                truncations = getattr(lsp_state, "loop_truncations", 0)
                 results["conditions"][name]["lsp"] = {
                     "margin_words": args.lsp_margin_words,
                     "truncate_loops": bool(args.lsp_truncate_loops),
                     "revisions": lsp_revisions,
-                    "loop_truncations": truncations,
+                    "loop_truncations": lsp_truncations,
                     "wer_raw": corpus_wer(refs, raw_hyps) if raw_hyps else None,
                     "committed_frac": {
                         str(fraction): sum(values) / len(values)
