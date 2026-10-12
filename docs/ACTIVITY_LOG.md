@@ -7,33 +7,37 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 14:45 IST)
+## Live status (updated 2026-10-12 15:30 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11115` | **WP1 — adapt5 LSP-policy eval** (`TRUNC=1`) | running | pending | ~30–45 min |
-| `11116` | **Stage 3 — 1.7B attention rollout** (from the FFN checkpoint, policy `decoder_attn_ffn`, lr 3e-5, anchor 0.1, 2 000 steps) | loading | pending | ~3–5 h |
+| `11121` | **Stage 3 — 1.7B attention rollout, retry with the memory stack** (adam8bit + grad-checkpointing + expandable_segments) | starting | pending | ~3–5 h |
 | — | WP1/WP2 0.6B | all finished | see operating points below | — |
 
-**adapt5 (11091) finished: offline 14.83 @1000 → 14.51 final** — better than
-content3 (15.8) and distill3 (25.6). Its streaming eval (`11115`, with the loop
-policy) is the number that decides whether the three-way mix can hold *both*.
+**The WP1 frontier is now measured (all with the LSP loop policy, 50 utts):**
 
-**Stage 3 (1.7B) first result:** the FFN-only warm start (84 projections,
-1.06 B trainable, lr 1e-4, anchor 0.1, 3 000 steps) finished at **ternary 22.03**
-— trajectory 113.9 @500 → 249.6 @1000 → 95.7 @1500 → 146.7 @2000 →
-**26.9 @2500 → 22.0 @3000**. The mid-run instability was the fresh-cycle +
-alpha transient (HANDOFF pitfall 5), and the cosine tail recovered it; the 1.7B
-FFN warm start is *better* than the 0.6B's (25.7). The attention rollout
-(`11116`, progressive precision, lr 3e-5) is running now.
+| checkpoint | offline ternary | raw streaming | + LSP loop policy | loop truncations |
+|---|---:|---:|---:|---:|
+| **distill3** | 25.6 | 278.18 | **144.60** (best streaming) | 11 |
+| content3 | 15.8 | 532.20 | 190.78 | 228 |
+| adapt5 | **14.51** | **215.04** (best raw) | 175.00 | 233 |
 
-**Operating points (official algorithm, 50-utt test-clean, 320 ms, 32 tokens):**
+`adapt5` (three-way mix from content3, lr 3e-6, 2 000 steps) repaired most of
+the content phase's raw damage (532 → 215) and has the best offline number of
+the streaming family (14.51), but its loop propensity stays high (233
+truncations), so after the loop policy it is still behind distill3
+(175.0 vs 144.6). **Neither checkpoint is a clean winner**: distill3 = best
+streaming + worst offline; adapt5 = best offline + worse streaming. The honest
+verdict is that the content/stop balance remains the open problem (the plan's
+forced-aligner stable-prefix targets are the untried piece).
 
-| checkpoint | offline ternary | raw streaming WER | + LSP loop policy |
-|---|---:|---:|---:|
-| **distill3** | 25.6 | 278.18 | **144.60** (best) |
-| content3 (step 2500) | 15.8 | 532.20 | 190.78 |
-| adapt5 (final) | **14.51** | pending (`11115`) | pending |
+**Stage 3 — 1.7B:** the attention rollout (196 projections, **1.41 B trainable**)
+**OOM'd** on a 45 GB-occupied GPU (`11116`: 34.6 GiB in-process + the co-tenant's
+42 GB). Fix shipped as `scripts/qat_17b_attn2.pbs` — `--optimizer adam8bit
+--grad-checkpointing 1` + `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+(the FFN-only stage at 1.06 B trainable fit comfortably; the rollout needs the
+memory stack). Retry `11121` is running. Earlier Stage-3 result stands:
+**1.7B FFN warm start = ternary 22.03** (better than the 0.6B's 25.7).
 
 **Loop truncation at emission is the biggest single win:** cutting a trailing
 repetition loop (one unit kept) at the LSP layer takes distill3 from **278.18 →

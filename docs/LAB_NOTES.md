@@ -753,3 +753,35 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/streaming_opd_content3_quantized.json`,
   `eval_streaming_opd_content3.log`, `qat_stream_adapt5.log`,
   `artifacts/stage3/qat_17b_ffn.log`.
+
+---
+
+## 2026-10-12 — adapt5 frontier point (offline 14.51 / policy 175.0) and the 1.7B rollout OOM
+
+- **Did:** evaluated adapt5 (three-way mix from content3, lr 3e-6, 2 000 steps)
+  with the LSP loop policy (`11115`), and ran the 1.7B attention rollout
+  (`11116`, policy `decoder_attn_ffn`, 1.41 B trainable).
+- **Results:**
+  - adapt5: offline **14.51** (best of the streaming family), raw streaming
+    **215.04** (best raw), LSP policy **175.00** — but **233** loop truncations,
+    so the policy gain (215 → 175) is smaller than on distill3 (278 → 144.6 with
+    11 truncations). Frontier: distill3 = best streaming / worst offline;
+    adapt5 = best offline / worse streaming.
+  - 1.7B rollout: **CUDA OOM** — 34.6 GiB in-process on top of a co-tenant's
+    42 GB (1.41 B trainable params with fp32 Adam ≈ 11 GB of optimizer state
+    alone). The FFN-only stage (1.06 B trainable) had fit comfortably.
+- **Fix:** `scripts/qat_17b_attn2.pbs` — `--optimizer adam8bit
+  --grad-checkpointing 1` + `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+  (retry `11121`). Lesson for Stage 3: at 1.7B, *any* policy beyond FFN-only
+  needs the memory stack from the start; the launcher comment already said so,
+  the plain template just did not set it.
+- **Why the frontier has no clean winner:** the two objectives trade on the
+  "when to stop" dimension; the loop policy rescues distill3 (stop-correct but
+  content-weak) more than adapt5 (content-strong but loop-prone). The remaining
+  untried lever is the plan's core Stage-4 piece — **forced-aligner
+  stable-prefix targets** (T4.1/T4.2), which would make the training target
+  exactly "the words heard so far" instead of "the whole remainder" or "the
+  teacher's continuation", addressing both failure directions at once.
+- **Artifacts:** `artifacts/stage1/streaming_opd_adapt5_quantized.json`,
+  `eval_streaming_opd_adapt5.log`, `artifacts/stage3/qat_17b_attn.log`
+  (OOM), `qat_17b_attn2.log` (retry).
