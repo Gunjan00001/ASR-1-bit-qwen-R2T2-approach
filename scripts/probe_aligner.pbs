@@ -1,0 +1,48 @@
+#!/bin/bash
+#PBS -N asr1bit-probe-aligner
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=32gb
+#PBS -l walltime=01:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/probe_aligner.out
+#
+# Stage 4 T4.1/T4.2 verification: align a few test-clean utterances with
+# Qwen3-ForcedAligner-0.6B and print the chunk-aligned prefix/target samples.
+# Submit: qsub scripts/probe_aligner.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+LOG="artifacts/stage4/probe_aligner.log"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+
+PICK=$(for _ in 1 2 3; do
+  nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits
+  sleep 1
+done | awk -F', ' '$2 < 55000 {u[$1]+=$3; m[$1]=$2} END {for (g in u) print u[g], m[g], g}' \
+  | sort -n | head -1 | awk '{print $3}')
+[ -z "$PICK" ] && PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
+  | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
+PICK="${EVAL_GPU:-$PICK}"
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+mkdir -p artifacts/stage4
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+"$PY" scripts/probe_aligner.py --n 3 --chunk-ms 320 --out artifacts/stage4/aligner_probe.json \
+  2>&1 | tee -a "$LOG"

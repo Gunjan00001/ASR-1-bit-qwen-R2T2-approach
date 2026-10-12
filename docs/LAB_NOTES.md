@@ -785,3 +785,40 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/streaming_opd_adapt5_quantized.json`,
   `eval_streaming_opd_adapt5.log`, `artifacts/stage3/qat_17b_attn.log`
   (OOM), `qat_17b_attn2.log` (retry).
+
+---
+
+## 2026-10-12 — T4.1/T4.2 implemented: forced-aligner timestamps + stable-prefix chunk targets; 1.7B rollout fixed twice
+
+- **Did:** implemented the plan's untried WP1 lever —
+  `src/asr1bit/data/align.py` (T4.1: `AlignedWord`, `align_words` adapter over
+  `Qwen3ForcedAligner-0.6B` with a lazy import; `alignment_covers` sanity check)
+  and `src/asr1bit/data/prefix.py` (T4.2: `chunk_examples` — at chunk *k* the
+  prefix is the words heard by chunk *k−1* and the target is the words heard
+  *in* chunk *k*, with an optional lookahead; chunks with no new words are empty
+  targets = stop samples). This is the supervision the earlier streaming
+  recipes lacked: "emit exactly what has been heard so far, then stop", instead
+  of "the whole remainder" (DAgger) or "the teacher's continuation"
+  (distillation). 13 new tests (`tests/test_data_prefix.py`), suite 322 passed,
+  ruff clean. A GPU probe (`scripts/probe_aligner.py` + `.pbs`, job `11136`)
+  verifies the aligner adapter on three test-clean utterances and dumps
+  `artifacts/stage4/aligner_probe.json`.
+- **Stage 3 incidents (both fixed):**
+  1. the 1.7B attention rollout OOM'd (1.41 B trainable, fp32 Adam);
+  2. the first retry then crashed with `element 0 of tensors does not require
+     grad` — **gradient checkpointing is incompatible with this frozen-only
+     training setup** (`model.gradient_checkpointing_enable()` is called without
+     `use_reentrant=False` / `enable_input_require_grads`), so the checkpointed
+     segment's inputs carry no grad. Fix: drop `--grad-checkpointing` and rely
+     on `--optimizer adam8bit` + a GPU with ≥50 GB free (`qat_17b_attn3.pbs`,
+     job `11134`). The 1.7B rollout's early ternary (58.7 @500) is the expected
+     attention-quantization transient (the 0.6B showed 25.7 → 52.8 → 14.4).
+- **Next:** wire `chunk_examples` into a training run — `scripts/run_stage1_qat.py`
+  needs an `--aligned-targets 1` path that aligns the train utterances once
+  (cache the word timings), builds (audio-slice, prefix, target) samples from
+  `chunk_examples`, and mixes them with the standard samples. Expected effect:
+  both failure directions (under-emission and loops) are supervised away
+  because the target length is *defined by the audio heard*, not inferred.
+- **Artifacts:** `src/asr1bit/data/{align,prefix}.py`, `tests/test_data_prefix.py`,
+  `scripts/probe_aligner.py`, `artifacts/stage4/aligner_probe.json`,
+  `artifacts/stage3/qat_17b_attn2.log` (grad-ckpt crash).
