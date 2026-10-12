@@ -964,3 +964,30 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/streaming_opd_aligned_quantized.json`,
   `eval_streaming_opd_aligned.log`, `streaming_opd_aligned_other_quantized.json`,
   `eval_streaming_opd_aligned_other.log`, `qat_stream_aligned.log`.
+
+---
+
+## 2026-10-12 (late night) — Scaled aligned run: streaming 9.65 / offline 9.11 — the recipe scales
+
+- **Did:** scaled the aligned recipe (from the 7.52 full-cache offline base,
+  2 400 aligned utterances, 2 500 steps, lr 5e-6, job `11148`) and started the
+  binary mirror (`11158`, progressive precision from its checkpoint).
+- **Result (in-training):** STREAM (20 utts, raw official algorithm)
+  11.29 @750 → 10.82 @1500 → 10.35 @2000 → **9.65 @2250**; offline ternary
+  **9.11 @1000** → 10.70 @1500 → 9.75 @2000. Both curves beat the first aligned
+  run (streaming ~10 vs 13.4; offline ~9.5 vs 14.6) — the aligned recipe scales
+  with the base quality, as predicted.
+- **Confirmation running:** full 50-utt clean (`11156`) and clean/other
+  (`11157`) evals on the step-2 500 checkpoint, plus the binary mirror
+  (`11158`). Context: the fp16 portable baseline is 2.33 clean; the `+1.5`
+  target ~3.8/6.1; previous ternary best was 144.60.
+- **Stage 3 (parallel):** the anchor-free 1.7B attention rollout (`11146`)
+  recovers without the anchor — ternary 35.28 @1000 → 24.15 @1500 →
+  **20.55 @2000** (already past its 22.03 FFN-only start), so the memory
+  workaround did not cost the training dynamics. 1 000 steps remain.
+- **Next:** read the evals; if the 50-utt numbers confirm ~10/20, the remaining
+  gap is base quality + the 1.7B; then the 1.7B gets the aligned recipe and the
+  final matrix (160/320/1000 ms, clean/other) follows.
+- **Artifacts:** `artifacts/stage1/qat_stream_aligned2.log`,
+  `artifacts/stage3/qat_17b_attn5.log`,
+  `streaming_opd_aligned2{,_other}_quantized.json` (pending).
