@@ -7,19 +7,18 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 09:20 IST)
+## Live status (updated 2026-10-12 11:05 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11067` | **WP1 — official 50-utt eval of distill3 with the LSP loop policy** (`--lsp-truncate-loops 1`) | **done** | **WER 144.60** (raw 278.18 → policy 144.60), RTF 1.387, wall 503 s; 348 revisions, committed@50 % 4.8 % | — |
-| — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | next |
+| `11076` | **WP1 — content phase** (distill3 + 40 % streaming share, `qat_stream_content3`, guardrail STREAM evals every 500) | step ~1 500/3 000, ~31 steps/min | offline 25.6 → **15.25 @1000** ✓; stream (20 utt) 366 @500 → 349 @1000 | ~11:55 |
+| `11077` | **Stage 3 — 1.7B FFN warm start** (`scripts/qat_17b_ffn.pbs`, GPU 1, 84 projections / 1.06 B trainable) | step ~900/3 000 | **ternary 113.9 @500** (the 0.6B FFN warm start was 118 @500 — same recovery curve) | ~12:30 |
 
 **Loop truncation at emission is the biggest single win:** cutting a trailing
 repetition loop (one unit kept) at the LSP layer takes distill3 from **278.18 →
-144.60**, distill2 349.89 → 154.56, v1 448.31 → 179.34 (re-scored offline on the
-stored hypotheses; the real-path confirmation is `11067`). Implemented as
-`truncate_trailing_loop` + `LSPState(truncate_loops=True)`
-(`--lsp-truncate-loops 1`), 309 tests.
+144.60** (confirmed through the real eval path, job `11067`), distill2
+349.89 → 154.56, v1 448.31 → 179.34. Implemented as `truncate_trailing_loop` +
+`LSPState(truncate_loops=True)` (`--lsp-truncate-loops 1`), 309 tests.
 
 **WP2 binary hits a floor:** the binary full-cache run (from the 7.5 ternary,
 8 000 steps) converged to **binary 10.70** — identical to the old 10.7 despite
@@ -27,7 +26,7 @@ the much better ternary base (readout 9.75 vs 22.35). Further binary gains need
 the co-training/stochastic-precision stack, not more of the same recipe.
 
 **v4 killed** after 2 000 steps: live 10-utt streaming WER 134.9 → 704.8 (not
-descending) at ~17 steps/min; the loop policy is the better lever.
+descending); the loop policy was the better lever.
 
 **Offline best (50-utt test-clean; fp16 pretrained 2.44):**
 
@@ -36,6 +35,8 @@ descending) at ~17 steps/min; the loop policy is the better lever.
 | `qat_ternary_long2` (8k data) | 9.2 | — |
 | **`qat_ternary_full` (28 539 utts)** | **7.52 best / 7.63 final** | **10.70** |
 | `qat_stream_distill3` (streaming v3) | 25.6 | — |
+| `qat_stream_content3` (content phase, in progress) | 15.25 @1000 | — |
+| `qat_17b_ffn` (Stage 3, in progress) | 113.9 @500 | — |
 
 **WP1 streaming results (official prefix algorithm, 50-utt test-clean, 320 ms,
 32 tokens):**
@@ -47,7 +48,8 @@ descending) at ~17 steps/min; the loop policy is the better lever.
 | Distillation v1 (`language X<asr_text>` kept) | 448.31 | 1.76 | stops ✓, content garbled (format conflict) |
 | Distillation v2 (metadata stripped) | 349.89 | 1.47 | loops gone, stops ✓, under-emits |
 | Distillation v3 (three-way mix) | **278.18** | 2.44 | streaming policy **correct**; residual = offline content + trailing loops |
-| **v3 + LSP loop policy** | **144.60** (re-score; `11067` confirming) | — | remaining gap = ordinary content errors (offline 25.6) |
+| **v3 + LSP loop policy** | **144.60** (confirmed) | 1.39 | remaining gap = ordinary content errors |
+| v3 + content phase (40 % share) | running `11076` | — | offline recovering to ~15; stream ~350 (20 utt) |
 
 **Streaming 320 ms (50 utts) — final picture:**
 
