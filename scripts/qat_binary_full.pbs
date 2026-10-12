@@ -7,8 +7,9 @@
 #PBS -o /home/jiit_992401210050/binary_full.out
 #
 # WP2 — offline scale-up: binary continuation on the full 28 539-utterance
-# train-clean-100 cache. Init: best binary (10.7, qat_binary_long3); fresh
-# cosine cycle lr 1e-5, anchor 0.05, progressive precision from ternary.
+# train-clean-100 cache. Init: the *full-cache ternary* checkpoint (7.5 WER,
+# progressive precision — never train binary from fp; see HANDOFF recipe).
+# Fresh cosine cycle lr 1e-5, anchor 0.05.
 # Submit: qsub scripts/qat_binary_full.pbs
 
 set -u
@@ -58,7 +59,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --policy decoder_attn_ffn \
   --bit-width 1.0 \
   --learnable-scale 1 \
-  --init-from data/checkpoints/qat_binary_long3/last.pt \
+  --init-from data/checkpoints/qat_ternary_full/last.pt \
   --steps 8000 \
   --train-cache "$CACHE" \
   --train-n 28539 \

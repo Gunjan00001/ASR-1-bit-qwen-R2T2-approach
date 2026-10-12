@@ -7,33 +7,35 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 06:10 IST)
+## Live status (updated 2026-10-12 07:10 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11059` | **WP1 — offline anneal of v3** (MIX 0.25, 800 distillation states + 2 400 standard, lr 5e-6, 3 000 steps), checkpoint `data/checkpoints/qat_stream_anneal3` | running | pending | ~1 h |
-| `11046` | **WP2 — ternary full-cache resume** (from step 5 000 to 10 000, GPU 5) | running | pending | ~7 h (contended) |
-| — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — no GPU with ≥45 GB free | — | submit when a GPU frees |
-| — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after WP2 |
+| `11062` | **WP1 — streaming eval of the annealed v3** (`qat_stream_anneal3`) | running (GPU 2) | pending | ~30 min |
+| `11046` | **WP2 — ternary full-cache run** | **finished 10 000 steps** | **ternary 7.52 best / 7.63 final** (from 9.2) | done — new best offline checkpoint |
+| — | `scripts/qat_binary_full.pbs` (WP2 binary) | ready: now inits from `qat_ternary_full/last.pt` (progressive precision) | — | submit when a GPU with ≥45 GB frees |
+| — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after binary |
+| — | **v4** (WP1 on the 7.5 base) | planned: three-way distillation + anneal from `qat_ternary_full` | — | after the anneal eval |
+
+**Offline best (ter: ternary, 50-utt test-clean; fp16 pretrained 2.44):**
+
+| Checkpoint | Offline ternary |
+|---|---:|
+| `qat_ternary_long2` (8k data) | 9.2 |
+| **`qat_ternary_full` (28 539 utts)** | **7.52 best / 7.63 final** |
+| `qat_stream_anneal3` (streaming v3 + anneal) | 15.25 (14.83 best) |
 
 **WP1 streaming results so far (official prefix algorithm, 50-utt test-clean,
-320 ms, 32 tokens; all from the 9.2 offline ternary):**
+320 ms, 32 tokens):**
 
 | Recipe | Official-algorithm WER | RTF | Failure mode |
 |---|---:|---:|---|
 | Static prefix SFT (earlier session) | 203.5 | — | correct content, never stops |
 | On-policy SFT, student prefixes (DAgger) | 920.55 | 4.49 | loops get **worse** (fits its own loops) |
 | Distillation v1 (`language X<asr_text>` kept) | 448.31 | 1.76 | stops ✓, content garbled (format conflict) |
-| Distillation v2 (metadata stripped, lr 7e-6) | 349.89 | 1.47 | loops gone, stops ✓, under-emits |
-| Distillation v3 (three-way mix) | **278.18** | 2.44 | streaming policy **correct** (u0 trace perfect); residual failures = offline content (25.6 offline) |
-| v3 + offline anneal | running (`11059`) | — | targets the residual content failures |
-
-**Trace evidence (v3, `diag_opd_distill3_*.json`):** u0 emits short
-EOS-terminated fragments per chunk ("If", "It.", "So.") and the final text is
-exactly right; u1's final chunk (full audio, empty prefix) produced **nothing** —
-the same utterances the offline model (25.6 WER) fails on. So the streaming
-policy is right; the offline degradation left by the streaming phases is what
-still costs WER → the anneal targets exactly that.
+| Distillation v2 (metadata stripped) | 349.89 | 1.47 | loops gone, stops ✓, under-emits |
+| Distillation v3 (three-way mix) | **278.18** | 2.44 | streaming policy **correct**; residual failures = offline content |
+| v3 + offline anneal (`11062`) | running | — | offline 25.6 → 15.25; streaming pending |
 
 **Streaming 320 ms (50 utts) — final picture:**
 
@@ -863,3 +865,33 @@ tags through `0.2.39`).
 - **Evidence:** `artifacts/stage1/streaming_opd_distill_quantized.json`,
   `eval_streaming_opd_distill.log`, `qat_stream_distill.log`,
   `qat_stream_distill2.log`.
+
+---
+
+### 07:05 — WP2 breaks the offline plateau (ternary 7.5 on the full cache); v3 anneal recovers offline quality
+
+- **WP2 result (the offline scale-up worked):** the ternary continuation on the
+  full 28 539-utterance `train-clean-100` cache (jobs `11022` + resume `11046`,
+  10 000 steps total, lr 1e-5 cosine, anchor 0.05) reached **ternary 7.52 @8000,
+  7.63 final** — from the 9.2 the 8k-data recipe had plateaued at. Trajectory:
+  11.97 @4000 → 9.22 @6000 → 7.52 @8000 → 7.63 @10000; fp16 readout also
+  improved (31.7 → 21.7 → 24.5). **New best offline ternary checkpoint:**
+  `data/checkpoints/qat_ternary_full/last.pt`.
+- **WP1 anneal of v3 (`11059`):** offline **15.25 final (14.83 best)** from v3's
+  25.6, with the streaming share held at 25 % (800 distillation states + 2 400
+  standard samples). The streaming eval on the annealed checkpoint (`11062`) is
+  running.
+- **Chained:** `11046` finished its 10 000-step schedule; the full-cache ternary
+  run is complete. The binary full-cache job (`scripts/qat_binary_full.pbs`)
+  should now be launched **from the ternary full-cache checkpoint** (progressive
+  precision) instead of `qat_binary_long3` — update `--init-from` before
+  submitting.
+- **Next:** (1) read the anneal streaming eval; (2) **v4**: run the full WP1
+  pipeline (three-way distillation + anneal) from the new 7.5 ternary base — the
+  residual streaming failures were offline-content-driven, so the better base
+  should carry through; (3) binary (progressive precision from the full-cache
+  ternary) and the Stage-3 1.7B scaffold.
+- **Evidence:** `artifacts/stage1/qat_ternary_full.log`,
+  `qat_ternary_full2.log`,
+  `stage1_decoder_attn_ffn_bw1.58_gNone_lr1e-05_adamw_delay_ls1_n28539.json`,
+  `qat_stream_anneal.log`.
