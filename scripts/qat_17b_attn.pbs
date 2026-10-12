@@ -1,0 +1,98 @@
+#!/bin/bash
+#PBS -N asr1bit-qat-17b-attn
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=48gb
+#PBS -l walltime=08:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/qat_17b_attn.out
+#
+# Stage 3 SCAFFOLD — 1.7B FFN warm start (NOT VALIDATED YET).
+#
+# Entry point of the Stage 3 stack for Qwen3-ASR-1.7B: quantize gate/up/down
+# only (attention stays fp) and train from the pretrained checkpoint — the same
+# warm start that worked for 0.6B (scripts/qat_ternary_ffn.pbs, 25.7 WER).
+# The 0.6B recipe after this: attention rollout with the frozen anchor, then
+# long cosine cycles, then progressive precision to binary.
+#
+# Memory plan (no cluster measurement yet): fp32 student ~6.8 GB + frozen fp32
+# teacher ~6.8 GB + ~1.4B trainable shadow params (5.6 GB) + grads (5.6 GB) +
+# fp32 Adam moments (11.2 GB) + activations at batch 1 ≈ 40-50 GB of the 80 GB
+# A100 — keep batch 1, no grad checkpointing, and check `nvidia-smi` in the log.
+# If it OOMs: `--grad-checkpointing 1 --optimizer adam8bit`.
+#
+# Note: Qwen3-ASR-1.7B ships no tokenizer.json either — run
+# `scripts/install_fast_tokenizer.py` against the model dir first (pitfall 2 in
+# docs/HANDOFF.md).
+# Usage: qsub scripts/qat_17b_ffn.pbs     (optionally -v QAT_GPU=<i>)
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage3/qat_17b_attn.log"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-1.7B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-1.7B
+else
+  MODEL=Qwen/Qwen3-ASR-1.7B
+fi
+if [ -f /tmp/asr1bit/qat_clean_train.100_n8000.pt ]; then
+  CACHE=/tmp/asr1bit/qat_clean_train.100_n8000.pt
+else
+  CACHE="$ROOT/data/qat_clean_train.100_n8000.pt"
+fi
+
+PICK=$(for _ in 1 2 3; do
+  nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits
+  sleep 1
+done | awk -F', ' '$2 < 20000 {u[$1]+=$3; m[$1]=$2} END {for (g in u) print u[g], m[g], g}' \
+  | sort -n | head -1 | awk '{print $3}')
+[ -z "$PICK" ] && PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
+  | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
+PICK="${QAT_GPU:-$PICK}"
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+mkdir -p artifacts/stage3
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | model $MODEL | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+"$PY" scripts/run_stage1_qat.py \
+  --model "$MODEL" \
+  --policy decoder_attn_ffn \
+  --bit-width 1.58 \
+  --learnable-scale 1 \
+  --init-from data/checkpoints/qat_17b_ffn/last.pt \
+  --steps 2000 \
+  --train-cache "$CACHE" \
+  --train-n 4000 \
+  --eval-n 50 \
+  --eval-every 500 \
+  --eval-both 0 \
+  --eval-fp16 1 \
+  --lr 3e-5 \
+  --warmup-steps 200 \
+  --lr-schedule cosine \
+  --batch-size 1 \
+  --max-new-tokens 128 \
+  --alpha-mode delay \
+  --alpha-warmup-frac 0.02 \
+  --distill-weight 0.1 \
+  --distill-temp 2.0 \
+  --frozen-teacher 1 \
+  --lazy-collate 1 \
+  --save-dir data/checkpoints/qat_17b_attn \
+  --save-every 500 \
+  --out artifacts/stage3 \
+  2>&1 | tee -a "$LOG"

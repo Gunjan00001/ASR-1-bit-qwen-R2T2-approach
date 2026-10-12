@@ -7,27 +7,33 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 12:10 IST)
+## Live status (updated 2026-10-12 14:45 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11091` | **WP1 — streaming re-adaptation (adapt5)** from the better-content content3 checkpoint (three-way mix, 40 % streaming, 2 000 steps, lr 3e-6) | starting | pending | ~12:45–13:30 |
-| `11076` | **WP1 — content phase** (distill3 + 40 % share) | step ~2 600/3 000 at ~5 steps/min | offline 15.8 @2000; its step-2500 checkpoint + LSP policy = **190.78** (raw 532.20) — the content phase traded the stop policy away | ~13:00 |
-| `11077` | **Stage 3 — 1.7B FFN warm start** | step ~2 000/3 000 | ternary 113.9 @500 → 249.6 @1000 → 95.7 @1500 (unstable; lr 1e-4 likely too high for 1.7B) | ~13:00 |
+| `11115` | **WP1 — adapt5 LSP-policy eval** (`TRUNC=1`) | running | pending | ~30–45 min |
+| `11116` | **Stage 3 — 1.7B attention rollout** (from the FFN checkpoint, policy `decoder_attn_ffn`, lr 3e-5, anchor 0.1, 2 000 steps) | loading | pending | ~3–5 h |
+| — | WP1/WP2 0.6B | all finished | see operating points below | — |
+
+**adapt5 (11091) finished: offline 14.83 @1000 → 14.51 final** — better than
+content3 (15.8) and distill3 (25.6). Its streaming eval (`11115`, with the loop
+policy) is the number that decides whether the three-way mix can hold *both*.
+
+**Stage 3 (1.7B) first result:** the FFN-only warm start (84 projections,
+1.06 B trainable, lr 1e-4, anchor 0.1, 3 000 steps) finished at **ternary 22.03**
+— trajectory 113.9 @500 → 249.6 @1000 → 95.7 @1500 → 146.7 @2000 →
+**26.9 @2500 → 22.0 @3000**. The mid-run instability was the fresh-cycle +
+alpha transient (HANDOFF pitfall 5), and the cosine tail recovered it; the 1.7B
+FFN warm start is *better* than the 0.6B's (25.7). The attention rollout
+(`11116`, progressive precision, lr 3e-5) is running now.
 
 **Operating points (official algorithm, 50-utt test-clean, 320 ms, 32 tokens):**
 
 | checkpoint | offline ternary | raw streaming WER | + LSP loop policy |
 |---|---:|---:|---:|
 | **distill3** | 25.6 | 278.18 | **144.60** (best) |
-| content3 (step 2500) | **15.8** | 532.20 | 190.78 |
-
-The content phase (40 % streaming share, but a *plain* standard pool and only
-1 600 distillation states) improved offline 25.6 → 15.8 yet **degraded the stop
-policy** (228 loop truncations vs 11): streaming quality is the fine balance,
-not a monotone function of training. adapt5 (`11091`) re-applies the *three-way*
-mix (gold-prefix completion + silence + distillation, 4 800 states) from the
-content3 checkpoint at a gentler lr to try to hold both.
+| content3 (step 2500) | 15.8 | 532.20 | 190.78 |
+| adapt5 (final) | **14.51** | pending (`11115`) | pending |
 
 **Loop truncation at emission is the biggest single win:** cutting a trailing
 repetition loop (one unit kept) at the LSP layer takes distill3 from **278.18 →
@@ -47,8 +53,9 @@ the co-training/stochastic-precision stack, not more of the same recipe.
 | `qat_ternary_long2` (8k data) | 9.2 | — |
 | **`qat_ternary_full` (28 539 utts)** | **7.52 best / 7.63 final** | **10.70** |
 | `qat_stream_distill3` | 25.6 | — |
-| `qat_stream_content3` (step 2500) | 15.8 | — |
-| `qat_17b_ffn` (Stage 3, in progress) | 95.7 @1500 | — |
+| `qat_stream_content3` | 15.8 | — |
+| `qat_stream_adapt5` | **14.51** | — |
+| `qat_17b_ffn` (Stage 3) | 22.03 (FFN-only) | — |
 
 **WP1 streaming results (official prefix algorithm, 50-utt test-clean, 320 ms,
 32 tokens):**
@@ -61,7 +68,8 @@ the co-training/stochastic-precision stack, not more of the same recipe.
 | Distillation v2 (metadata stripped) | 349.89 | 1.47 | loops gone, stops ✓, under-emits |
 | Distillation v3 (three-way mix) | **278.18** | 2.44 | streaming policy **correct**; residual = offline content + trailing loops |
 | **v3 + LSP loop policy** | **144.60** (confirmed) | 1.39 | remaining gap = ordinary content errors |
-| Content phase (40 % share) + policy | 190.78 (raw 532.20) | 2.60 | offline 15.8 but stop policy lost |
+| Content phase (40 % share) + policy | 190.78 (raw 532.20) | 2.60 | offline 15.8 but stop policy eroded |
+| adapt5 (three-way from content3) + policy | pending `11115` | — | aims to hold offline 14.5 *and* the policy |
 
 **Streaming 320 ms (50 utts) — final picture:**
 
