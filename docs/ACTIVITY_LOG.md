@@ -7,23 +7,28 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 21:20 IST)
+## Live status (updated 2026-10-12 23:50 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11143` | **Aligned checkpoint — full 50-utt official eval, clean** (LSP loop policy on) | running (GPU 4) | pending | ~30 min |
-| `11145` | **Aligned checkpoint — clean/other pair** (`CFG=other`) | running (GPU 5) | pending | ~30 min |
-| `11146` | **Stage 3 — 1.7B attention rollout, anchor-free** (fits shared-GPU memory) | running | pending | ~3–5 h |
+| `11156` | **Scaled aligned checkpoint — 50-utt clean eval** (`TRUNC=1`) | running | pending (in-training: streaming 9.65, offline 9.11-10.70) | ~30 min |
+| `11157` | **Scaled aligned checkpoint — clean/other pair** | running | pending | ~30 min |
+| `11158` | **Binary mirror** (progressive precision from the scaled aligned checkpoint, `bit_width 1.0`) | running | pending | ~1–2 h |
+| `11146` | **Stage 3 — 1.7B anchor-free attention rollout** | step ~2 100/3 000 | ternary 35.3 → 24.2 → **20.6 @2000** (past the FFN start 22.03) | ~1 h |
 | — | WP2 / 0.6B offline | finished | see the offline table | — |
 
-**MILESTONE — aligned targets (T4.1–T4.3) take the official algorithm to ~14 WER.**
-The aligned-target run (`11140`, from adapt5, lr 3e-6, 1 500 steps) raw
-official-algorithm WER on the 20-utt guardrail: 20.7 @750 → 16.5 @1000 →
-**13.4 @1250** → 14.4 @1500, with offline held at **14.62** ternary. Every
-earlier recipe's *raw* number was 215–532 (144–190 only with the LSP loop
-policy). The recipe — forced-aligner chunk targets + LSP loop policy + offline
-anchor — is now the recommended WP1 recipe in `docs/HANDOFF.md` §0. Full 50-utt
-clean/other confirmations are the two running evals.
+**MILESTONE (tag `0.2.42`): the aligned-targets recipe works and scales.**
+
+| checkpoint (official algorithm, 320 ms) | offline (50 utt) | streaming raw | streaming policy | loops |
+|---|---:|---:|---:|---:|
+| aligned (first) | 14.62 | 12.71 | **12.61** clean / 22.50 other | 0 |
+| **scaled aligned** (2 400 utts, 7.5 base) | **9.11–10.70** | **9.65** (20 utt @2250) | pending (`11156/11157`) | 0 |
+| previous best (distill3 + loop policy) | 25.6 | 278.18 | 144.60 | 11 |
+
+The recipe: forced-aligner chunk targets (T4.1–T4.3, `--aligned-targets 1`) +
+the LSP loop policy + the offline anchor, from the best offline base. The
+remaining gap to the `+1.5` target (~3.8/6.1) is base quality (offline 7.5 → the
+1.7B next).
 
 **Root cause of the crash chain (fixed):** `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
 is incompatible with this cluster's driver 525 (`CUDA driver error: invalid
