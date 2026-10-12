@@ -7,34 +7,38 @@
 
 ---
 
-## 0. Latest session (2026-10-12) — WP1: two recipes measured, distillation v2 running
+## 0. Latest session (2026-10-12) — WP1: streaming policy fixed; the remaining gap is offline quality
 
-- **WP1 code is in**: on-policy streaming SFT (`--op-rollout*`),
-  **streaming-state distillation** (`--op-distill` + `build_distill_examples`,
-  metadata-stripped targets), filtered-DAgger guard (`is_degenerate`,
-  `--op-filter-degenerate`), and the LSP emission policy
-  (`LSPState`/`update_lsp`/`emit_stable`/`flush_lsp`, reported by
-  `eval_streaming.py --lsp-margin-words`). 300+ tests, ruff clean.
-- **Results (official prefix algorithm, 50-utt test-clean, 320 ms, 32 tokens),
-  all from the 9.2 offline ternary — read `docs/LAB_NOTES.md` 2026-10-12 first:**
+- **WP1 code**: on-policy streaming SFT (`--op-rollout*`), **streaming-state
+  distillation** (`--op-distill`, `build_distill_examples`, metadata-stripped),
+  filtered-DAgger guard (`is_degenerate`, `--op-filter-degenerate`), LSP emission
+  (`LSPState`/`update_lsp`/`emit_stable`/`flush_lsp`, `eval_streaming.py
+  --lsp-margin-words`). ~300 tests, ruff clean.
+- **Results (official prefix algorithm, 50-utt test-clean, 320 ms, 32 tokens) —
+  read `docs/LAB_NOTES.md` 2026-10-12 before repeating any of this:**
 
   | recipe | WER | RTF | outcome |
   |---|---:|---:|---|
-  | static prefix SFT (earlier session) | 203.5 | — | correct text, loops |
+  | static prefix SFT (earlier session) | 203.5 | — | content OK, never stops |
   | DAgger on the student's own prefixes | 920.55 | 4.49 | loops get *worse* |
-  | distillation v1 (metadata kept) | 448.31 | **1.76** | **stops**, content garbled |
-  | distillation v2 (metadata stripped) | running `11042` | — | format conflict fixed |
+  | distillation v1 (metadata kept) | 448.31 | 1.76 | stops, content garbled |
+  | distillation v2 (metadata stripped) | 349.89 | 1.47 | loops gone, stops, under-emits |
+  | **distillation v3 (three-way mix)** | **278.18** | 2.44 | **streaming policy correct** (trace u0 perfect); residual failures = offline content |
+  | v3 + offline anneal | running `11059` | — | recovers offline while keeping 25 % streaming |
 
-- **Running:** `11042` distillation v2 (GPU 1, lr 7e-6, 5 000 steps → ETA ~3 h
-  from 04:15 IST; checkpoint `data/checkpoints/qat_stream_distill2/`), and
-  `11022` WP2 ternary on the full cache (GPU 2, walltime 06:20 IST → chain
-  `qat_ternary_full2.pbs`; ternary 10.70 @2000 from 9.2 = expected dip).
-- **Next steps:** (1) eval v2
-  (`qsub -v CKPT=data/checkpoints/qat_stream_distill2/last.pt,TAG=_distill2 scripts/eval_streaming_opd.pbs`);
-  (2) if the streaming WER is usable, add an offline-annealing phase (standard
-  samples only or a low op-share) and mirror the recipe to binary; (3) if v2
-  fails, try mix 0.3–0.4 / different anchor / warm-up over-sampling before
-  abandoning the state-distillation route.
+- **Key insight (per-chunk traces `diag_opd_distill3_*.json`):** the streaming
+  *policy* now behaves like the pretrained teacher (short EOS-terminated
+  fragments, final text correct); what still costs WER is the *offline* quality
+  the streaming phases erode (offline 21–26 vs the 9.2 baseline). Annealing with
+  a small streaming share (`scripts/qat_stream_anneal.pbs`, `-v MIX=0.25,OPMAX=800`)
+  is the current step.
+- **Running:** `11059` anneal (checkpoint `data/checkpoints/qat_stream_anneal3/`,
+  ~1 h) and `11046` WP2 ternary full-cache resume (steps 5 000→10 000, ~7 h).
+- **Next:** eval the annealed checkpoint
+  (`qsub -v CKPT=data/checkpoints/qat_stream_anneal3/last.pt,TAG=_anneal3 scripts/eval_streaming_opd.pbs`);
+  if offline recovers without losing the streaming policy, mirror the recipe to
+  binary and start the write-up. Also pending: `scripts/qat_binary_full.pbs`
+  (WP2 binary, needs a free GPU) and the Stage-3 scaffold `qat_17b_ffn.pbs`.
 
 ---
 

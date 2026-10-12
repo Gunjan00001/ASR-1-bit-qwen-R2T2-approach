@@ -30,6 +30,7 @@ fi
 MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
 [ -d "$MODEL" ] || MODEL=Qwen/Qwen3-ASR-0.6B
 CKPT="${CKPT:-data/checkpoints/qat_stream_opd/last.pt}"
+TAG="${TAG:-}"
 
 PICK=$(for _ in 1 2 3; do
   nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits
@@ -45,20 +46,20 @@ echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
 echo "=== pretrained (utt 0) ==="
 "$PY" scripts/diag_stream_generation.py \
   --model "$MODEL" --utterance 0 --chunk-ms 320 \
-  --out artifacts/stage1/diag_opd_pretrained_u0.json
+  --out artifacts/stage1/diag_opd${TAG}_pretrained_u0.json
 
 echo "=== on-policy SFT phase 1 (utt 0) ==="
 "$PY" scripts/diag_stream_generation.py \
   --model "$MODEL" --utterance 0 --chunk-ms 320 --checkpoint "$CKPT" --bit-width 1.58 \
-  --out artifacts/stage1/diag_opd_u0.json
+  --out artifacts/stage1/diag_opd${TAG}_u0.json
 
 echo "=== on-policy SFT phase 1 (utt 1) ==="
 "$PY" scripts/diag_stream_generation.py \
   --model "$MODEL" --utterance 1 --chunk-ms 320 --checkpoint "$CKPT" --bit-width 1.58 \
-  --out artifacts/stage1/diag_opd_u1.json
+  --out artifacts/stage1/diag_opd${TAG}_u1.json
 
 echo "=== on-policy SFT phase 1 (utt 1, warm-up skip 1.28 s) ==="
 "$PY" scripts/diag_stream_generation.py \
   --model "$MODEL" --utterance 1 --chunk-ms 320 --min-decode-sec 1.28 \
   --checkpoint "$CKPT" --bit-width 1.58 \
-  --out artifacts/stage1/diag_opd_u1_skip.json
+  --out artifacts/stage1/diag_opd${TAG}_u1_skip.json

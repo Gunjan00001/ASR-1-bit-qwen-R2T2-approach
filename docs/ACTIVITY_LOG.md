@@ -7,32 +7,33 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 05:00 IST)
+## Live status (updated 2026-10-12 06:10 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11044` | **WP1 — distillation v3** (three-way mix: standard + gold-prefix completion + teacher distillation), GPU 1 | running | pending | ~1 h (idle GPU: ~130–175 steps/min) |
-| `11022` | **WP2** — ternary offline continuation, full 28 539-utt cache, GPU 2 | training ~12 steps/min | ternary 10.70 @2000 (from 9.2) | walltime 06:20 IST → chain `qat_ternary_full2.pbs` |
+| `11059` | **WP1 — offline anneal of v3** (MIX 0.25, 800 distillation states + 2 400 standard, lr 5e-6, 3 000 steps), checkpoint `data/checkpoints/qat_stream_anneal3` | running | pending | ~1 h |
+| `11046` | **WP2 — ternary full-cache resume** (from step 5 000 to 10 000, GPU 5) | running | pending | ~7 h (contended) |
 | — | `scripts/qat_binary_full.pbs` (WP2 binary) | **not submitted** — no GPU with ≥45 GB free | — | submit when a GPU frees |
 | — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after WP2 |
 
 **WP1 streaming results so far (official prefix algorithm, 50-utt test-clean,
-320 ms, 32 tokens; all init from the 9.2 offline ternary):**
+320 ms, 32 tokens; all from the 9.2 offline ternary):**
 
 | Recipe | Official-algorithm WER | RTF | Failure mode |
 |---|---:|---:|---|
 | Static prefix SFT (earlier session) | 203.5 | — | correct content, never stops |
 | On-policy SFT, student prefixes (DAgger) | 920.55 | 4.49 | loops get **worse** (fits its own loops) |
 | Distillation v1 (`language X<asr_text>` kept) | 448.31 | 1.76 | stops ✓, content garbled (format conflict) |
-| Distillation v2 (metadata stripped, lr 7e-6) | **349.89** | **1.47** | **loops gone, stops ✓** but *under-emits*: truncates or outputs single words |
-| Distillation v3 (three-way mix) | running `11044` | — | targets the under-emission (gold-prefix completion) |
+| Distillation v2 (metadata stripped, lr 7e-6) | 349.89 | 1.47 | loops gone, stops ✓, under-emits |
+| Distillation v3 (three-way mix) | **278.18** | 2.44 | streaming policy **correct** (u0 trace perfect); residual failures = offline content (25.6 offline) |
+| v3 + offline anneal | running (`11059`) | — | targets the residual content failures |
 
-**v2 details:** offline 21.08 final (16.31 @3000 — a band of 16–21, much better
-than v1's 27–35); LSP margin 3: 438 revisions, committed@50 % 2.8 %.
-Under-emission root cause: the teacher's per-chunk continuations are 1–3 words,
-so the student only saw "finish a nearly-complete prefix and stop" — never the
-lazy state (short prefix + full audio) where the whole remainder is needed.
-v3 adds gold-prefix completion samples for exactly that state.
+**Trace evidence (v3, `diag_opd_distill3_*.json`):** u0 emits short
+EOS-terminated fragments per chunk ("If", "It.", "So.") and the final text is
+exactly right; u1's final chunk (full audio, empty prefix) produced **nothing** —
+the same utterances the offline model (25.6 WER) fails on. So the streaming
+policy is right; the offline degradation left by the streaming phases is what
+still costs WER → the anneal targets exactly that.
 
 **Streaming 320 ms (50 utts) — final picture:**
 

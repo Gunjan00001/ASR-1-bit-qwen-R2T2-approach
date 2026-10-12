@@ -33,6 +33,10 @@ export HF_HOME=/tmp/asr1bit/hf
 
 CKPT="${CKPT:-data/checkpoints/qat_stream_distill2/last.pt}"
 MIX="${MIX:-0.25}"
+OPMAX="${OPMAX:-800}"   # cap the streaming pool so MIX is honoured exactly:
+                        # |streaming| = MIX/(1-MIX) * |standard| (no streaming
+                        # sample is ever dropped, so an oversized pool would
+                        # raise the share instead of the ratio)
 STEPS="${STEPS:-3000}"
 LR="${LR:-5e-6}"
 SAVE_DIR="${SAVE_DIR:-data/checkpoints/qat_stream_anneal}"
@@ -83,7 +87,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --op-chunk-ms 320 \
   --op-chunk-stride 3 \
   --op-max-rounds 16 \
-  --op-max-samples 2400 \
+  --op-max-samples "$OPMAX" \
   --op-mix-frac "$MIX" \
   --op-refresh-every 0 \
   --steps "$STEPS" \

@@ -605,3 +605,34 @@ environmental, not model bugs):
   and then mirroring to binary.
 - **Artifacts:** `artifacts/stage1/streaming_opd_distill2_quantized.json`,
   `eval_streaming_opd_distill2.log`, `qat_stream_distill3.log`.
+
+---
+
+## 2026-10-12 — Distillation v3 (three-way mix): WER 278.18, and the trace shows the streaming policy is *right* — the remaining failures are offline quality
+
+- **Did:** three-way mix (standard + gold-prefix completion + teacher
+  distillation, 40 % streaming) from the v2 checkpoint, 5 000 steps at lr 5e-6
+  (job `11044`), decisive eval `11045`, per-chunk trace `11047`.
+- **Result:** official algorithm **WER 278.18** (v2 349.89, v1 448.31, DAgger
+  920.55, static SFT 203.5), CER 339.10, RTF 2.436; offline 25.6 final
+  (oscillating 24–33).
+- **Trace finding (the important part, `diag_opd_distill3_*.json`):** the
+  streaming *policy* is now correct — on u0 the model emits short
+  EOS-terminated fragments per chunk ("If", "It.", "So.") and the final text is
+  **exactly right** ("IF IT ONLY WERE NOT SO DARK HERE AND SO TERRIBLY LONELY").
+  The remaining failures are *content* failures: on u1 the final chunk (full
+  audio, empty prefix) produced **nothing** — the same utterances the offline
+  model (25.6 WER) cannot transcribe. So under-emission is largely the offline
+  degradation of the streaming phases, not a broken streaming policy.
+- **Chose:** anneal the offline quality while keeping a small streaming share —
+  job `11059` (`scripts/qat_stream_anneal.pbs`, `-v MIX=0.25,OPMAX=800`): init
+  from the v3 checkpoint, 800 distillation states + 2 400 standard samples,
+  lr 5e-6, 3 000 steps. The pool cap is what makes MIX exact: the interleave
+  never drops streaming samples, so |streaming| must be
+  `MIX/(1-MIX) * |standard|`.
+- **Next:** eval the annealed checkpoint; success = offline back toward ≤12-14
+  *and* the official-algorithm WER at or below v3's 278 (ideally single-digit
+  once the content failures disappear). Then mirror to binary.
+- **Artifacts:** `artifacts/stage1/streaming_opd_distill3_quantized.json`,
+  `eval_streaming_opd_distill3.log`, `diag_opd_distill3_*.json`,
+  `qat_stream_anneal.log`.
