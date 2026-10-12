@@ -16,6 +16,8 @@
 # `-v MIX=0` for a standard-samples-only anneal (fastest offline recovery, but
 # it may forget the streaming policy — verify with the eval afterwards).
 #
+# The live `STREAM {...}` evals (20 utts, official algorithm) are the guardrail:
+# stop the run if the streaming WER climbs while the offline WER falls.
 # Init: the distillation checkpoint. Submit:
 #   qsub scripts/qat_stream_anneal.pbs
 #   qsub -v CKPT=data/checkpoints/qat_stream_distill2/last.pt,MIX=0.25 \
@@ -95,6 +97,8 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --train-n 2400 \
   --eval-n 50 \
   --eval-every 1000 \
+  --stream-eval-every 500 \
+  --stream-eval-n 20 \
   --eval-both 0 \
   --eval-fp16 1 \
   --lr "$LR" \
