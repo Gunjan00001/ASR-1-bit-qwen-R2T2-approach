@@ -7,41 +7,40 @@
 
 ---
 
-## 0. Latest session (2026-10-12) — WP1 streaming: policy fixed, balance is the open problem; WP2 offline 7.5
+## 0. Latest session (2026-10-12 night) — WP1 SOLVED-ish: aligned targets (T4.1–T4.3) take the official algorithm to ~14 WER
 
-- **WP1 code**: on-policy streaming SFT (`--op-rollout*`), **streaming-state
-  distillation** (`--op-distill`, metadata-stripped), filtered-DAgger guard
-  (`--op-filter-degenerate`), LSP emission (`--lsp-margin-words`), annealing
-  (`scripts/qat_stream_anneal.pbs`) and **in-training streaming evals**
-  (`--stream-eval-every N --stream-eval-n 10` → `STREAM {...}` log lines).
-  300 tests, ruff clean.
-- **WP2 result:** the full 28 539-utt cache broke the offline plateau —
-  **ternary 7.52 best / 7.63 final** from 9.2 (`data/checkpoints/qat_ternary_full/`).
-  `scripts/qat_binary_full.pbs` now inits from it (progressive precision).
-
-- **Streaming results (official prefix algorithm, 50-utt test-clean, 320 ms, 32
-  tokens) — read `docs/LAB_NOTES.md` 2026-10-12 before repeating any of this:**
-
-  | recipe | WER | outcome |
-  |---|---:|---|
-  | static prefix SFT (earlier session) | 203.5 | content OK, never stops |
-  | DAgger on the student's own prefixes | 920.55 | loops get *worse* |
-  | distillation v1 (metadata kept) | 448.31 | stops, content garbled |
-  | distillation v2 (metadata stripped) | 349.89 | loops gone, stops, under-emits |
-  | distillation v3 (three-way mix) | **278.18** | streaming policy correct; residual = offline content |
-  | v3 + 25 % anneal | 358.90 | offline 15.3 but loops return |
-  | v4 (three-way mix on the 7.5 base) | running `11063` → `STREAM` curve | — |
-
-- **The open problem is the stop/offline balance, not the policy:** 40–50 %
-  streaming share ⇒ stops but offline ~21–26; 25 % ⇒ offline 15.3 but loops.
-  v4 attacks it with a better base (7.5) + live streaming evals so the trade-off
-  curve is visible. If both curves cannot descend together, the fallbacks are a
-  stronger anchor on the streaming samples, a precision-split model, or
-  explicit LSP-based stop handling.
-- **Next steps:** (1) read v4's `STREAM` lines
-  (`grep STREAM artifacts/stage1/qat_stream_distill4.log`); if promising, extend
-  or mirror the recipe to binary; (2) launch `scripts/qat_binary_full.pbs` when
-  a GPU frees; (3) the Stage-3 scaffold `scripts/qat_17b_ffn.pbs` after that.
+- **Recommended WP1 recipe (new):** forced-aligner chunk targets (T4.1–T4.3) +
+  the LSP loop policy + the offline anchor, from the best-content streaming
+  checkpoint:
+  `scripts/qat_stream_aligned.pbs` → `--aligned-targets 1 --aligned-n 800
+  --aligned-stop-stride 2 --op-mix-frac 0.5 --lr 3e-6` (init `qat_stream_adapt5`,
+  which itself came from `qat_stream_distill3` ← the three-way mix ← the 9.2
+  ternary). Eval with `scripts/eval_streaming_opd.pbs` (`TRUNC=1`).
+- **The numbers (20-utt official-algorithm guardrail, raw = no loop policy):**
+  step 750 → 20.7, 1 000 → 16.5, **1 250 → 13.4**, 1 500 → 14.4; offline held at
+  **14.62** ternary. Every earlier recipe's *raw* number was 215–532 (and needed
+  the loop policy to reach 144–190). Full 50-utt clean/other evals are running
+  (`11143`, `11145`).
+- **Why it works:** the target at each 320 ms chunk is exactly *the words whose
+  end time falls in that chunk* (Qwen3-ForcedAligner-0.6B), i.e. "emit what you
+  have heard, then stop" — the supervision that matches the official algorithm,
+  instead of "the whole remainder" (DAgger) or "the teacher's continuation"
+  (distillation), which made the model infer the target length and produced the
+  under-emission / loop failure modes.
+- **Streaming frontier (50-utt, official algorithm, LSP loop policy on):**
+  distill3 144.60 (offline 25.6) · content3 190.78 (15.8) · adapt5 175.00 (14.5)
+  · **aligned ~14 raw (offline 14.6)** — pending the 50-utt confirmation.
+- **Stage 3:** the 1.7B FFN warm start is banked at **ternary 22.03**. The
+  full-attention rollout (1.41 B trainable) needs ~38–40 GB free and is racy on
+  the shared node; `qat_17b_attn5.pbs` (running `11146`) drops the anchor to fit
+  (watch its ternary WER — the 0.6B needed the anchor).
+- **Cluster lessons (binding):** NEVER set `PYTORCH_CUDA_ALLOC_CONF` (driver 525
+  → `CUDA driver error: invalid argument`); `gradient_checkpointing_enable()`
+  breaks this frozen-only setup; `bitsandbytes` is now installed (0.50.2) so
+  `--optimizer adam8bit` really engages — verify it in the log.
+- **Next:** confirm the 50-utt numbers, then scale the aligned recipe
+  (aligned-n 2 400 → 8 000, longer schedule, the 7.5 offline base) and mirror it
+  to binary via progressive precision; the 1.7B once its rollout fits.
 
 ---
 

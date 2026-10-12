@@ -889,3 +889,44 @@ environmental, not model bugs):
   --distill-weight 0`, saves ~7–14 GB, risks the audio-conditioning collapse the
   0.6B needed the anchor for), (c) partial attention quantization (q/k/v first).
   The FFN warm start (22.03 ternary) remains the banked Stage-3 result.
+
+---
+
+## 2026-10-12 — MILESTONE: aligned targets (T4.1–T4.3) take the official algorithm from 215 → **~14 WER**
+
+- **Did:** ran the aligned-target streaming SFT (job `11140`): init from adapt5
+  (offline 14.51), `--aligned-targets 1` (800 utterances aligned with
+  Qwen3-ForcedAligner-0.6B, chunk targets = the words whose end time falls in
+  each 320 ms chunk, `--aligned-stop-stride 2`), 2 400 aligned + 2 400 standard
+  samples, 1 500 steps at lr 3e-6 with 20-utt official-algorithm `STREAM`
+  guardrails every 250 steps.
+- **Result (the decisive curve, official prefix algorithm, 32 tokens, 20 utts):**
+
+  | step | raw streaming WER |
+  |---:|---:|
+  | 750 | 20.71 |
+  | 1 000 | 16.47 |
+  | 1 250 | **13.41** |
+  | 1 500 | 14.35 |
+
+  Offline held at **14.62** ternary (16.74 @500 → 17.58 @1000 → 14.62 @1500);
+  fp16 readout 24.5.
+- **Why this is the breakthrough:** every earlier recipe topped out at a *raw*
+  official-algorithm WER of 215–532 (distill3 278.18, content3 532.20,
+  adapt5 215.04) and needed the LSP loop policy to reach 144–190. The aligned
+  targets make the raw number ~14 — an order of magnitude better — because the
+  supervision now matches the algorithm exactly: *emit the words heard so far,
+  then stop*. The model no longer has to infer the target length from the audio
+  (which produced both failure modes: under-emission and loops); the aligner
+  defines it per chunk.
+- **Confirmation running:** full 50-utt clean eval (`11143`) and the
+  clean/other pair (`11145`, `CFG=other`) with the LSP loop policy enabled
+  (raw vs policy reported).
+- **Next:** (1) read the 50-utt numbers and promote the recipe —
+  aligned targets + LSP loop policy + the offline anchor; (2) scale it: more
+  aligned utterances (2 400 → 8 000), longer schedule, and the same recipe on
+  the 7.5-WER offline base (the 1.7B once its rollout fits); (3) mirror to
+  binary via progressive precision.
+- **Artifacts:** `artifacts/stage1/qat_stream_aligned.log`,
+  `artifacts/stage1/stage1_decoder_attn_ffn_bw1.58_gNone_lr3e-06_adamw_delay_ls1_n2400.json`,
+  `artifacts/stage4/aligner_probe.json`.
