@@ -7,20 +7,34 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 18:50 IST)
+## Live status (updated 2026-10-12 21:20 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11140` | **WP1/T4.3 — aligned-target streaming SFT** (forced-aligner targets, `--aligned-targets 1`, from adapt5) | aligning 800 utterances | pending | ~1–2 h |
-| `11141` | **Stage 3 — 1.7B attention rollout** (adam8bit, no grad-ckpt, no allocator flag) | OOM on a shared GPU; resubmitted | — | retry strategy below |
+| `11143` | **Aligned checkpoint — full 50-utt official eval, clean** (LSP loop policy on) | running (GPU 4) | pending | ~30 min |
+| `11145` | **Aligned checkpoint — clean/other pair** (`CFG=other`) | running (GPU 5) | pending | ~30 min |
+| `11146` | **Stage 3 — 1.7B attention rollout, anchor-free** (fits shared-GPU memory) | running | pending | ~3–5 h |
 | — | WP2 / 0.6B offline | finished | see the offline table | — |
 
+**MILESTONE — aligned targets (T4.1–T4.3) take the official algorithm to ~14 WER.**
+The aligned-target run (`11140`, from adapt5, lr 3e-6, 1 500 steps) raw
+official-algorithm WER on the 20-utt guardrail: 20.7 @750 → 16.5 @1000 →
+**13.4 @1250** → 14.4 @1500, with offline held at **14.62** ternary. Every
+earlier recipe's *raw* number was 215–532 (144–190 only with the LSP loop
+policy). The recipe — forced-aligner chunk targets + LSP loop policy + offline
+anchor — is now the recommended WP1 recipe in `docs/HANDOFF.md` §0. Full 50-utt
+clean/other confirmations are the two running evals.
+
 **Root cause of the crash chain (fixed):** `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
-is incompatible with this cluster's driver 525 and produced
-`CUDA driver error: invalid argument` on ordinary CUDA ops (model loading,
-optimizer state) in three different runs — no earlier run set the flag, and
-removing it made both resubmissions pass their previous crash points. Never set
-it on this cluster.
+is incompatible with this cluster's driver 525 (`CUDA driver error: invalid
+argument` on ordinary CUDA ops) — never set it. Also: `gradient_checkpointing_enable()`
+breaks the frozen-only setup, and `bitsandbytes` (now installed, 0.50.2) is
+required for `--optimizer adam8bit` to engage.
+
+**1.7B attention rollout:** needs ~38–40 GB free (1.41 B trainable, fp32
+student+teacher); the shared node is racy. `qat_17b_attn5.pbs` (`11146`) drops
+the anchor to fit (watch its ternary WER — the 0.6B needed the anchor).
+Banked Stage-3 result: **FFN warm start 22.03 ternary**.
 
 **T4.1/T4.2/T4.3 done:** `data/align.py` (aligner adapter), `data/prefix.py`
 (chunk-aligned targets; probe verified on real audio — e.g. chunk 1 → `'I'`,
