@@ -11,7 +11,7 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11067` | **WP1 — official 50-utt eval of distill3 with the LSP loop policy** (`--lsp-truncate-loops 1`) | running | pending (offline re-score: 278.18 → **144.60**) | ~30 min |
+| `11067` | **WP1 — official 50-utt eval of distill3 with the LSP loop policy** (`--lsp-truncate-loops 1`) | **done** | **WER 144.60** (raw 278.18 → policy 144.60), RTF 1.387, wall 503 s; 348 revisions, committed@50 % 4.8 % | — |
 | — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | next |
 
 **Loop truncation at emission is the biggest single win:** cutting a trailing
@@ -907,3 +907,29 @@ tags through `0.2.39`).
   `qat_ternary_full2.log`,
   `stage1_decoder_attn_ffn_bw1.58_gNone_lr1e-05_adamw_delay_ls1_n28539.json`,
   `qat_stream_anneal.log`.
+
+---
+
+### 09:30 — Scheduled check: binary floor found, v4 killed, LSP loop policy implemented and **confirmed (144.60)**
+
+- **Binary (WP2):** the full-cache binary run finished — **binary 10.70**
+  (19.60 @2000 → 13.88 @4000 → 11.02 @6000 → 10.70 @8000), *identical* to the
+  old binary long3 despite the much better ternary base (readout 9.75 vs 22.35):
+  a quantizer floor, not a base-quality issue.
+- **v4 killed** after 2 000 steps: live 10-utt streaming WER 134.9 → 704.8 and
+  ~17 steps/min (the GPU contention returned).
+- **Loop policy (the win):** diagnosed the anneal-3 loops (8/50 hypotheses
+  5–20× the reference length), implemented `truncate_trailing_loop` +
+  `LSPState(truncate_loops=True)` with tests, and confirmed the real-path eval
+  `11067`: **raw WER 278.18 → policy WER 144.60** on distill3 (RTF 1.387).
+  Offline re-scores of the other checkpoints: distill2 349.89 → 154.56,
+  v1 448.31 → 179.34, anneal3 358.90 → 244.70. Best official-algorithm number
+  so far (previous best recipe: static SFT 203.5).
+- **Also fixed:** the eval's loop-truncation counter now aggregates across
+  utterances (it read only the last state and always reported 0).
+- **Next:** the remaining gap in the 144.6 is ordinary content error (offline
+  25.6) — a content phase that keeps ≥40 % streaming pressure (the 25 % anneal
+  lost the stop policy), with the live `STREAM` evals as the guardrail.
+- **Evidence:** `artifacts/stage1/streaming_opd_lspdistill3_quantized.json`,
+  `eval_streaming_opd_lspdistill3.log`, `qat_binary_full.log`,
+  `qat_stream_distill4.log`.
