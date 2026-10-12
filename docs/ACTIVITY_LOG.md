@@ -7,11 +7,12 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 23:50 IST)
+## Live status (updated 2026-10-13 03:20 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11159` | **Binary mirror** (progressive precision from the scaled aligned checkpoint, `bit_width 1.0`, aligned targets) | running | pending | ~1–2 h |
+| `11161` | **Stage 3 — aligned targets on the 1.7B** (from `qat_17b_attn5`, 1 200 aligned utts, 1 500 steps, adam8bit, teacher dropped for memory) | starting (baseline eval) | pending | ~2–4 h |
+| — | **Binary mirror** (`qat_stream_aligned2bin2.pbs`) | **deferred** — node nearly full; first attempt OOM'd after a co-tenant grew to 52 GB | — | when a GPU with ≥20 GB frees |
 | — | **Scaled aligned evals** (`11156`/`11157`) | **done** | clean **12.92** (CER 5.00), other **20.00**, 0 loops | — |
 | — | **1.7B anchor-free attention rollout** (`11146`) | **done (2000 steps)** | ternary **20.55** (from 22.03); pretrained 1.17 | — |
 
