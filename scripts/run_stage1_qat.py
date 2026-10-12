@@ -283,6 +283,36 @@ def collect_op_examples(
             set_precision(model, args.bit_width, restore_alpha)
 
 
+def evaluate_streaming(
+    wrapper, model, utterances, n: int, *, chunk_ms: int = 320, max_new_tokens: int = 32,
+    unfixed_token_num: int = 5,
+) -> dict:
+    """Official-algorithm streaming WER on a small eval slice (training feedback).
+
+    The periodic eval is offline-only, which made the streaming iterations blind
+    (docs/ACTIVITY_LOG.md 2026-10-12). This runs the portable streamer on the
+    first ``n`` eval utterances, exactly like ``scripts/eval_streaming.py``.
+    """
+    refs, hyps = [], []
+    previous = getattr(wrapper, "max_new_tokens", None)
+    try:
+        wrapper.max_new_tokens = max_new_tokens
+        for utt in utterances[:n]:
+            trace = backends.stream_transcribe_portable(
+                wrapper,
+                utt.audio,
+                chunk_size_sec=chunk_ms / 1000.0,
+                step_sec=chunk_ms / 1000.0,
+                unfixed_token_num=unfixed_token_num,
+            )
+            refs.append(utt.text)
+            hyps.append(trace.text)
+    finally:
+        if previous is not None:
+            wrapper.max_new_tokens = previous
+    return {"n": len(refs), "wer": corpus_wer(refs, hyps), "cer": corpus_cer(refs, hyps)}
+
+
 def shadow_state(model) -> dict:
     """Trainable tensor snapshot (BitLinear shadows and learnable scales)."""
     return {name: p.detach().cpu() for name, p in model.named_parameters() if p.requires_grad}
@@ -419,6 +449,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--op-filter-degenerate", type=int, default=1,
                    help="1 = drop on-policy states whose own text is already a repetition loop "
                         "(guards against DAgger poisoning; distillation ignores this flag).")
+    p.add_argument("--stream-eval-every", type=int, default=0,
+                   help="Run the official-algorithm streaming eval on a small eval slice every N "
+                        "steps (0 = off). The offline eval cannot see streaming regressions.")
+    p.add_argument("--stream-eval-n", type=int, default=10,
+                   help="Utterances in the in-training streaming eval (kept small: it is slow).")
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
 
@@ -658,6 +693,23 @@ def main() -> int:
                 ),
                 flush=True,
             )
+        if args.stream_eval_every and (step + 1) % args.stream_eval_every == 0:
+            model.eval()
+            with torch.no_grad():
+                stream = evaluate_streaming(
+                    wrapper, model, eval_utts, args.stream_eval_n,
+                    chunk_ms=args.op_chunk_ms,
+                )
+            model.train()
+            set_precision(model, args.bit_width, alpha)
+            ev = {
+                "step": step + 1,
+                "stream_wer": stream["wer"],
+                "stream_cer": stream["cer"],
+                "stream_n": stream["n"],
+            }
+            history.append(ev)
+            print("STREAM " + json.dumps(ev), flush=True)
         if args.eval_every and (step + 1) % args.eval_every == 0:
             prec = evaluate_precisions(
                 wrapper, model, eval_utts, args.eval_n,

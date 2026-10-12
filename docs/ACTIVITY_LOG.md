@@ -7,26 +7,31 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 07:10 IST)
+## Live status (updated 2026-10-12 07:45 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11062` | **WP1 — streaming eval of the annealed v3** (`qat_stream_anneal3`) | running (GPU 2) | pending | ~30 min |
-| `11046` | **WP2 — ternary full-cache run** | **finished 10 000 steps** | **ternary 7.52 best / 7.63 final** (from 9.2) | done — new best offline checkpoint |
-| — | `scripts/qat_binary_full.pbs` (WP2 binary) | ready: now inits from `qat_ternary_full/last.pt` (progressive precision) | — | submit when a GPU with ≥45 GB frees |
+| `11063` | **WP1 — distillation v4** on the 7.5 full-cache base (three-way mix, 8 000 steps, lr 5e-6) + **live streaming evals** (`STREAM {...}` every 1 000 steps), GPU 1 | running | pending | ~1–2 h |
+| — | `scripts/qat_binary_full.pbs` (WP2 binary) | ready: inits from `qat_ternary_full/last.pt` (progressive precision) | — | submit when a GPU with ≥45 GB frees |
 | — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after binary |
-| — | **v4** (WP1 on the 7.5 base) | planned: three-way distillation + anneal from `qat_ternary_full` | — | after the anneal eval |
 
-**Offline best (ter: ternary, 50-utt test-clean; fp16 pretrained 2.44):**
+**New trainer instrumentation:** `--stream-eval-every N --stream-eval-n 10` runs
+the official-algorithm streaming eval on the first 10 eval utterances during
+training and prints `STREAM {"step":…,"stream_wer":…}` — the earlier streaming
+iterations were flying blind because the periodic eval is offline-only.
+
+**Offline best (50-utt test-clean; fp16 pretrained 2.44):**
 
 | Checkpoint | Offline ternary |
 |---|---:|
 | `qat_ternary_long2` (8k data) | 9.2 |
 | **`qat_ternary_full` (28 539 utts)** | **7.52 best / 7.63 final** |
-| `qat_stream_anneal3` (streaming v3 + anneal) | 15.25 (14.83 best) |
+| `qat_stream_distill2` (streaming v2) | 21.1 |
+| `qat_stream_distill3` (streaming v3) | 25.6 |
+| `qat_stream_anneal3` (v3 + 25 % anneal) | 15.25 (14.83 best) |
 
-**WP1 streaming results so far (official prefix algorithm, 50-utt test-clean,
-320 ms, 32 tokens):**
+**WP1 streaming results (official prefix algorithm, 50-utt test-clean, 320 ms,
+32 tokens):**
 
 | Recipe | Official-algorithm WER | RTF | Failure mode |
 |---|---:|---:|---|
@@ -35,7 +40,8 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 | Distillation v1 (`language X<asr_text>` kept) | 448.31 | 1.76 | stops ✓, content garbled (format conflict) |
 | Distillation v2 (metadata stripped) | 349.89 | 1.47 | loops gone, stops ✓, under-emits |
 | Distillation v3 (three-way mix) | **278.18** | 2.44 | streaming policy **correct**; residual failures = offline content |
-| v3 + offline anneal (`11062`) | running | — | offline 25.6 → 15.25; streaming pending |
+| v3 + 25 % anneal | 358.90 | 2.68 | offline recovered (15.3) but **loops returned** — a thin streaming share does not hold the stop policy |
+| v4 (three-way mix on the 7.5 base) | running `11063` | — | live `STREAM` evals will show the curve |
 
 **Streaming 320 ms (50 utts) — final picture:**
 

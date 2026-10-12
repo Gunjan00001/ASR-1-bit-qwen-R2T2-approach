@@ -636,3 +636,39 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/streaming_opd_distill3_quantized.json`,
   `eval_streaming_opd_distill3.log`, `diag_opd_distill3_*.json`,
   `qat_stream_anneal.log`.
+
+---
+
+## 2026-10-12 — The anneal trade-off, measured: offline 25.6 → 15.3 costs the stop policy (loops return, WER 358.9)
+
+- **Did:** annealed the v3 streaming model (`11059`, 25 % streaming share: 800
+  distillation states + 2 400 standard samples, lr 5e-6, 3 000 steps) and
+  evaluated it (`11062`).
+- **Result:** offline **15.25** (14.83 best) from 25.6 — the anneal works for
+  offline. Streaming **WER 358.90** (RTF 2.68), *worse* than the un-annealed
+  v3 (278.18): 8 of 50 hypotheses are **loops 5–20× the reference length**
+  (583/29, 857/54 words …), only 4 under-emit, 0 empty. The stop policy was
+  partially forgotten.
+- **Why:** the two objectives are in direct tension on the "when to stop"
+  dimension, and the *streaming share* controls which side wins. 40–50 %
+  streaming (v2/v3) ⇒ stops, offline 21–26. 25 % ⇒ offline 15.3, loops back.
+  The offline behaviour cannot be recovered "for free" after the streaming
+  behaviour is learned; both need to be co-trained at a rate where the stop
+  policy sticks.
+- **Chose (v4, job `11063`):** three-way mix on the *new 7.5 offline base*
+  (`qat_ternary_full`) instead of the 9.2 one, 8 000 steps at lr 5e-6, and —
+  the key instrumentation change — **live streaming evals during training**
+  (`--stream-eval-every 1000 --stream-eval-n 10`, printed as `STREAM {...}`),
+  so the streaming/offline trade-off curve is visible instead of inferred from
+  end-of-run evals. Also: do not anneal below a share that holds the stop
+  policy; if offline must be recovered, mix in the other streaming phases'
+  samples rather than reducing the streaming sample count.
+- **Next:** read the v4 `STREAM` curve: if the streaming WER descends with the
+  offline stable in the 15–20 band, keep training (or extend) and mirror the
+  recipe to binary; if the two curves cannot be made to descend together, the
+  last resort per the plan is a precision-split model (streaming policy in the
+  quantized path, offline anchor stronger) or explicit LSP-based stop handling.
+- **Artifacts:** `artifacts/stage1/streaming_opd_anneal3_quantized.json`,
+  `eval_streaming_opd_anneal3.log`, `qat_stream_anneal.log`,
+  `qat_stream_distill4.log`.
+
