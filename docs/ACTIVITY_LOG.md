@@ -7,37 +7,34 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 15:30 IST)
+## Live status (updated 2026-10-12 18:50 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11121` | **Stage 3 — 1.7B attention rollout, retry with the memory stack** (adam8bit + grad-checkpointing + expandable_segments) | starting | pending | ~3–5 h |
-| — | WP1/WP2 0.6B | all finished | see operating points below | — |
+| `11140` | **WP1/T4.3 — aligned-target streaming SFT** (forced-aligner targets, `--aligned-targets 1`, from adapt5) | aligning 800 utterances | pending | ~1–2 h |
+| `11141` | **Stage 3 — 1.7B attention rollout** (adam8bit, no grad-ckpt, no allocator flag) | OOM on a shared GPU; resubmitted | — | retry strategy below |
+| — | WP2 / 0.6B offline | finished | see the offline table | — |
 
-**The WP1 frontier is now measured (all with the LSP loop policy, 50 utts):**
+**Root cause of the crash chain (fixed):** `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+is incompatible with this cluster's driver 525 and produced
+`CUDA driver error: invalid argument` on ordinary CUDA ops (model loading,
+optimizer state) in three different runs — no earlier run set the flag, and
+removing it made both resubmissions pass their previous crash points. Never set
+it on this cluster.
 
-| checkpoint | offline ternary | raw streaming | + LSP loop policy | loop truncations |
-|---|---:|---:|---:|---:|
-| **distill3** | 25.6 | 278.18 | **144.60** (best streaming) | 11 |
-| content3 | 15.8 | 532.20 | 190.78 | 228 |
-| adapt5 | **14.51** | **215.04** (best raw) | 175.00 | 233 |
+**T4.1/T4.2/T4.3 done:** `data/align.py` (aligner adapter), `data/prefix.py`
+(chunk-aligned targets; probe verified on real audio — e.g. chunk 1 → `'I'`,
+chunk 2 → `'HAVE GREAT'`, 9/39 chunks empty for *"I HAVE GREAT THINGS…"*), and
+`--aligned-targets 1` in the trainer with `--aligned-stop-stride 2`. The probe
+also exposed the recipe's supervision quality: targets are exactly
+"the words whose end time falls in this chunk" — the first recipe whose targets
+are defined by the *audio heard*, not by the model or the teacher.
 
-`adapt5` (three-way mix from content3, lr 3e-6, 2 000 steps) repaired most of
-the content phase's raw damage (532 → 215) and has the best offline number of
-the streaming family (14.51), but its loop propensity stays high (233
-truncations), so after the loop policy it is still behind distill3
-(175.0 vs 144.6). **Neither checkpoint is a clean winner**: distill3 = best
-streaming + worst offline; adapt5 = best offline + worse streaming. The honest
-verdict is that the content/stop balance remains the open problem (the plan's
-forced-aligner stable-prefix targets are the untried piece).
-
-**Stage 3 — 1.7B:** the attention rollout (196 projections, **1.41 B trainable**)
-**OOM'd** on a 45 GB-occupied GPU (`11116`: 34.6 GiB in-process + the co-tenant's
-42 GB). Fix shipped as `scripts/qat_17b_attn2.pbs` — `--optimizer adam8bit
---grad-checkpointing 1` + `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
-(the FFN-only stage at 1.06 B trainable fit comfortably; the rollout needs the
-memory stack). Retry `11121` is running. Earlier Stage-3 result stands:
-**1.7B FFN warm start = ternary 22.03** (better than the 0.6B's 25.7).
+**1.7B attention rollout:** needs ~38–40 GB free (1.41 B trainable, fp32
+student+teacher, fp32 Adam); the shared node's co-tenants make that racy. Retry
+options: a quiet GPU (≥55 GB free), dropping the anchor
+(`--frozen-teacher 0 --distill-weight 0`), or partial attention quantization.
+Banked Stage-3 result: **FFN warm start 22.03 ternary**.
 
 **Loop truncation at emission is the biggest single win:** cutting a trailing
 repetition loop (one unit kept) at the LSP layer takes distill3 from **278.18 →
