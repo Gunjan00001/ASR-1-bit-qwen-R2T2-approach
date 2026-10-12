@@ -822,3 +822,43 @@ environmental, not model bugs):
 - **Artifacts:** `src/asr1bit/data/{align,prefix}.py`, `tests/test_data_prefix.py`,
   `scripts/probe_aligner.py`, `artifacts/stage4/aligner_probe.json`,
   `artifacts/stage3/qat_17b_attn2.log` (grad-ckpt crash).
+
+---
+
+## 2026-10-12 — Stage-3 OOM chain root-caused (bitsandbytes was missing) + T4.3 wired
+
+- **Did:** chased the 1.7B attention-rollout failures to the end and wired the
+  aligned targets into the trainer.
+- **The OOM chain (all three attempts):**
+  1. `11116` (fp32 AdamW): OOM at 34.6 GiB in-process + a 42 GB co-tenant.
+  2. `11121` (`--grad-checkpointing 1` + `--optimizer adam8bit`): crashed with
+     `element 0 of tensors does not require grad` — **gradient checkpointing is
+     incompatible with this frozen-only setup** (`gradient_checkpointing_enable()`
+     without `use_reentrant=False`/`enable_input_require_grads`).
+  3. `11134` (`--optimizer adam8bit`, no grad-ckpt): crashed with
+     `CUDA driver error: invalid argument` inside `torch._multi_tensor_adam` —
+     and the traceback showed **fp32 AdamW**, because **bitsandbytes was not
+     installed** and `build_optimizer` silently falls back (`warnings.warn` →
+     AdamW). The flag had never been exercised on this cluster.
+- **Fix:** installed `bitsandbytes 0.50.2` into the shared conda
+  (`~/miniconda3`), added a one-off sync job for the node-local env (`11138`),
+  and made the launcher use the shared env explicitly (`qat_17b_attn4.pbs`,
+  job `11137`). Lesson: **verify `--optimizer adam8bit` actually engaged**
+  (grep the run log for the fallback warning) whenever memory matters.
+- **T4.3 wired:** `scripts/run_stage1_qat.py` gained `--aligned-targets 1`
+  (`--aligned-n`, `--aligned-lookahead-ms`, `--aligned-stop-stride`): it loads
+  `Qwen3ForcedAligner-0.6B`, aligns the train utterances, builds
+  (audio-slice, template+prefix, target) samples via `chunk_examples`, and mixes
+  them with the standard samples through the existing `interleave_with_ratio`
+  machinery. `stop_stride=2` halves the empty-target (stop) samples so the mix
+  is not dominated by silence teaching. 3 new glue tests (suite 325 passed,
+  ruff clean). The probe (`artifacts/stage4/aligner_probe.json`) confirmed the
+  targets on real audio, e.g. for *"I HAVE GREAT THINGS…"*: chunk 1 → `'I'`,
+  chunk 2 → `'HAVE GREAT'`, chunk 3 → `'THINGS'`, 9/39 chunks empty.
+- **Next:** launch the aligned SFT run — from `qat_stream_adapt5` (offline 14.5)
+  with `--aligned-targets 1 --op-mix-frac 0.5`, lr ~3e-6, 1 500–2 000 steps,
+  plus `--stream-eval-every 250 --stream-eval-n 20` as the guardrail; then the
+  full 50-utt eval with the loop policy. This is the first run whose targets are
+  *defined by the audio heard*, so it should improve both failure directions.
+- **Artifacts:** `artifacts/stage3/qat_17b_attn{2,3}.log` (crashes),
+  `qat_17b_attn4.log` (fix), `artifacts/stage4/aligner_probe.json`.

@@ -313,6 +313,72 @@ def evaluate_streaming(
     return {"n": len(refs), "wer": corpus_wer(refs, hyps), "cer": corpus_cer(refs, hyps)}
 
 
+def build_aligned_examples(
+    utterances,
+    processor,
+    aligner,
+    *,
+    prompt: str = "",
+    chunk_ms: int = 320,
+    lookahead_ms: int = 0,
+    stop_stride: int = 2,
+    progress=None,
+) -> list[dict]:
+    """Chunk-aligned SFT samples from forced-aligner word timestamps (T4.3).
+
+    For every utterance: align the reference (T4.1) → chunk targets (T4.2) →
+    ``(audio_slice, template + prefix, target)`` examples. The target is exactly
+    the words the model should have emitted at that chunk ("what I have heard,
+    then stop"), which is the behaviour the official prefix algorithm needs.
+
+    Roughly half of all chunks have *no* new words (an empty target = a stop
+    sample); ``stop_stride`` keeps only every N-th of those so the mix is not
+    dominated by silence teaching.
+    """
+    from asr1bit.data.align import align_words
+    from asr1bit.data.prefix import chunk_examples
+
+    examples: list[dict] = []
+    empty_seen = 0
+    for index, utt in enumerate(utterances):
+        words = align_words(utt.audio, utt.text, aligner=aligner)
+        if not words:
+            continue
+        empty_seen = 0
+        for example in chunk_examples(
+            words,
+            chunk_sec=chunk_ms / 1000.0,
+            lookahead_sec=lookahead_ms / 1000.0,
+            total_sec=utt.duration,
+        ):
+            if not example.target_text:
+                empty_seen += 1
+                if stop_stride > 1 and (empty_seen - 1) % stop_stride != 0:
+                    continue
+            samples = max(1, round(example.audio_sec * 16000))
+            audio = utt.audio[:samples]
+            prefix = processor.apply_chat_template(
+                [
+                    {"role": "system", "content": prompt or ""},
+                    {"role": "user", "content": [{"type": "audio", "audio": None}]},
+                ],
+                add_generation_prompt=True,
+                tokenize=False,
+            )
+            if isinstance(prefix, list):
+                prefix = prefix[0]
+            examples.append(
+                {
+                    "audio": audio,
+                    "prefix_text": prefix + example.prefix_text,
+                    "target": example.target_text,
+                }
+            )
+        if progress is not None and (index + 1) % 50 == 0:
+            progress(index + 1, len(utterances))
+    return examples
+
+
 def shadow_state(model) -> dict:
     """Trainable tensor snapshot (BitLinear shadows and learnable scales)."""
     return {name: p.detach().cpu() for name, p in model.named_parameters() if p.requires_grad}
@@ -454,6 +520,17 @@ def parse_args() -> argparse.Namespace:
                         "steps (0 = off). The offline eval cannot see streaming regressions.")
     p.add_argument("--stream-eval-n", type=int, default=10,
                    help="Utterances in the in-training streaming eval (kept small: it is slow).")
+    p.add_argument("--aligned-targets", type=int, default=0,
+                   help="1 = build streaming SFT samples from forced-aligner word timestamps "
+                        "(T4.3): each chunk's target is exactly the words whose end time falls "
+                        "inside it (+ lookahead). Mixed with the standard samples via --op-mix-frac.")
+    p.add_argument("--aligned-n", type=int, default=800,
+                   help="Train utterances to align for --aligned-targets (aligning is cheap).")
+    p.add_argument("--aligned-lookahead-ms", type=int, default=0,
+                   help="Extra audio the aligned target may include (0 = strictly causal).")
+    p.add_argument("--aligned-stop-stride", type=int, default=2,
+                   help="Keep every N-th empty-target (stop) aligned sample (half of all chunks "
+                        "have no new words; stride 1 keeps them all).")
     p.add_argument("--out", default="artifacts/stage1")
     return p.parse_args()
 
@@ -579,7 +656,39 @@ def main() -> int:
     standard_examples = train_examples
     op_utterances: list = []
     op_examples: list[dict] = []
-    if args.op_rollout:
+    if args.aligned_targets:
+        strip = min(args.aligned_n, len(train_utts))
+        print(f"=== forced-aligner targets: aligning {strip} train utterances (T4.1) ===", flush=True)
+        from qwen_asr import Qwen3ForcedAligner
+
+        from asr1bit.data.align import DEFAULT_ALIGNER_MODEL
+
+        aligner = Qwen3ForcedAligner.from_pretrained(DEFAULT_ALIGNER_MODEL)
+        align_started = time.perf_counter()
+
+        def align_progress(done: int, total: int) -> None:
+            print(f"aligned {done}/{total} utts ({time.perf_counter() - align_started:.0f}s)", flush=True)
+
+        aligned = build_aligned_examples(
+            train_utts[:strip],
+            processor,
+            aligner,
+            chunk_ms=args.op_chunk_ms,
+            lookahead_ms=args.aligned_lookahead_ms,
+            stop_stride=args.aligned_stop_stride,
+            progress=align_progress,
+        )
+        del aligner
+        torch.cuda.empty_cache()
+        op_utterances = train_utts[:strip]
+        op_examples = select_evenly(aligned, args.op_max_samples)
+        train_examples = interleave_with_ratio(standard_examples, op_examples, args.op_mix_frac)
+        print(
+            f"aligned targets: {len(aligned)} examples -> {len(op_examples)} pooled | "
+            f"mix {len(train_examples)} ({len(standard_examples)} standard + {len(op_examples)} aligned)",
+            flush=True,
+        )
+    elif args.op_rollout:
         op_utterances = train_utts[: args.op_rollout_n]
         mode = (
             "streaming-state distillation (teacher rollout)"
@@ -678,6 +787,7 @@ def main() -> int:
             print(json.dumps(record), flush=True)
         if (
             args.op_rollout
+            and not args.aligned_targets
             and args.op_refresh_every
             and (step + 1) % args.op_refresh_every == 0
         ):
@@ -727,7 +837,7 @@ def main() -> int:
             save_checkpoint(Path(args.save_dir) / "last.pt", model, step + 1, args)
     results["history"] = history
     results["qat_seconds"] = time.perf_counter() - started
-    if args.op_rollout:
+    if args.op_rollout or args.aligned_targets:
         results["on_policy_examples"] = len(op_examples)
         results["on_policy_utterances"] = len(op_utterances)
         results["mix_size"] = len(train_examples)

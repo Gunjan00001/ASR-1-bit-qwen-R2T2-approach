@@ -43,6 +43,9 @@ class _FakeProcessor:
     def batch_decode(self, ids, skip_special_tokens=True, clean_up_tokenization_spaces=False):
         return [self.continuation] * int(np.asarray(ids).shape[0])
 
+    def apply_chat_template(self, messages, add_generation_prompt=True, tokenize=False):
+        return "PROMPT "
+
 
 class _FakeTokenizer:
     eos_token_id = 2
@@ -123,6 +126,65 @@ def _utterance(text, seconds):
         reference=text.lower(),
         duration=seconds,
     )
+
+
+class TestBuildAlignedExamples:
+    def _fake_aligner(self, items):
+        class _Item:
+            def __init__(self, text, start, end):
+                self.text, self.start_time, self.end_time = text, start, end
+
+        class _Result:
+            def __init__(self):
+                self.items = [_Item(*item) for item in items]
+
+        class _Aligner:
+            def __init__(self):
+                self.calls = 0
+
+            def align(self, audio, text, language):
+                self.calls += 1
+                return [_Result()]
+
+        return _Aligner()
+
+    def test_builds_chunk_samples_from_timestamps(self):
+        module = _load_trainer()
+        wrapper = _FakeWrapper()
+        aligner = self._fake_aligner([("ONE", 0.1, 0.4), ("TWO", 0.5, 0.9)])
+        utterances = [_utterance("ONE TWO", 1.6)]
+        examples = module.build_aligned_examples(
+            utterances, wrapper.processor, aligner, chunk_ms=500, stop_stride=1
+        )
+        targets = [e["target"] for e in examples]
+        assert targets == ["ONE", "TWO", "", ""]
+        assert all(e["prefix_text"].startswith("PROMPT") for e in examples)
+        # audio slices follow the chunk clock (0.5/1.0/1.5 s, then the 1.6 s tail)
+        assert [e["audio"].shape[0] for e in examples] == [8000, 16000, 24000, 25600]
+
+    def test_stop_stride_subsamples_empty_targets(self):
+        module = _load_trainer()
+        wrapper = _FakeWrapper()
+        aligner = self._fake_aligner([("ONE", 0.1, 0.2)])
+        utterances = [_utterance("ONE", 2.1)]
+        kept_all = module.build_aligned_examples(
+            utterances, wrapper.processor, aligner, chunk_ms=500, stop_stride=1
+        )
+        kept_half = module.build_aligned_examples(
+            utterances, wrapper.processor, aligner, chunk_ms=500, stop_stride=2
+        )
+        assert sum(1 for e in kept_all if not e["target"]) == 4
+        assert sum(1 for e in kept_half if not e["target"]) == 2
+        assert len(kept_half) < len(kept_all)
+
+    def test_skips_utterances_without_alignment(self):
+        module = _load_trainer()
+        wrapper = _FakeWrapper()
+        aligner = self._fake_aligner([])
+        examples = module.build_aligned_examples(
+            [_utterance("A B", 1.0)], wrapper.processor, aligner, chunk_ms=500
+        )
+        assert examples == []
 
 
 class TestRolloutOnPolicyExamples:
