@@ -11,24 +11,25 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11156` | **Scaled aligned checkpoint — 50-utt clean eval** (`TRUNC=1`) | running | pending (in-training: streaming 9.65, offline 9.11-10.70) | ~30 min |
-| `11157` | **Scaled aligned checkpoint — clean/other pair** | running | pending | ~30 min |
-| `11158` | **Binary mirror** (progressive precision from the scaled aligned checkpoint, `bit_width 1.0`) | running | pending | ~1–2 h |
-| `11146` | **Stage 3 — 1.7B anchor-free attention rollout** | step ~2 100/3 000 | ternary 35.3 → 24.2 → **20.6 @2000** (past the FFN start 22.03) | ~1 h |
-| — | WP2 / 0.6B offline | finished | see the offline table | — |
+| `11159` | **Binary mirror** (progressive precision from the scaled aligned checkpoint, `bit_width 1.0`, aligned targets) | running | pending | ~1–2 h |
+| — | **Scaled aligned evals** (`11156`/`11157`) | **done** | clean **12.92** (CER 5.00), other **20.00**, 0 loops | — |
+| — | **1.7B anchor-free attention rollout** (`11146`) | **done (2000 steps)** | ternary **20.55** (from 22.03); pretrained 1.17 | — |
 
 **MILESTONE (tag `0.2.42`): the aligned-targets recipe works and scales.**
 
-| checkpoint (official algorithm, 320 ms) | offline (50 utt) | streaming raw | streaming policy | loops |
+| checkpoint (official algorithm, 320 ms, 50 utts, LSP policy on) | offline | clean | other | loops |
 |---|---:|---:|---:|---:|
-| aligned (first) | 14.62 | 12.71 | **12.61** clean / 22.50 other | 0 |
-| **scaled aligned** (2 400 utts, 7.5 base) | **9.11–10.70** | **9.65** (20 utt @2250) | pending (`11156/11157`) | 0 |
-| previous best (distill3 + loop policy) | 25.6 | 278.18 | 144.60 | 11 |
+| aligned v1 | 14.62 | **12.61** | 22.50 | 0 |
+| **scaled aligned** (7.5 base, 2 400 utts) | **9.1–10.7** | **12.92** (CER 5.00) | **20.00** | 0 |
+| pretrained fp16 reference | 2.44 / **1.17 (1.7B)** | 2.33 | ~4.6 | — |
+| previous best streaming (distill3 + loop policy) | 25.6 | 144.60 | — | 11 |
 
-The recipe: forced-aligner chunk targets (T4.1–T4.3, `--aligned-targets 1`) +
-the LSP loop policy + the offline anchor, from the best offline base. The
-remaining gap to the `+1.5` target (~3.8/6.1) is base quality (offline 7.5 → the
-1.7B next).
+The 0.6B streaming has **saturated at ~12–13** (scaling improved offline and
+`other`, not `clean`) — the remaining error is the model's own streaming content
+ability, so the **1.7B** (pretrained offline 1.17 vs the 0.6B's 2.44) is the
+lever. Stage 3 status: FFN warm start 22.03, anchor-free attention rollout
+finished at **20.55** (2000 steps; the anchored variant awaits a quiet GPU).
+The binary mirror (`11159`) is running.
 
 **Root cause of the crash chain (fixed):** `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
 is incompatible with this cluster's driver 525 (`CUDA driver error: invalid
