@@ -57,6 +57,10 @@ def parse_args() -> argparse.Namespace:
                    help="Enable Longest-Stable-Prefix emission holding back this many words "
                         "(Stage 4 / T4.4). The final text is unchanged; the report adds the "
                         "append-only commit latency and revision count.")
+    p.add_argument("--lsp-truncate-loops", type=int, default=0,
+                   help="1 = LSP stop policy: cut a trailing repetition loop at emission "
+                        "(measured: corpus WER 278 -> 144 on the 2026-10-12 checkpoints). "
+                        "Implies the LSP state; pass --lsp-margin-words for a margin too.")
     p.add_argument("--out", default=None)
     return p.parse_args()
 
@@ -104,15 +108,21 @@ def main() -> int:
                 continue
             set_qat_alpha(model, alpha)
             refs, hyps = [], []
+            raw_hyps: list[str] = []
             total_decode = 0.0
             total_audio = 0.0
             started = time.perf_counter()
             lsp_revisions = 0
             lsp_progress: dict[float, list[float]] = {}
-            lsp_enabled = args.lsp_margin_words is not None
+            lsp_enabled = args.lsp_margin_words is not None or bool(args.lsp_truncate_loops)
             for utt in utterances:
                 lsp_state = (
-                    LSPState(margin_words=args.lsp_margin_words) if lsp_enabled else None
+                    LSPState(
+                        margin_words=args.lsp_margin_words or 0,
+                        truncate_loops=bool(args.lsp_truncate_loops),
+                    )
+                    if lsp_enabled
+                    else None
                 )
                 trace = backends.stream_transcribe_portable(
                     wrapper, utt.audio,
@@ -128,6 +138,7 @@ def main() -> int:
                 total_audio += trace.audio_sec
                 if lsp_state is not None:
                     lsp_revisions += trace.revisions
+                    raw_hyps.append(trace.chunks[-1] if trace.chunks else trace.text)
                     for fraction in (0.5, 0.8):
                         cutoff = fraction * trace.audio_sec
                         committed = 0
@@ -149,9 +160,13 @@ def main() -> int:
                 "references": refs,
             }
             if lsp_enabled:
+                truncations = getattr(lsp_state, "loop_truncations", 0)
                 results["conditions"][name]["lsp"] = {
                     "margin_words": args.lsp_margin_words,
+                    "truncate_loops": bool(args.lsp_truncate_loops),
                     "revisions": lsp_revisions,
+                    "loop_truncations": truncations,
+                    "wer_raw": corpus_wer(refs, raw_hyps) if raw_hyps else None,
                     "committed_frac": {
                         str(fraction): sum(values) / len(values)
                         for fraction, values in sorted(lsp_progress.items())
@@ -165,8 +180,11 @@ def main() -> int:
             )
             if lsp_enabled:
                 lsp_report = results["conditions"][name]["lsp"]
+                raw = lsp_report["wer_raw"]
                 print(
-                    f"    LSP(margin={args.lsp_margin_words}): revisions {lsp_report['revisions']} | "
+                    f"    LSP(margin={args.lsp_margin_words}, truncate_loops={lsp_report['truncate_loops']}): "
+                    f"revisions {lsp_report['revisions']} | loop truncations {lsp_report['loop_truncations']} | "
+                    + (f"raw WER {raw:.2f} -> policy {wer:.2f} | " if raw is not None else "")
                     + " | ".join(
                         f"committed@{fraction}: {value * 100:.1f}%"
                         for fraction, value in lsp_report["committed_frac"].items()

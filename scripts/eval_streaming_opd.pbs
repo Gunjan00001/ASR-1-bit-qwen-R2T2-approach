@@ -25,6 +25,7 @@ export HF_HOME=/tmp/asr1bit/hf
 CKPT="${CKPT:-data/checkpoints/qat_stream_opd/last.pt}"
 CFG="${CFG:-clean}"
 TAG="${TAG:-}"
+TRUNC="${TRUNC:-0}"
 SUFFIX=""
 [ "$CFG" = "other" ] && SUFFIX="_other"
 LOG="artifacts/stage1/eval_streaming_opd${TAG}${SUFFIX}.log"
@@ -66,6 +67,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --max-new-tokens 32 \
   --unfixed-token-num 5 \
   --lsp-margin-words 3 \
+  --lsp-truncate-loops "$TRUNC" \
   --conditions quantized \
   --out "artifacts/stage1/streaming_opd${TAG}${SUFFIX}_quantized.json" \
   2>&1 | tee -a "$LOG"

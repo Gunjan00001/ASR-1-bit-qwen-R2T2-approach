@@ -266,6 +266,61 @@ def word_safe_cut(text: str, limit: int, margin_words: int = 0) -> int:
     return cut
 
 
+def truncate_trailing_loop(
+    text: str,
+    *,
+    max_char_period: int = 64,
+    max_word_period: int = 6,
+    min_repeats: int = 3,
+) -> tuple[str, bool]:
+    """Cut ``text`` at the start of a trailing repetition loop.
+
+    Returns ``(clean_text, looped)``. Streaming models that fall into a
+    repetition loop usually emit the correct text first and then ramble
+    (``"…THAT LOVE FOR ILLILLILLILL…"``); the loop start marks where the
+    transcript ended, so truncating there is an emission-layer stop policy. One
+    occurrence of the repeated unit is kept, so a legitimate word repeated
+    incidentally is never lost. Measured on the 2026-10-12 streaming
+    checkpoints: corpus WER 278 → 145 and 350 → 155 with everything else
+    unchanged.
+    """
+    if not text:
+        return text, False
+    tail = text.rstrip()
+    loop_start = None
+    loop_period = 0
+    # Character-level periodicity catches subword loops ("ILLILLILL…").
+    for period in range(1, max_char_period + 1):
+        if len(tail) < period * min_repeats:
+            break
+        unit = tail[-period:]
+        if not unit.strip():
+            continue
+        index = len(tail)
+        while index >= period and tail[index - period : index] == unit:
+            index -= period
+        if (len(tail) - index) >= period * min_repeats and (
+            loop_start is None or index < loop_start
+        ):
+            loop_start = index
+            loop_period = period
+    if loop_start is not None:
+        return tail[: loop_start + loop_period].rstrip(), True
+    # Word-level periodicity catches repeated phrases.
+    words = tail.split()
+    count = len(words)
+    for period in range(1, max_word_period + 1):
+        if count < period * min_repeats:
+            break
+        unit = words[count - period : count]
+        index = count
+        while index >= period and words[index - period : index] == unit:
+            index -= period
+        if (count - index) >= period * min_repeats:
+            return " ".join(words[: index + period]), True
+    return text, False
+
+
 @dataclass
 class LSPState:
     """Longest-Stable-Prefix emission state (Stage 4, T4.4).
@@ -282,14 +337,21 @@ class LSPState:
     into committed text is appended after the divergence point (or held if the
     text diverges from its very beginning), so the committed transcript stays a
     stable, never-revised stream.
+
+    ``truncate_loops`` makes the policy refuse a trailing repetition loop: while
+    a loop is detected the text is held as pending and never committed, and
+    ``flush`` cuts it at the loop start (an emission-layer stop policy — see
+    :func:`truncate_trailing_loop`).
     """
 
     margin_words: int = 0
+    truncate_loops: bool = False
     committed: str = ""
     pending: str = ""
     last_full: str = ""
     updates: int = 0
     revisions: int = 0
+    loop_truncations: int = 0
     commit_lengths: list[int] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -304,6 +366,12 @@ class LSPState:
     def update(self, full_text: str) -> None:
         """Ingest the latest full transcript produced by the streamer."""
         full_text = str(full_text or "")
+        if self.truncate_loops:
+            # Cut a trailing repetition loop *before* the commit logic runs, so
+            # looped text can never enter the append-only transcript.
+            full_text, looped = truncate_trailing_loop(full_text)
+            if looped:
+                self.loop_truncations += 1
         previous = self.committed + self.pending
         if full_text != previous:
             self.updates += 1
@@ -331,8 +399,11 @@ class LSPState:
 
     def flush(self) -> None:
         """Commit the pending tail — call when the stream ends (no revisions left)."""
-        if self.pending:
-            self.committed = self.text
+        pending = self.pending
+        if self.truncate_loops:
+            pending, _ = truncate_trailing_loop(pending)
+        if pending:
+            self.committed = self.committed + pending
             self.pending = ""
             self.commit_lengths.append(len(self.committed))
 

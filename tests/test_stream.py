@@ -17,6 +17,7 @@ from asr1bit.qwen.stream import (
     flush_lsp,
     parse_stream_output,
     rollback_prefix,
+    truncate_trailing_loop,
     update_lsp,
     word_safe_cut,
 )
@@ -314,6 +315,65 @@ class TestLSPState:
 
         with pytest.raises(ValueError):
             LSPState(margin_words=-1)
+
+
+class TestTruncateTrailingLoop:
+    def test_cuts_subword_loops(self):
+        # One occurrence of the looped unit is kept (never delete everything).
+        cleaned, looped = truncate_trailing_loop("WORDS WAS IT THEIR ILLILLILLILLILL")
+        assert looped
+        assert cleaned == "WORDS WAS IT THEIR ILL"
+
+    def test_cuts_word_loops_keeping_the_first_occurrence(self):
+        cleaned, looped = truncate_trailing_loop("HE NODS HIS CONSENT HIS HIS HIS HIS")
+        assert looped
+        assert cleaned == "HE NODS HIS CONSENT HIS"
+
+    def test_cuts_repeated_phrases(self):
+        cleaned, looped = truncate_trailing_loop("THE CAT SAT ON THE CAT SAT ON THE CAT SAT ON")
+        assert looped
+        assert cleaned.startswith("THE CAT SAT ON")
+
+    def test_clean_text_is_untouched(self):
+        assert truncate_trailing_loop("WORDS WAS IT THEIR COLOURS") == (
+            "WORDS WAS IT THEIR COLOURS",
+            False,
+        )
+
+    def test_few_repeats_are_tolerated(self):
+        # Two repeats can be legitimate ("no no"); the policy needs min_repeats.
+        assert truncate_trailing_loop("OH NO NO") == ("OH NO NO", False)
+
+    def test_empty_text(self):
+        assert truncate_trailing_loop("") == ("", False)
+
+
+class TestLSPLoopPolicy:
+    def test_looping_tail_is_never_committed(self):
+        state = LSPState(truncate_loops=True)
+        for text in [
+            "HE NODS HIS",
+            "HE NODS HIS CONSENT",
+            "HE NODS HIS CONSENT ILLILLILL",
+            "HE NODS HIS CONSENT ILLILLILLILLILLILL",
+        ]:
+            update_lsp(state, text)
+        final = flush_lsp(state)
+        assert final == "HE NODS HIS CONSENT ILL"  # transcript + one kept unit
+        assert "ILLILL" not in final
+        assert state.loop_truncations >= 1
+
+    def test_loop_truncations_are_counted(self):
+        state = LSPState(truncate_loops=True)
+        update_lsp(state, "A B C D D D D")
+        assert state.loop_truncations == 1
+        assert emit_stable(state)[0] + emit_stable(state)[1] == "A B C D"
+
+    def test_disabled_by_default(self):
+        state = LSPState()
+        update_lsp(state, "A B C D D D D")
+        assert state.loop_truncations == 0
+        assert state.text == "A B C D D D D"
 
 
 class TestLSPWithStreamer:

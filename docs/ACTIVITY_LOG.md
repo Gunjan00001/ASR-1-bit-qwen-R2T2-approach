@@ -7,28 +7,35 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 08:00 IST)
+## Live status (updated 2026-10-12 09:20 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11063` | **WP1 — distillation v4** on the 7.5 full-cache base (three-way mix, 8 000 steps, lr 5e-6) + **live streaming evals** (`STREAM {...}` every 1 000 steps), GPU 1 | running | pending | ~08:30–09:00 (idle GPU: 100–175 steps/min) |
-| `11064` | **WP2 — binary full-cache run** (progressive precision from the 7.5 ternary), GPU 4 pinned | running | pending | few hours depending on contention |
-| — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after the binary run |
+| `11067` | **WP1 — official 50-utt eval of distill3 with the LSP loop policy** (`--lsp-truncate-loops 1`) | running | pending (offline re-score: 278.18 → **144.60**) | ~30 min |
+| — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | next |
 
-**New trainer instrumentation:** `--stream-eval-every N --stream-eval-n 10` runs
-the official-algorithm streaming eval on the first 10 eval utterances during
-training and prints `STREAM {"step":…,"stream_wer":…}` — the earlier streaming
-iterations were flying blind because the periodic eval is offline-only.
+**Loop truncation at emission is the biggest single win:** cutting a trailing
+repetition loop (one unit kept) at the LSP layer takes distill3 from **278.18 →
+144.60**, distill2 349.89 → 154.56, v1 448.31 → 179.34 (re-scored offline on the
+stored hypotheses; the real-path confirmation is `11067`). Implemented as
+`truncate_trailing_loop` + `LSPState(truncate_loops=True)`
+(`--lsp-truncate-loops 1`), 309 tests.
+
+**WP2 binary hits a floor:** the binary full-cache run (from the 7.5 ternary,
+8 000 steps) converged to **binary 10.70** — identical to the old 10.7 despite
+the much better ternary base (readout 9.75 vs 22.35). Further binary gains need
+the co-training/stochastic-precision stack, not more of the same recipe.
+
+**v4 killed** after 2 000 steps: live 10-utt streaming WER 134.9 → 704.8 (not
+descending) at ~17 steps/min; the loop policy is the better lever.
 
 **Offline best (50-utt test-clean; fp16 pretrained 2.44):**
 
-| Checkpoint | Offline ternary |
-|---|---:|
-| `qat_ternary_long2` (8k data) | 9.2 |
-| **`qat_ternary_full` (28 539 utts)** | **7.52 best / 7.63 final** |
-| `qat_stream_distill2` (streaming v2) | 21.1 |
-| `qat_stream_distill3` (streaming v3) | 25.6 |
-| `qat_stream_anneal3` (v3 + 25 % anneal) | 15.25 (14.83 best) |
+| Checkpoint | Offline ternary | Offline binary |
+|---|---:|---:|
+| `qat_ternary_long2` (8k data) | 9.2 | — |
+| **`qat_ternary_full` (28 539 utts)** | **7.52 best / 7.63 final** | **10.70** |
+| `qat_stream_distill3` (streaming v3) | 25.6 | — |
 
 **WP1 streaming results (official prefix algorithm, 50-utt test-clean, 320 ms,
 32 tokens):**
@@ -39,9 +46,8 @@ iterations were flying blind because the periodic eval is offline-only.
 | On-policy SFT, student prefixes (DAgger) | 920.55 | 4.49 | loops get **worse** (fits its own loops) |
 | Distillation v1 (`language X<asr_text>` kept) | 448.31 | 1.76 | stops ✓, content garbled (format conflict) |
 | Distillation v2 (metadata stripped) | 349.89 | 1.47 | loops gone, stops ✓, under-emits |
-| Distillation v3 (three-way mix) | **278.18** | 2.44 | streaming policy **correct**; residual failures = offline content |
-| v3 + 25 % anneal | 358.90 | 2.68 | offline recovered (15.3) but **loops returned** — a thin streaming share does not hold the stop policy |
-| v4 (three-way mix on the 7.5 base) | running `11063` | — | live `STREAM` evals will show the curve |
+| Distillation v3 (three-way mix) | **278.18** | 2.44 | streaming policy **correct**; residual = offline content + trailing loops |
+| **v3 + LSP loop policy** | **144.60** (re-score; `11067` confirming) | — | remaining gap = ordinary content errors (offline 25.6) |
 
 **Streaming 320 ms (50 utts) — final picture:**
 

@@ -672,3 +672,48 @@ environmental, not model bugs):
   `eval_streaming_opd_anneal3.log`, `qat_stream_anneal.log`,
   `qat_stream_distill4.log`.
 
+
+---
+
+## 2026-10-12 — Loop truncation at emission: the biggest single win (278 → 144.6); binary hits a 10.7 floor
+
+- **Did:** (a) diagnosed the anneal-3 failure (8/50 hypotheses were loops 5–20×
+  the reference length); (b) tested an **emission-layer loop policy** offline —
+  `truncate_trailing_loop` applied to the stored hypotheses, then re-scored
+  (CPU only); (c) implemented it in the LSP layer
+  (`LSPState(truncate_loops=True)`: a trailing repetition loop is cut *before*
+  the commit logic, so looped text can never enter the append-only transcript;
+  one occurrence of the unit is kept) with tests; (d) ran the WP2 binary
+  full-cache job to completion; (e) killed v4.
+- **Result (emission policy, re-scored on the existing 50-utt hypotheses):**
+
+  | checkpoint | raw WER | with loop truncation |
+  |---|---:|---:|
+  | distillation v1 | 448.31 | 179.34 |
+  | distillation v2 | 349.89 | 154.56 |
+  | **distillation v3** | **278.18** | **144.60** |
+  | v3 + anneal | 358.90 | 244.70 |
+
+  The loops start exactly where the correct transcript ended, so cutting there
+  removes hundreds of insertion errors. This is the best official-algorithm
+  number so far (the old static SFT was 203.5).
+- **Binary floor:** the WP2 binary full-cache run (from the 7.5 ternary,
+  8 000 steps, lr 1e-5) converged to **binary 10.70** (19.60 → 13.88 → 11.02 →
+  10.70) — *identical* to the old binary long3 (10.7) despite its much better
+  ternary start (readout 9.75 vs 22.35). Binary accuracy is limited by the
+  quantizer's sign error, not by the ternary base — a further binary gain needs
+  the co-training / stochastic-precision stack, not more of the same recipe.
+- **v4 killed** after 2 000 steps: its live 10-utt streaming WER went
+  134.9 → 704.8 (not descending) and the run was at ~17 steps/min. The
+  loop-truncation policy is the better lever.
+- **Chose:** make the loop policy part of the LSP state (default off; enabled
+  with `--lsp-truncate-loops 1`, reported as `wer_raw` → policy WER) and re-run
+  the official 50-utt eval on the v3 checkpoint *through the real eval path*
+  (job `11067`) to confirm the 144.6 number end-to-end.
+- **Next:** if 11067 confirms, the remaining gap is content (the ~145 is
+  dominated by ordinary word errors at offline 21–26); then a *content* phase
+  that keeps ≥40 % streaming pressure (the anneal at 25 % lost the stop policy)
+  with the live `STREAM` evals as the guardrail.
+- **Artifacts:** `tests/test_stream.py::TestTruncateTrailingLoop`,
+  `artifacts/stage1/stage1_decoder_attn_ffn_bw1.0_gNone_lr1e-05_adamw_delay_ls1_n28539.json`,
+  `artifacts/stage1/qat_stream_distill4.log`.
