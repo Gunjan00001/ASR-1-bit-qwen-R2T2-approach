@@ -991,3 +991,38 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/qat_stream_aligned2.log`,
   `artifacts/stage3/qat_17b_attn5.log`,
   `streaming_opd_aligned2{,_other}_quantized.json` (pending).
+
+---
+
+## 2026-10-13 — Scaled aligned confirmed (12.92 clean / 20.00 other); 1.7B rollout done (20.55); streaming saturates at the 0.6B's content ability
+
+- **Did:** full 50-utt evals of the scaled aligned checkpoint (`11156` clean,
+  `11157` other), and collected the 1.7B anchor-free attention rollout.
+- **Results (official prefix algorithm, 320 ms, 32 tokens, LSP loop policy on):**
+
+  | checkpoint (ternary) | offline (50 utt) | clean WER | other WER | CER (clean) | loops |
+  |---|---:|---:|---:|---:|---:|
+  | aligned v1 (from adapt5) | 14.62 | **12.61** | 22.50 | 5.68 | 0 |
+  | **scaled aligned** (7.5 base, 2 400 utts) | **9.11–10.70** | **12.92** | **20.00** | 5.00 | 0 |
+  | pretrained fp16 (reference) | 2.44 (0.6B) / **1.17 (1.7B!)** | 2.33 | ~4.6 | — | — |
+
+  Scaling improved the offline (14.6 → 9.7) and `other` (22.5 → 20.0) but not
+  `clean` (12.61 → 12.92, within noise): **the 0.6B streaming result has
+  saturated at ~12–13** — the remaining error is the model's own streaming
+  content ability, not its offline WER. The 1.7B is the lever: its *pretrained*
+  offline is 1.17 WER (vs the 0.6B's 2.44), so the same recipe on 1.7B should
+  carry much lower.
+- **Stage 3:** the anchor-free 1.7B attention rollout finished (2000 steps, its
+  configured schedule) at **ternary 20.55** (from the FFN start's 22.03;
+  trajectory 35.3 @1000 → 24.2 @1500 → 20.6 @2000, no anchor) — a modest gain;
+  the anchored variant (waiting for a ≥55 GB-free GPU) and a longer schedule are
+  the next levers. Note the 1.7B's own anchors: pretrained offline **1.17**,
+  fp16 readout 159 (shadow drift as usual).
+- **Binary mirror** (`11159`, progressive precision from the scaled aligned
+  checkpoint, bit_width 1.0, aligned targets) is running.
+- **Next:** (1) the 1.7B: anchored attention rollout (quiet GPU) → 5 000+ steps,
+  then the aligned recipe on it; (2) mirror the aligned recipe to the 7.5 base
+  with a longer schedule (5 000+ steps) if the 0.6B can still move; (3) the
+  final matrix (160/320/1000 ms, clean/other) for the report.
+- **Artifacts:** `artifacts/stage1/streaming_opd_aligned2{,_other}_quantized.json`,
+  `artifacts/stage3/stage1_decoder_attn_ffn_bw1.58_gNone_lr3e-05_adam8bit_delay_ls1_n4000.json`.
