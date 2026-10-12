@@ -7,13 +7,13 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 07:45 IST)
+## Live status (updated 2026-10-12 08:00 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11063` | **WP1 — distillation v4** on the 7.5 full-cache base (three-way mix, 8 000 steps, lr 5e-6) + **live streaming evals** (`STREAM {...}` every 1 000 steps), GPU 1 | running | pending | ~1–2 h |
-| — | `scripts/qat_binary_full.pbs` (WP2 binary) | ready: inits from `qat_ternary_full/last.pt` (progressive precision) | — | submit when a GPU with ≥45 GB frees |
-| — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after binary |
+| `11063` | **WP1 — distillation v4** on the 7.5 full-cache base (three-way mix, 8 000 steps, lr 5e-6) + **live streaming evals** (`STREAM {...}` every 1 000 steps), GPU 1 | running | pending | ~08:30–09:00 (idle GPU: 100–175 steps/min) |
+| `11064` | **WP2 — binary full-cache run** (progressive precision from the 7.5 ternary), GPU 4 pinned | running | pending | few hours depending on contention |
+| — | `scripts/qat_17b_ffn.pbs` (Stage 3 scaffold) | written, **not validated/launched** | — | after the binary run |
 
 **New trainer instrumentation:** `--stream-eval-every N --stream-eval-n 10` runs
 the official-algorithm streaming eval on the first 10 eval utterances during
