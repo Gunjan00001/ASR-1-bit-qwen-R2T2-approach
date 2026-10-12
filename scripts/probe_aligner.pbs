@@ -19,7 +19,6 @@ cd "$ROOT" || exit 1
 export PYTHONPATH="$ROOT/src"
 export TOKENIZERS_PARALLELISM=false
 export HF_HOME=/tmp/asr1bit/hf
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 LOG="artifacts/stage4/probe_aligner.log"
 
 if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then

@@ -34,7 +34,6 @@ cd "$ROOT" || exit 1
 export PYTHONPATH="$ROOT/src"
 export TOKENIZERS_PARALLELISM=false
 export HF_HOME=/tmp/asr1bit/hf
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 LOG="artifacts/stage3/qat_17b_attn4.log"
 
 PY=/home/jiit_992401210050/miniconda3/bin/python  # bitsandbytes (Adam8bit) lives in the shared env

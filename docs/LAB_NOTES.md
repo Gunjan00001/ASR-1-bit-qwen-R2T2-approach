@@ -862,3 +862,30 @@ environmental, not model bugs):
   *defined by the audio heard*, so it should improve both failure directions.
 - **Artifacts:** `artifacts/stage3/qat_17b_attn{2,3}.log` (crashes),
   `qat_17b_attn4.log` (fix), `artifacts/stage4/aligner_probe.json`.
+
+---
+
+## 2026-10-12 — ROOT CAUSE of the crash chain: `expandable_segments:True` is incompatible with this cluster's driver 525
+
+- **Did:** correlated the three `CUDA driver error: invalid argument` crashes
+  (`11121` grad-ckpt, `11134` adam8bit, `11139` model load) against the runs
+  that worked.
+- **Finding:** every crash had
+  `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` in its launcher (added
+  while chasing the 1.7B OOM); **no earlier run set it**. The flag's allocator
+  needs newer driver support, so on driver 525.147.05 it fails with
+  `invalid argument` on ordinary CUDA ops (model loading, optimizer state) —
+  which is why the failure looked like an OOM/frozen-grad problem in completely
+  unrelated places. Removed from every launcher; both resubmissions then passed
+  their previous crash points immediately (the aligned run reached alignment;
+  the 1.7B rollout reached its optimizer).
+- **Lesson:** on this cluster never set `PYTORCH_CUDA_ALLOC_CONF` — and when a
+  "CUDA driver error" appears on a basic op, diff the launcher environment
+  against the last known-good run before chasing model-side causes.
+- **Remaining Stage-3 reality:** the 1.7B *full-attention* rollout needs
+  ~38–40 GB free (1.41 B trainable + fp32 students/teacher); on the shared node
+  co-tenants can grow mid-run and OOM it. Options recorded: (a) retry when a GPU
+  has ≥55 GB free, (b) drop the frozen anchor (`--frozen-teacher 0
+  --distill-weight 0`, saves ~7–14 GB, risks the audio-conditioning collapse the
+  0.6B needed the anchor for), (c) partial attention quantization (q/k/v first).
+  The FFN warm start (22.03 ternary) remains the banked Stage-3 result.
