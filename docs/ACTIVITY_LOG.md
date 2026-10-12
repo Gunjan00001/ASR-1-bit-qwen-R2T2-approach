@@ -7,12 +7,27 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-12 11:05 IST)
+## Live status (updated 2026-10-12 12:10 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11076` | **WP1 — content phase** (distill3 + 40 % streaming share, `qat_stream_content3`, guardrail STREAM evals every 500) | step ~1 500/3 000, ~31 steps/min | offline 25.6 → **15.25 @1000** ✓; stream (20 utt) 366 @500 → 349 @1000 | ~11:55 |
-| `11077` | **Stage 3 — 1.7B FFN warm start** (`scripts/qat_17b_ffn.pbs`, GPU 1, 84 projections / 1.06 B trainable) | step ~900/3 000 | **ternary 113.9 @500** (the 0.6B FFN warm start was 118 @500 — same recovery curve) | ~12:30 |
+| `11091` | **WP1 — streaming re-adaptation (adapt5)** from the better-content content3 checkpoint (three-way mix, 40 % streaming, 2 000 steps, lr 3e-6) | starting | pending | ~12:45–13:30 |
+| `11076` | **WP1 — content phase** (distill3 + 40 % share) | step ~2 600/3 000 at ~5 steps/min | offline 15.8 @2000; its step-2500 checkpoint + LSP policy = **190.78** (raw 532.20) — the content phase traded the stop policy away | ~13:00 |
+| `11077` | **Stage 3 — 1.7B FFN warm start** | step ~2 000/3 000 | ternary 113.9 @500 → 249.6 @1000 → 95.7 @1500 (unstable; lr 1e-4 likely too high for 1.7B) | ~13:00 |
+
+**Operating points (official algorithm, 50-utt test-clean, 320 ms, 32 tokens):**
+
+| checkpoint | offline ternary | raw streaming WER | + LSP loop policy |
+|---|---:|---:|---:|
+| **distill3** | 25.6 | 278.18 | **144.60** (best) |
+| content3 (step 2500) | **15.8** | 532.20 | 190.78 |
+
+The content phase (40 % streaming share, but a *plain* standard pool and only
+1 600 distillation states) improved offline 25.6 → 15.8 yet **degraded the stop
+policy** (228 loop truncations vs 11): streaming quality is the fine balance,
+not a monotone function of training. adapt5 (`11091`) re-applies the *three-way*
+mix (gold-prefix completion + silence + distillation, 4 800 states) from the
+content3 checkpoint at a gentler lr to try to hold both.
 
 **Loop truncation at emission is the biggest single win:** cutting a trailing
 repetition loop (one unit kept) at the LSP layer takes distill3 from **278.18 →
@@ -25,18 +40,15 @@ repetition loop (one unit kept) at the LSP layer takes distill3 from **278.18 �
 the much better ternary base (readout 9.75 vs 22.35). Further binary gains need
 the co-training/stochastic-precision stack, not more of the same recipe.
 
-**v4 killed** after 2 000 steps: live 10-utt streaming WER 134.9 → 704.8 (not
-descending); the loop policy was the better lever.
-
 **Offline best (50-utt test-clean; fp16 pretrained 2.44):**
 
 | Checkpoint | Offline ternary | Offline binary |
 |---|---:|---:|
 | `qat_ternary_long2` (8k data) | 9.2 | — |
 | **`qat_ternary_full` (28 539 utts)** | **7.52 best / 7.63 final** | **10.70** |
-| `qat_stream_distill3` (streaming v3) | 25.6 | — |
-| `qat_stream_content3` (content phase, in progress) | 15.25 @1000 | — |
-| `qat_17b_ffn` (Stage 3, in progress) | 113.9 @500 | — |
+| `qat_stream_distill3` | 25.6 | — |
+| `qat_stream_content3` (step 2500) | 15.8 | — |
+| `qat_17b_ffn` (Stage 3, in progress) | 95.7 @1500 | — |
 
 **WP1 streaming results (official prefix algorithm, 50-utt test-clean, 320 ms,
 32 tokens):**
@@ -49,7 +61,7 @@ descending); the loop policy was the better lever.
 | Distillation v2 (metadata stripped) | 349.89 | 1.47 | loops gone, stops ✓, under-emits |
 | Distillation v3 (three-way mix) | **278.18** | 2.44 | streaming policy **correct**; residual = offline content + trailing loops |
 | **v3 + LSP loop policy** | **144.60** (confirmed) | 1.39 | remaining gap = ordinary content errors |
-| v3 + content phase (40 % share) | running `11076` | — | offline recovering to ~15; stream ~350 (20 utt) |
+| Content phase (40 % share) + policy | 190.78 (raw 532.20) | 2.60 | offline 15.8 but stop policy lost |
 
 **Streaming 320 ms (50 utts) — final picture:**
 

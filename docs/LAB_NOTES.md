@@ -717,3 +717,39 @@ environmental, not model bugs):
 - **Artifacts:** `tests/test_stream.py::TestTruncateTrailingLoop`,
   `artifacts/stage1/stage1_decoder_attn_ffn_bw1.0_gNone_lr1e-05_adamw_delay_ls1_n28539.json`,
   `artifacts/stage1/qat_stream_distill4.log`.
+
+---
+
+## 2026-10-12 — The balance is not monotone: content phase (offline 15.8) *degraded* streaming (528 raw / 190.8 with the loop policy), adapt5 launched
+
+- **Did:** content phase `11076` — distill3 + 40 % streaming share for 3 000
+  steps at lr 5e-6 (1 600 distillation states + 2 400 **plain** standard
+  samples, guardrail STREAM evals every 500); evaluated its step-2 500
+  checkpoint through the real LSP path (`11088`, `TRUNC=1`).
+- **Result:** offline **15.8** (25.6 → 15.25 @1000 → 15.78 @2000) but streaming
+  **raw 532.20 → policy 190.78** (RTF 2.60) — *worse* than distill3 (278.18 →
+  144.60), with **228** loop truncations vs 11. The 20-utt guardrail curve was
+  noisy (366 → 349 → 485 → 326 → 512) and did not warn clearly.
+- **Why:** the content phase's streaming pool was distillation-only (no
+  gold-prefix completion / silence samples) and its standard pool was plain
+  full-audio samples; that mix teaches content but not the
+  "emit-what-you-heard-then-stop" discipline, so the stop policy eroded while
+  offline improved. Streaming quality is a **fine balance**, not a monotone
+  function of the training mix — the three-way composition matters more than the
+  nominal share.
+- **Chose:** `adapt5` (`11091`) — the *three-way* mix (gold-prefix completion +
+  silence + 4 800 distillation states, 40 % share) applied to the
+  content3 checkpoint at a gentler lr (3e-6, 2 000 steps), aiming to keep the
+  better content (15.8) and recover distill3-level streaming.
+- **Stage 3 note:** the 1.7B FFN warm start is memory-feasible (84 projections,
+  1.06 B trainable, batch 1, fp32 + frozen teacher on one 80 GB A100) but its
+  ternary trajectory is unstable (113.9 @500 → 249.6 @1000 → 95.7 @1500 vs the
+  0.6B's monotone 118 → 84 → 42): lr 1e-4 is likely too high for 1.7B — the next
+  stage-3 run should use ~3-5e-5 and/or a longer warmup.
+- **Next:** eval adapt5 (+loop policy); if it holds both, iterate the balance
+  toward ≤12 offline while keeping the policy WER ≤145; the remaining streaming
+  error is then ordinary content error, which the 7.5-class offline model
+  (or the 1.7B once its lr is fixed) should shrink.
+- **Artifacts:** `artifacts/stage1/streaming_opd_content3_quantized.json`,
+  `eval_streaming_opd_content3.log`, `qat_stream_adapt5.log`,
+  `artifacts/stage3/qat_17b_ffn.log`.

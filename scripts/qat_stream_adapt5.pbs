@@ -1,0 +1,107 @@
+#!/bin/bash
+#PBS -N asr1bit-stream-adapt5
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=48gb
+#PBS -l walltime=08:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/stream_adapt5.out
+#
+# WP1 — streaming re-adaptation (adapt5) from the better-content content3 checkpoint
+# prefix" signal (three-way mix).
+#
+# What the runs taught us (docs/LAB_NOTES.md 2026-10-12):
+#   static prefix SFT      content OK, never stops        (WER 203.5)
+#   DAgger (own prefixes)  loops get worse                (WER 920)
+#   distillation v1/v2     stops, but under-emits: the teacher's per-chunk
+#                          continuations are 1-3 words, so the student never
+#                          learned to *finish* the transcript from a lazy
+#                          prefix                              (v2 WER 349.9)
+# v3 therefore mixes three sample families:
+#   1. standard full-audio samples (incl. frac 0.0 = plain)      -> offline anchor
+#   2. gold-prefix completion samples (fracs 0.3-0.95 + silence) -> finish the text
+#   3. teacher-state distillation samples                        -> stop policy
+# Init: the v2 checkpoint (it already stops). Submit: qsub scripts/qat_stream_distill3.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage1/qat_stream_adapt5.log"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-0.6B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
+else
+  MODEL=Qwen/Qwen3-ASR-0.6B
+fi
+if [ -f /tmp/asr1bit/qat_clean_train.100_n8000.pt ]; then
+  CACHE=/tmp/asr1bit/qat_clean_train.100_n8000.pt
+else
+  CACHE="$ROOT/data/qat_clean_train.100_n8000.pt"
+fi
+
+PICK=$(for _ in 1 2 3; do
+  nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits
+  sleep 1
+done | awk -F', ' '$2 < 45000 {u[$1]+=$3; m[$1]=$2} END {for (g in u) print u[g], m[g], g}' \
+  | sort -n | head -1 | awk '{print $3}')
+[ -z "$PICK" ] && PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
+  | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
+PICK="${QAT_GPU:-$PICK}"
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | cache $CACHE | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+"$PY" scripts/run_stage1_qat.py \
+  --model "$MODEL" \
+  --policy decoder_attn_ffn \
+  --bit-width 1.58 \
+  --learnable-scale 1 \
+  --init-from data/checkpoints/qat_stream_content3/step2500.pt \
+  --prefix-sft-fracs 0.0,0.3,0.6,0.8,0.95 \
+  --silence-samples-sec 0.5 \
+  --op-rollout 1 \
+  --op-distill 1 \
+  --op-rollout-n 700 \
+  --op-batch-size 6 \
+  --op-max-new-tokens 32 \
+  --op-chunk-ms 320 \
+  --op-chunk-stride 3 \
+  --op-max-rounds 16 \
+  --op-max-samples 4800 \
+  --op-mix-frac 0.4 \
+  --op-refresh-every 0 \
+  --steps 2000 \
+  --train-cache "$CACHE" \
+  --train-n 1200 \
+  --eval-n 50 \
+  --eval-every 1000 \
+  --eval-both 0 \
+  --eval-fp16 1 \
+  --lr 3e-6 \
+  --warmup-steps 100 \
+  --lr-schedule cosine \
+  --batch-size 2 \
+  --max-new-tokens 128 \
+  --alpha-mode delay \
+  --alpha-warmup-frac 0.02 \
+  --distill-weight 0.05 \
+  --distill-temp 2.0 \
+  --frozen-teacher 1 \
+  --lazy-collate 1 \
+  --save-dir data/checkpoints/qat_stream_adapt5 \
+  --save-every 500 \
+  --out artifacts/stage1 \
+  2>&1 | tee -a "$LOG"
