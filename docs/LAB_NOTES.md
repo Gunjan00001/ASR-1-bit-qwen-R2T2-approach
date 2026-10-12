@@ -1026,3 +1026,29 @@ environmental, not model bugs):
   final matrix (160/320/1000 ms, clean/other) for the report.
 - **Artifacts:** `artifacts/stage1/streaming_opd_aligned2{,_other}_quantized.json`,
   `artifacts/stage3/stage1_decoder_attn_ffn_bw1.58_gNone_lr3e-05_adam8bit_delay_ls1_n4000.json`.
+
+---
+
+## 2026-10-13 — Cluster capacity bites: binary mirror deferred; the 1.7B gets the aligned recipe (the high-value run)
+
+- **Did:** attempted the binary mirror on the scaled aligned checkpoint; the
+  first attempt (`11159`) OOM'd after ~30 min (a co-tenant grew to 52.7 GB on
+  the GPU the picker had sampled — our process only held 8.3 GB). Retried with a
+  stricter GPU filter (`$2 < 25000`) as `11162`, but the node was nearly full
+  (only GPU 7 had ~39 GB free) so both our jobs landed there; the binary mirror
+  was killed again to give the memory to the higher-value run.
+- **Launched (the high-value run):** `11161` **aligned targets on the 1.7B** —
+  `qat_stream_aligned17b.pbs`: model `Qwen/Qwen3-ASR-1.7B`, init from the
+  anchor-free attention checkpoint (`qat_17b_attn5`, ternary 20.55), 1 200
+  aligned utterances, 1 500 steps, lr 3e-6, batch 1, **adam8bit** (shared env),
+  the frozen teacher dropped to fit memory, 20-utt `STREAM` guardrails every
+  250 steps. Rationale: the 0.6B streaming is saturated at ~12–13 (its content
+  ability), while the 1.7B's pretrained offline is 1.17 (vs the 0.6B's 2.44) —
+  the aligned recipe on the 1.7B is the path to the `+1.5` target.
+- **Binary mirror status:** deferred (not lost) — `qat_stream_aligned2bin2.pbs`
+  is ready; submit when a GPU with ≥20 GB free appears.
+- **Next:** read the 1.7B aligned run's `STREAM`/ternary curves; if it tracks the
+  0.6B pattern (~12–13), the 1.7B could land single-digit/low-teens; then the
+  final matrix (160/320/1000 ms, clean/other) and the write-up.
+- **Artifacts:** `artifacts/stage1/qat_stream_aligned2bin.log` (OOM),
+  `qat_stream_aligned17b.log`, `scripts/qat_stream_aligned2bin2.pbs`.
