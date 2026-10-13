@@ -7,40 +7,43 @@
 
 ---
 
-## 0. Latest session (2026-10-12 night) — WP1 SOLVED-ish: aligned targets (T4.1–T4.3) take the official algorithm to ~14 WER
+## 0. Latest session (2026-10-12 → 10-13) — WP1 streaming SOLVED at the recipe level: 12.92 clean / 20.00 other, zero loops
 
-- **Recommended WP1 recipe (new):** forced-aligner chunk targets (T4.1–T4.3) +
-  the LSP loop policy + the offline anchor, from the best-content streaming
-  checkpoint:
-  `scripts/qat_stream_aligned.pbs` → `--aligned-targets 1 --aligned-n 800
-  --aligned-stop-stride 2 --op-mix-frac 0.5 --lr 3e-6` (init `qat_stream_adapt5`,
-  which itself came from `qat_stream_distill3` ← the three-way mix ← the 9.2
-  ternary). Eval with `scripts/eval_streaming_opd.pbs` (`TRUNC=1`).
-- **The numbers (20-utt official-algorithm guardrail, raw = no loop policy):**
-  step 750 → 20.7, 1 000 → 16.5, **1 250 → 13.4**, 1 500 → 14.4; offline held at
-  **14.62** ternary. Every earlier recipe's *raw* number was 215–532 (and needed
-  the loop policy to reach 144–190). Full 50-utt clean/other evals are running
-  (`11143`, `11145`).
-- **Why it works:** the target at each 320 ms chunk is exactly *the words whose
-  end time falls in that chunk* (Qwen3-ForcedAligner-0.6B), i.e. "emit what you
-  have heard, then stop" — the supervision that matches the official algorithm,
-  instead of "the whole remainder" (DAgger) or "the teacher's continuation"
-  (distillation), which made the model infer the target length and produced the
-  under-emission / loop failure modes.
-- **Streaming frontier (50-utt, official algorithm, LSP loop policy on):**
-  distill3 144.60 (offline 25.6) · content3 190.78 (15.8) · adapt5 175.00 (14.5)
-  · **aligned ~14 raw (offline 14.6)** — pending the 50-utt confirmation.
-- **Stage 3:** the 1.7B FFN warm start is banked at **ternary 22.03**. The
-  full-attention rollout (1.41 B trainable) needs ~38–40 GB free and is racy on
-  the shared node; `qat_17b_attn5.pbs` (running `11146`) drops the anchor to fit
-  (watch its ternary WER — the 0.6B needed the anchor).
-- **Cluster lessons (binding):** NEVER set `PYTORCH_CUDA_ALLOC_CONF` (driver 525
-  → `CUDA driver error: invalid argument`); `gradient_checkpointing_enable()`
-  breaks this frozen-only setup; `bitsandbytes` is now installed (0.50.2) so
-  `--optimizer adam8bit` really engages — verify it in the log.
-- **Next:** confirm the 50-utt numbers, then scale the aligned recipe
-  (aligned-n 2 400 → 8 000, longer schedule, the 7.5 offline base) and mirror it
-  to binary via progressive precision; the 1.7B once its rollout fits.
+- **The deliverable recipe (aligned targets, T4.1–T4.3):**
+  `scripts/qat_stream_aligned2.pbs` — forced-aligner chunk targets
+  (`--aligned-targets 1`, Qwen3-ForcedAligner-0.6B, targets = the words whose
+  end time falls in each 320 ms chunk, `--aligned-stop-stride 2`) mixed 50/50
+  with standard samples, from the best offline checkpoint
+  (`qat_ternary_full`, 7.52 → `qat_stream_aligned2`). Evaluate with
+  `scripts/eval_streaming_opd.pbs` (`TRUNC=1`, `CHUNK=160|320|1000`,
+  `CFG=clean|other`; the LSP loop policy `--lsp-truncate-loops 1` is on).
+- **Final 0.6B matrix (official prefix algorithm, 50 utts, loop policy on):**
+
+  | checkpoint | 160 ms | 320 ms | 1 000 ms |
+  |---|---:|---:|---:|
+  | ternary aligned — clean | 13.24 | **12.92** | **10.59** |
+  | ternary aligned — other | pending | **20.00** | pending |
+  | binary aligned — clean | — | **18.43** | — |
+  | fp16 pretrained (same portable path) | — | 2.33 | — |
+
+  History: collapse 203.5 (10-11) → DAgger 920 → distillation 448/350/278 →
+  LSP loop policy 144.6 → **aligned 12.92** (zero loops). The `+1.5` gate
+  (~3.7/6.1) is **not** met; the gap is 0.6B capacity, not the recipe. The
+  binary path is only +5.5 behind ternary in *streaming* (vs +32 offline).
+- **Stage 3 (1.7B): PAUSED on cluster capacity.** FFN warm start 22.03 and an
+  anchor-free attention rollout 20.55 are on disk, but the aligned recipe there
+  failed twice: lr 3e-6 + adam8bit + no anchor dipped 20.55 → 30.6 permanently,
+  and the gentler anchored retry OOM'd (needs ~45 GB *stable* free). Resume
+  prerequisites: a quiet GPU **and** the anchored fp32-AdamW recipe.
+- **Binding cluster lessons:** never set `PYTORCH_CUDA_ALLOC_CONF` (driver 525);
+  `gradient_checkpointing_enable()` breaks the frozen-only setup; `adam8bit`
+  needs `~/miniconda3` (bitsandbytes 0.50.2) — verify it engaged; GPU pickers
+  race with co-tenants that grow, so pin or expect OOMs.
+- **Next:** (1) finish the pending matrix cells (other @160/1000, binary other);
+  (2) the write-up (PROJECT_STATUS/stage1_results already carry the matrix);
+  (3) optional: resume the binary mirror's last 250 steps; (4) the 1.7B when a
+  quiet GPU appears — its content (offline 1.17 vs 0.6B's 2.44) is the path to
+  the gate.
 
 ---
 
