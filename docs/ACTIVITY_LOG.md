@@ -7,13 +7,13 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-13 21:00 IST)
+## Live status (updated 2026-10-14 02:35 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11213` | **0.6B aligned refinement** (continue `qat_stream_aligned2` at lr 2e-6, 3 000 steps, aligned targets) | starting | pending | ~2–4 h |
-| — | **Matrix complete** | done | see the table below | — |
-| — | 1.7B aligned | **paused** (needs a quiet GPU + anchored fp32-AdamW) | — | — |
+| `11213` | **0.6B aligned refinement** (`qat_stream_aligned3`: continue `aligned2` at lr 2e-6, 3 000 steps, aligned targets, GPU 0) | running | pending | ~2–4 h |
+| — | **Matrix complete** (tag `0.2.44`; headlines refreshed, tag `0.2.45`) | done | see the table below | — |
+| — | 1.7B aligned | **paused** — GPUs 0/1 have ~39–42 GB free at 100 % utilization (bar is ≥45 GB *stable*); the rest are 67–79 GB used | — | — |
 
 **The 0.6B aligned matrix (official algorithm, loop policy on, 50 utts):**
 
