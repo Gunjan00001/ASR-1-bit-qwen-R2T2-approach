@@ -7,27 +7,29 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-13 18:35 IST)
+## Live status (updated 2026-10-13 21:00 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11196` | **Matrix eval — 160 ms, clean** (aligned 0.6B ternary) | running (1 391/~2 200 calls) | pending (`11197` 1000 ms = **10.59**) | ~15 min |
-| `11198` | **Binary mirror eval** — done | **18.43 clean** (CER 11.84, raw 17.90) | — | — |
-| — | 1.7B aligned | **paused** — needs an anchored fp32-AdamW run on a quiet GPU (verdict in LAB_NOTES) | — | — |
+| `11199` | Matrix — ternary aligned, **other @160 ms** | running | pending | ~40 min |
+| `11200` | Matrix — **other @1 000 ms** | running | pending | ~15 min |
+| `11201` | Matrix — **binary aligned, other @320 ms** | running | pending | ~25 min |
+| — | 1.7B aligned | **paused** (needs a quiet GPU + anchored fp32-AdamW) | — | — |
 
-**The 0.6B aligned matrix (official algorithm, loop policy on):**
+**The 0.6B aligned matrix (official algorithm, loop policy on, 50 utts):**
 
 | checkpoint | 160 ms | 320 ms | 1 000 ms |
 |---|---:|---:|---:|
-| ternary aligned (scaled) | pending | **12.92** | **10.59** |
-| — other | pending | **20.00** | pending |
-| **binary aligned** | — | **18.43** | — |
-| pretrained fp16 (reference) | — | 2.33 clean | — |
+| ternary aligned — clean | **13.24** (RTF 10.3) | **12.92** (RTF 3.3) | **10.59** (RTF 3.2) |
+| ternary aligned — other | running | **20.00** | running |
+| binary aligned — clean | — | **18.43** | — |
+| binary aligned — other | — | running | — |
+| fp16 pretrained (same path) | — | 2.33 | — |
 
-**Key finding:** the binary checkpoint's *streaming* WER (18.43) is far better
-than its *offline* binary WER (41.8) — the aligned targets are the binding
-supervision, not the precision (ternary→binary streaming gap +5.5 vs offline
-+32). Chunk size behaves as expected (1 000 ms < 320 ms).
+Committed to `docs/PROJECT_STATUS.md` + `docs/stage1_results.md`; tag `0.2.43`.
+The `+1.5` gate (~3.7/6.1) is not met — the remaining gap is 0.6B capacity, not
+the recipe (zero loops everywhere; binary only +5.5 behind ternary in streaming
+vs +32 offline).
 
 **MILESTONE (tag `0.2.42`): the aligned-targets recipe works and scales.**
 
