@@ -11,9 +11,8 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11199` | Matrix — ternary aligned, **other @160 ms** | running | pending | ~40 min |
-| `11200` | Matrix — **other @1 000 ms** | running | pending | ~15 min |
-| `11201` | Matrix — **binary aligned, other @320 ms** | running | pending | ~25 min |
+| `11213` | **0.6B aligned refinement** (continue `qat_stream_aligned2` at lr 2e-6, 3 000 steps, aligned targets) | starting | pending | ~2–4 h |
+| — | **Matrix complete** | done | see the table below | — |
 | — | 1.7B aligned | **paused** (needs a quiet GPU + anchored fp32-AdamW) | — | — |
 
 **The 0.6B aligned matrix (official algorithm, loop policy on, 50 utts):**
@@ -21,9 +20,9 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 | checkpoint | 160 ms | 320 ms | 1 000 ms |
 |---|---:|---:|---:|
 | ternary aligned — clean | **13.24** (RTF 10.3) | **12.92** (RTF 3.3) | **10.59** (RTF 3.2) |
-| ternary aligned — other | running | **20.00** | running |
+| ternary aligned — other | **20.80** | **20.00** | **16.59** |
 | binary aligned — clean | — | **18.43** | — |
-| binary aligned — other | — | running | — |
+| binary aligned — other | — | **25.45** | — |
 | fp16 pretrained (same path) | — | 2.33 | — |
 
 Committed to `docs/PROJECT_STATUS.md` + `docs/stage1_results.md`; tag `0.2.43`.

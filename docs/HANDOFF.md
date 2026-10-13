@@ -22,8 +22,9 @@
   | checkpoint | 160 ms | 320 ms | 1 000 ms |
   |---|---:|---:|---:|
   | ternary aligned — clean | 13.24 | **12.92** | **10.59** |
-  | ternary aligned — other | pending | **20.00** | pending |
+  | ternary aligned — other | 20.80 | **20.00** | **16.59** |
   | binary aligned — clean | — | **18.43** | — |
+  | binary aligned — other | — | **25.45** | — |
   | fp16 pretrained (same portable path) | — | 2.33 | — |
 
   History: collapse 203.5 (10-11) → DAgger 920 → distillation 448/350/278 →
@@ -39,8 +40,7 @@
   `gradient_checkpointing_enable()` breaks the frozen-only setup; `adam8bit`
   needs `~/miniconda3` (bitsandbytes 0.50.2) — verify it engaged; GPU pickers
   race with co-tenants that grow, so pin or expect OOMs.
-- **Next:** (1) finish the pending matrix cells (other @160/1000, binary other);
-  (2) the write-up (PROJECT_STATUS/stage1_results already carry the matrix);
+- **Next:** (1) the write-up (PROJECT_STATUS/stage1_results carry the complete matrix);
   (3) optional: resume the binary mirror's last 250 steps; (4) the 1.7B when a
   quiet GPU appears — its content (offline 1.17 vs 0.6B's 2.44) is the path to
   the gate.
@@ -54,7 +54,7 @@
 | **Offline WER**, ternary, all 196 decoder projections | **9.2** (best 9.1) | fp16 pretrained 2.44; naive QAT ≈ 100 |
 | **Offline WER**, binary, all 196 decoder projections | **10.7** | same |
 | **Streaming 320 ms** (valid chunked re-feed variant) | ternary **9.43**, binary **10.28** | same-variant pretrained 2.54 |
-| Streaming 320 ms, official prefix algorithm | **collapses** (203.5 best) | WP1 fix implemented, phase-1 result pending (see §0) |
+| Streaming 320 ms, official prefix algorithm | **12.92 clean / 20.00 other** (aligned recipe, zero loops; was 203.5 collapse) | see §0 |
 | LSP emission (append-only) | policy implemented + tested | Stage 4 / T4.4; WER-neutral, reports commit latency |
 
 - Stage 0 gate passed (`0.2.0`); Stage 1/2 machinery is implemented, tested

@@ -285,9 +285,9 @@ pretrained 0.6B through the same portable path.
 | config | 160 ms | 320 ms | 1 000 ms |
 |---|---:|---:|---:|
 | Ternary aligned — clean | 13.24 (CER 5.11) | **12.92** (CER 5.00) | **10.59** (CER 4.07) |
-| Ternary aligned — other | pending | **20.00** (CER 10.10) | pending |
+| Ternary aligned — other | 20.80 (CER 10.83) | **20.00** (CER 10.10) | **16.59** (CER 7.27) |
 | Binary aligned — clean | — | **18.43** (CER 11.84) | — |
-| Binary aligned — other | — | pending | — |
+| Binary aligned — other | — | **25.45** (CER 15.31) | — |
 | FP16 pretrained — clean (same portable path) | — | 2.33 | — |
 | FP16 pretrained — other (same portable path) | — | ~4.6 (protocol baseline) | — |
 
