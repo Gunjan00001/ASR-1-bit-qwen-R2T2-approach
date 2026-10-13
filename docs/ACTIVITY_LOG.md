@@ -7,21 +7,20 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-13 10:45 IST)
+## Live status (updated 2026-10-13 13:50 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11177` | **Stage 3 — 1.7B aligned RESUME** (`--resume` from step ~750, same schedule, 8 h) | starting (GPU 5) | pending | 2.5–6 h (750 steps at 2–5 steps/min) |
-| `11164` | **Binary mirror** (aligned + progressive precision, 0.6B) | step ~920/1 500 | STREAM 64.9 → 48.2 → **35.8 @750**; offline binary 48.5 @500 (from ~100) | ~1–2 h |
-| — | 1.7B aligned (first leg, `11161`) | cut by walltime at ~750/1500 | STREAM 28.5 @250 / 31.1 @500; offline 20.55 → 31.57 @500 (mid-transient) | resumed by `11177` |
-| — | **0.6B aligned frontier** | done | **12.92 clean / 20.00 other**, 0 loops | — |
+| `11186` | **Stage 3 — 1.7B aligned v3 (gentler + anchored)**: from `qat_17b_attn5` (pre-dip), lr 1.5e-6, 1 200 steps, anchor `w=0.05`, adam8bit | starting (GPU 7) | pending; acceptance bar: dip < ~3 pts and recover below 20.55 | 4–10 h (contended) |
+| `11164` | **Binary mirror** (0.6B, aligned + progressive precision) | step ~1 250/1 500 | offline binary 48.5 @500 → **41.8 @1000**; STREAM 64.9 → 35.8 → 37.6 | ~1 h → then its loop-policy eval |
+| — | **1.7B aligned v1** (`11161`+`11177`) | **FAILED** | ternary 20.55 → **30.61**; streaming 28.00 (flat) | superseded by `11186` |
+| — | **0.6B aligned frontier** | done | **12.92 clean / 20.00 other**, 0 loops | the reference to beat |
 
-**Notes:** the 1.7B's fresh-cycle dip (20.55 → 31.57 at lr 3e-6) is much deeper
-than the 0.6B's — 1.41 B trainable params move further at the same nominal lr.
-The resume continues the same cosine; if its tail does not recover below 20.55,
-halve the lr (1.5e-6) or restart from the FFN checkpoint with the anchor
-present. The silent-but-important constraint remains cluster contention
-(~2–5 steps/min vs ~100+ on a quiet GPU).
+**Lessons this round:** at 1.7B the "fresh cosine cycle" is not benign — the
+same nominal lr that cost the 0.6B ~2 points cost it ~10, with adam8bit and no
+anchor as the other two deltas. v3 halves the lr, restores the anchor and
+restarts from the pre-dip checkpoint. The binary arm recovers as designed but
+lags (41.8 binary offline vs 12.9 ternary streaming).
 
 **MILESTONE (tag `0.2.42`): the aligned-targets recipe works and scales.**
 
