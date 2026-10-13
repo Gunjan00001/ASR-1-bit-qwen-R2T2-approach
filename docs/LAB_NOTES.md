@@ -1077,3 +1077,30 @@ environmental, not model bugs):
   curves; then the final matrix.
 - **Artifacts:** `artifacts/stage1/qat_stream_aligned17b.log`,
   `qat_stream_aligned2bin2.log`, `scripts/qat_stream_aligned17b2.pbs`.
+
+---
+
+## 2026-10-13 — 1.7B aligned run cut mid-transient (walltime); resume launched. Binary mirror descending.
+
+- **Did:** collected the 1.7B aligned run's partial trajectory, chained its
+  resume, and read the binary mirror's curve.
+- **1.7B aligned (`11161`, cut by the 6 h walltime at step ~750/1 500):** STREAM
+  (20 utts) 28.47 @250 → 31.06 @500; offline ternary 20.55 → **31.57 @500** —
+  a deep fresh-cycle dip (the 0.6B's aligned runs dipped only ~2 points at the
+  same stage). The run was cut *before* the cosine tail, so its current state is
+  mid-transient, not converged; the resume (`11177`, `--resume`, 8 h) continues
+  the same schedule (LR advances from step 750).
+- **Binary mirror (`11164`, 0.6B, still running):** STREAM 64.94 @250 →
+  48.24 @500 → **35.76 @750**; offline binary **48.52 @500** (from a ~100
+  readout on the ternary checkpoint). The binary path recovers, as designed.
+- **Why the 1.7B dip matters:** at lr 3e-6 the 1.7B (1.41 B trainable, adam8bit)
+  moves much further than the 0.6B (440 M, fp32 AdamW) — the same nominal lr is
+  not the same perturbation. If the resume's tail does not recover it below
+  20.55, the next attempt should halve the lr (1.5e-6) or start from the
+  *pre-rollout* FFN checkpoint with the anchor present.
+- **Next:** read the resume's trajectory (STREAM + ternary) as it lands; if it
+  recovers below the 20.55 start and the streaming tracks it, run the full
+  clean/other eval and start the final matrix (160/320/1000 ms); otherwise
+  adjust the 1.7B recipe (lr / anchor) per the note above.
+- **Artifacts:** `artifacts/stage1/qat_stream_aligned17b.log`,
+  `qat_stream_aligned17b2.log`, `qat_stream_aligned2bin2.log`.
