@@ -1104,3 +1104,31 @@ environmental, not model bugs):
   adjust the 1.7B recipe (lr / anchor) per the note above.
 - **Artifacts:** `artifacts/stage1/qat_stream_aligned17b.log`,
   `qat_stream_aligned17b2.log`, `qat_stream_aligned2bin2.log`.
+
+---
+
+## 2026-10-13 — 1.7B aligned v1 FAILED to recover (30.6 offline / 28.0 streaming); gentler anchored v3 launched
+
+- **Did:** completed the 1.7B aligned schedule (first leg + resume, 1 500 steps
+  total) and launched a corrected retry.
+- **Result (failure, kept):** the 1.7B aligned v1 ended at **ternary 30.61**
+  (20.55 → 31.57 @500 → 30.83 @1000 → 30.61 @1500) with streaming **28.00**
+  (28.47 @250 → 31.06 @500 → 30.12 @750 → 31.53 @1000 → 28.71 @1250 → 28.00
+  @1500, 20 utts). The deep fresh-cycle dip never healed — the cosine tail
+  flattened ~10 points below the starting checkpoint. For contrast, the 0.6B
+  aligned runs dipped ~2 points and recovered below their start.
+- **Why (diagnosis):** three differences from the successful 0.6B recipe —
+  (1) **adam8bit** instead of fp32 AdamW (the 1.7B needed it for memory);
+  (2) **no frozen anchor** (dropped to fit); (3) lr 3e-6 hitting a 1.41 B-
+  trainable model much harder than the 0.6B's 440 M. Any of the three can turn
+  a "fresh cycle" into a permanent regression at this scale.
+- **Fix launched (`11186`, `qat_stream_aligned17b3.pbs`):** restart from the
+  **pre-dip** checkpoint (`qat_17b_attn5`, ternary 20.55), lr **1.5e-6**,
+  1 200 steps, **anchor restored** (`--frozen-teacher 1 --distill-weight 0.05`),
+  adam8bit kept, aligned targets unchanged. Watch the ternary EVALs: the
+  acceptance bar is "dips < ~3 points and recovers below 20.55".
+- **Binary mirror (`11164`):** still training (step ~1 250/1 500): offline binary
+  48.52 @500 → **41.84 @1000**; STREAM 64.9 → 48.2 → 35.8 → 37.6 (noisy mid-run).
+  Its full eval with the loop policy follows when it ends.
+- **Artifacts:** `artifacts/stage1/qat_stream_aligned17b2.log` (failure),
+  `qat_stream_aligned17b3.log` (retry), `qat_stream_aligned2bin2.log`.
