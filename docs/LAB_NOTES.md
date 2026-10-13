@@ -1132,3 +1132,34 @@ environmental, not model bugs):
   Its full eval with the loop policy follows when it ends.
 - **Artifacts:** `artifacts/stage1/qat_stream_aligned17b2.log` (failure),
   `qat_stream_aligned17b3.log` (retry), `qat_stream_aligned2bin2.log`.
+
+---
+
+## 2026-10-13 — 1.7B aligned: VERDICT (paused on capacity); 0.6B final matrix started
+
+- **Did:** diagnosed both dead jobs and started the final matrix.
+- **1.7B aligned verdict (3 attempts, all failures — kept for the record):**
+  1. v1 (`11161`+`11177`, lr 3e-6, adam8bit, no anchor): dipped 20.55 → 31.6 and
+     never recovered (ternary 30.61; streaming 28.0, flat).
+  2. v3 (`11186`, lr 1.5e-6 + anchor restored): **OOM'd** in its first steps —
+     the anchored variant (student 7 GB + teacher 7 GB + adam8bit + 1.41 B
+     trainable) needs a genuinely free GPU, and the picker's sample keeps losing
+     the race with growing co-tenants on this node.
+  **Prerequisites before retrying:** a GPU with ≥45–50 GB *stable* free memory
+  and the **anchored fp32-AdamW** recipe (the 0.6B's proven combination; adam8bit
+  changes the update scale and the anchor is what keeps audio conditioning
+  alive). The 1.7B FFN checkpoint (22.03) and the anchor-free attention
+  checkpoint (20.55) remain on disk. **The 0.6B aligned recipe is the
+  deliverable** while the cluster is contended.
+- **0.6B final matrix started:** `11196` (chunk 160 ms, clean), `11197`
+  (1 000 ms, clean) on the scaled aligned checkpoint, and `11198` (the binary
+  mirror's step-1 250 checkpoint with the loop policy). The 320 ms numbers exist
+  (12.92 clean / 20.00 other); the `other`-config counterparts for 160/1000 ms
+  follow as GPU slots free.
+- **Binary mirror:** cut by its 6 h walltime at step 1 246/1 500 (offline binary
+  41.8 @1000, still descending; log stops silently, no traceback — classic
+  walltime kill). Its launcher can be resumed (`--resume`, 250 steps) if wanted;
+  the binary arm remains far behind the ternary (41.8 vs 12.9).
+- **Artifacts:** `artifacts/stage1/qat_stream_aligned17b3.log` (OOM),
+  `qat_stream_aligned2bin2.log` (walltime cut), `eval_streaming_opd_aligned2_c160.log`,
+  `eval_streaming_opd_aligned2_c1000.log`, `eval_streaming_opd_aligned2bin.log`.

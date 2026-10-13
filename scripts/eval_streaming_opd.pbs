@@ -26,8 +26,10 @@ CKPT="${CKPT:-data/checkpoints/qat_stream_opd/last.pt}"
 CFG="${CFG:-clean}"
 TAG="${TAG:-}"
 TRUNC="${TRUNC:-0}"
+CHUNK="${CHUNK:-320}"
 SUFFIX=""
 [ "$CFG" = "other" ] && SUFFIX="_other"
+SUFFIX="${SUFFIX}$([ "$CHUNK" != "320" ] && echo "_c${CHUNK}")"
 LOG="artifacts/stage1/eval_streaming_opd${TAG}${SUFFIX}.log"
 
 if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
@@ -52,7 +54,7 @@ PICK="${EVAL_GPU:-$PICK}"
 export CUDA_VISIBLE_DEVICES="$PICK"
 
 {
-  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | config $CFG | tag ${TAG:-none} | $(date) ==="
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | config $CFG | tag ${TAG:-none} | chunk ${CHUNK}ms | $(date) ==="
   nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
 } | tee "$LOG"
 
@@ -61,7 +63,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --checkpoint "$CKPT" \
   --policy decoder_attn_ffn \
   --bit-width 1.58 \
-  --chunk-ms 320 \
+  --chunk-ms "$CHUNK" \
   --n 50 \
   --config "$CFG" \
   --max-new-tokens 32 \
