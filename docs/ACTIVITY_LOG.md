@@ -7,20 +7,27 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-13 13:50 IST)
+## Live status (updated 2026-10-13 18:35 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11186` | **Stage 3 — 1.7B aligned v3 (gentler + anchored)**: from `qat_17b_attn5` (pre-dip), lr 1.5e-6, 1 200 steps, anchor `w=0.05`, adam8bit | starting (GPU 7) | pending; acceptance bar: dip < ~3 pts and recover below 20.55 | 4–10 h (contended) |
-| `11164` | **Binary mirror** (0.6B, aligned + progressive precision) | step ~1 250/1 500 | offline binary 48.5 @500 → **41.8 @1000**; STREAM 64.9 → 35.8 → 37.6 | ~1 h → then its loop-policy eval |
-| — | **1.7B aligned v1** (`11161`+`11177`) | **FAILED** | ternary 20.55 → **30.61**; streaming 28.00 (flat) | superseded by `11186` |
-| — | **0.6B aligned frontier** | done | **12.92 clean / 20.00 other**, 0 loops | the reference to beat |
+| `11196` | **Matrix eval — 160 ms, clean** (aligned 0.6B ternary) | running (1 391/~2 200 calls) | pending (`11197` 1000 ms = **10.59**) | ~15 min |
+| `11198` | **Binary mirror eval** — done | **18.43 clean** (CER 11.84, raw 17.90) | — | — |
+| — | 1.7B aligned | **paused** — needs an anchored fp32-AdamW run on a quiet GPU (verdict in LAB_NOTES) | — | — |
 
-**Lessons this round:** at 1.7B the "fresh cosine cycle" is not benign — the
-same nominal lr that cost the 0.6B ~2 points cost it ~10, with adam8bit and no
-anchor as the other two deltas. v3 halves the lr, restores the anchor and
-restarts from the pre-dip checkpoint. The binary arm recovers as designed but
-lags (41.8 binary offline vs 12.9 ternary streaming).
+**The 0.6B aligned matrix (official algorithm, loop policy on):**
+
+| checkpoint | 160 ms | 320 ms | 1 000 ms |
+|---|---:|---:|---:|
+| ternary aligned (scaled) | pending | **12.92** | **10.59** |
+| — other | pending | **20.00** | pending |
+| **binary aligned** | — | **18.43** | — |
+| pretrained fp16 (reference) | — | 2.33 clean | — |
+
+**Key finding:** the binary checkpoint's *streaming* WER (18.43) is far better
+than its *offline* binary WER (41.8) — the aligned targets are the binding
+supervision, not the precision (ternary→binary streaming gap +5.5 vs offline
++32). Chunk size behaves as expected (1 000 ms < 320 ms).
 
 **MILESTONE (tag `0.2.42`): the aligned-targets recipe works and scales.**
 
