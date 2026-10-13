@@ -7,20 +7,21 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-13 06:30 IST)
+## Live status (updated 2026-10-13 10:45 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11161` | **Stage 3 — aligned targets on the 1.7B** (from `qat_17b_attn5`) | step ~480/1 500 at **~2 steps/min** (GPU 7 heavily contended) | STREAM @250 = **28.47** (from an unadapted base) | walltime 09:12 IST → cuts it near step ~700–1000 → chain `qat_stream_aligned17b2.pbs` (`--resume`, 8 h) |
-| `11164` | **Binary mirror** (aligned + progressive precision, 0.6B) | baseline eval | pending | ~1.5–2 h |
+| `11177` | **Stage 3 — 1.7B aligned RESUME** (`--resume` from step ~750, same schedule, 8 h) | starting (GPU 5) | pending | 2.5–6 h (750 steps at 2–5 steps/min) |
+| `11164` | **Binary mirror** (aligned + progressive precision, 0.6B) | step ~920/1 500 | STREAM 64.9 → 48.2 → **35.8 @750**; offline binary 48.5 @500 (from ~100) | ~1–2 h |
+| — | 1.7B aligned (first leg, `11161`) | cut by walltime at ~750/1500 | STREAM 28.5 @250 / 31.1 @500; offline 20.55 → 31.57 @500 (mid-transient) | resumed by `11177` |
 | — | **0.6B aligned frontier** | done | **12.92 clean / 20.00 other**, 0 loops | — |
-| — | 1.7B rollout (anchor-free) | done | ternary 20.55 (pretrained 1.17) | — |
 
-**The 1.7B aligned run is the path to the `+1.5` target.** Its first guardrail
-(28.47 @250) already beats anything the unadapted 1.7B could do, and the 0.6B's
-pattern says the curve keeps descending (raw streaming ≈ offline WER after
-alignment). The bottleneck is cluster contention, not the recipe — the resume
-launcher is ready for the walltime cut.
+**Notes:** the 1.7B's fresh-cycle dip (20.55 → 31.57 at lr 3e-6) is much deeper
+than the 0.6B's — 1.41 B trainable params move further at the same nominal lr.
+The resume continues the same cosine; if its tail does not recover below 20.55,
+halve the lr (1.5e-6) or restart from the FFN checkpoint with the anchor
+present. The silent-but-important constraint remains cluster contention
+(~2–5 steps/min vs ~100+ on a quiet GPU).
 
 **MILESTONE (tag `0.2.42`): the aligned-targets recipe works and scales.**
 
