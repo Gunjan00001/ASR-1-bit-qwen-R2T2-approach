@@ -63,7 +63,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --policy decoder_attn_ffn \
   --bit-width 1.58 \
   --learnable-scale 1 \
-  --init-from data/checkpoints/qat_stream_aligned3/step2500.pt \
+  --init-from data/checkpoints/qat_stream_aligned2/step2500.pt \
   --aligned-targets 1 \
   --aligned-n 2400 \
   --aligned-lookahead-ms 0 \

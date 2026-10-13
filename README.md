@@ -19,17 +19,27 @@ metric fp16 anchors locked (streaming 320 ms clean `2.24` / other `4.61`) and
 `X = +1.5` absolute. See [`docs/stage0_results.md`](docs/stage0_results.md).
 
 **Stage 1/2 (in progress, branch `stage-1`)** — BitLinear + QAT machinery is
-implemented and tested (203 tests); loss controllability proven (ternary QAT
+implemented and tested (325 tests); loss controllability proven (ternary QAT
 memorizes exactly). A working recovery recipe was found and scaled up on the
-A100 cluster:
+A100 cluster, and the **streaming algorithm is solved at the recipe level**:
 
-| Configuration (50-utt `test-clean`) | WER |
+| Configuration (50-utt `test-clean` / `test-other`) | WER |
 |---|---:|
 | fp16 pretrained reference | **2.44** |
-| Ternary, all 196 decoder projections (8k data, offline) | **9.2** (best 9.1) |
-| Binary, all 196 decoder projections (8k data, offline) | **10.7** |
+| Ternary, all 196 decoder projections (28.5k-utt cache, offline) | **7.5** |
+| Binary, all 196 decoder projections (offline) | **10.7** |
 | Streaming 320 ms, chunked re-feed (ternary / binary) | **9.43 / 10.28** |
+| **Streaming 320 ms, official prefix algorithm — aligned-targets recipe** | **12.92 / 20.00** (zero loops) |
 | Naive QAT (for comparison) | ~100 |
+
+The official streaming algorithm used to *collapse* for quantized models
+(WER 203.5 with repetition loops). The fix is the **aligned-targets recipe**:
+Qwen3-ForcedAligner word timestamps → per-chunk targets ("emit the words whose
+end time falls in this chunk, then stop") + the LSP loop-emission policy
+(`docs/LAB_NOTES.md`, 2026-10-12/13). The `+1.5` gate against the fp16 baseline
+is **not** met yet — the remaining gap is 0.6B model capacity (the 1.7B is the
+next lever); zero repetition loops everywhere. Full matrix, recipe and history:
+`docs/PROJECT_STATUS.md`, `docs/stage1_results.md`, `docs/HANDOFF.md`.
 
 ![WER trajectories](docs/figures/wer_trajectories.png)
 

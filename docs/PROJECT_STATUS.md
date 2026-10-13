@@ -15,17 +15,30 @@
   T4 (1.7B full clean 1.96 vs published 1.95); `X = +1.5` locked.
 - **Stage 1 (BitLinear + QAT) machinery works**: ternary QAT can memorize a
   single utterance exactly (loss 0.000); all quantizer/training code is tested
-  (203 tests).
+  (325 tests).
 - **Naive QAT collapses** (~100 WER) — this is expected, not a bug (quantizer
   audit: per-tensor binary error 0.648 ≈ the Gaussian closed form 0.60).
-- **A working recovery recipe was found (Stage 2a/2b) and scaled up on 8k data:**
+- **A working recovery recipe was found (Stage 2a/2b) and scaled up:**
   FFN warm start → attention rollout with a **frozen pretrained-teacher anchor**
   → repeated warm-restart cosine cycles; binary via **progressive precision**.
-  - **Ternary, all 196 decoder projections: 9.2 final / 9.1 best WER**
-  - **Binary, all 196 decoder projections: 10.7 WER**
+  - **Ternary, all 196 decoder projections: 9.2 final / 9.1 best** on 8k data;
+    **7.52 best / 7.63 final** on the full 28.5k-utterance cache — more data
+    broke the offline plateau.
+  - **Binary, all 196 decoder projections: 10.7 WER** — and the full-cache
+    binary run landed at the same **10.70**, i.e. a quantizer floor, not a
+    data/base-quality limit.
   - (fp16 pretrained reference on the same 50-utt sample: **2.44**)
-  - Offline recovery plateaued after four continuation rounds; **streaming
-    robustness is now the critical path** — see the streaming section below.
+- **Streaming (the official prefix algorithm) is solved at the recipe level**
+  (2026-10-12/13): the **aligned-targets recipe** — Qwen3-ForcedAligner word
+  timestamps → per-chunk targets ("emit the words whose end time falls in this
+  chunk, then stop") + the **LSP loop-emission policy** — takes the official
+  algorithm from total collapse (**WER 203.5**, repetition loops) to
+  **12.92 clean / 20.00 other** at 320 ms (**10.59 / 16.59** at 1 000 ms) with
+  **zero loops**; the binary aligned checkpoint streams at **18.43 clean /
+  25.45 other**. The `+1.5` gate (~3.7 / 6.1) is **not** met — the remaining gap
+  is 0.6B model capacity (the 1.7B path is paused on cluster capacity). The full
+  matrix is in the streaming section below and `docs/stage1_results.md`; every
+  failed recipe (with numbers) is kept in `docs/LAB_NOTES.md`.
 
 ---
 
