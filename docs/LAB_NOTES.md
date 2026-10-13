@@ -1163,3 +1163,31 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/qat_stream_aligned17b3.log` (OOM),
   `qat_stream_aligned2bin2.log` (walltime cut), `eval_streaming_opd_aligned2_c160.log`,
   `eval_streaming_opd_aligned2_c1000.log`, `eval_streaming_opd_aligned2bin.log`.
+
+---
+
+## 2026-10-13 — Matrix filling in: 1000 ms 10.59, 320 ms 12.92 (clean), 320 ms other 20.00; **binary streams at 18.43**
+
+- **Did:** collected the matrix evals (the aligned 0.6B checkpoint at 160/320/
+  1000 ms, clean/other; the binary mirror's loop-policy eval).
+- **Results (official algorithm, 50 utts, LSP loop policy on):**
+
+  | checkpoint | chunk | clean | other |
+  |---|---|---:|---:|
+  | ternary aligned (scaled) | 320 ms | **12.92** | **20.00** |
+  | ternary aligned (scaled) | 1 000 ms | **10.59** (CER 4.07) | pending |
+  | ternary aligned (scaled) | 160 ms | pending | pending |
+  | **binary aligned** (mirror, cut at step 1 246/1 500) | 320 ms | **18.43** (CER 11.84, raw 17.90) | pending |
+
+- **The binary surprise:** the binary checkpoint's *offline* binary WER is 41.8,
+  yet its *streaming* WER is **18.43** — the aligned streaming recipe transfers
+  to binary far better than the offline recipe does. The ternary→binary
+  streaming gap is only **+5.5** (12.92 → 18.43), whereas offline it is +32
+  (9.7 → 41.8). Consistent with the aligned targets being the binding
+  supervision, not the precision.
+- **Chunk-size trend:** 1 000 ms beats 320 ms (10.59 vs 12.92) — boundary errors
+  dominate at short chunks, as expected; 160 ms pending.
+- **Verdict recap:** the 0.6B aligned recipe is the deliverable (ternary
+  12.92/20.00; binary 18.43); the 1.7B waits on cluster capacity.
+- **Artifacts:** `artifacts/stage1/streaming_opd_aligned2_c1000_quantized.json`,
+  `streaming_opd_aligned2bin_quantized.json`, `eval_streaming_opd_*.log`.
