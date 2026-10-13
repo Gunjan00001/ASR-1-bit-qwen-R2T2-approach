@@ -272,3 +272,37 @@ python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_f
 - The fp16 readout still drifts (31–50); must be solved for the plan's
   "co-train" story.
 - All checkpoints and caches are kept on disk; nothing is lost between rounds.
+
+---
+
+## Streaming matrix — aligned-targets recipe (2026-10-13, tag `0.2.42`)
+
+The official Qwen3-ASR prefix algorithm evaluated with the portable streamer,
+50-utt `test-clean` / `test-other` (seed 0), greedy, 32 tokens per chunk, LSP
+loop policy on (`--lsp-margin-words 3 --lsp-truncate-loops 1`). FP16 = the
+pretrained 0.6B through the same portable path.
+
+| config | 160 ms | 320 ms | 1 000 ms |
+|---|---:|---:|---:|
+| Ternary aligned — clean | 13.24 (CER 5.11) | **12.92** (CER 5.00) | **10.59** (CER 4.07) |
+| Ternary aligned — other | pending | **20.00** (CER 10.10) | pending |
+| Binary aligned — clean | — | **18.43** (CER 11.84) | — |
+| Binary aligned — other | — | pending | — |
+| FP16 pretrained — clean (same portable path) | — | 2.33 | — |
+| FP16 pretrained — other (same portable path) | — | ~4.6 (protocol baseline) | — |
+
+Reference points: the *published* 0.6B streaming numbers are clean 2.54 /
+other 6.27; the `+1.5` gate is locked against the fp16 1.7B (clean 2.24 /
+other 4.61 → ~3.7 / 6.1). **The Stage-4 gate is therefore not met** — the
+recipe's achievement is going from total collapse (203.5, 2026-10-11) to
+**12.92 clean / 20.00 other with zero repetition loops**, an order-of-magnitude
+improvement whose remaining gap is base-model capacity (0.6B), not the
+streaming recipe. The binary path is only +5.5 behind ternary in *streaming*
+(18.43 vs 12.92) although it is +32 behind in offline WER — the aligned targets
+are the binding supervision, not the precision.
+
+Recipe (all committed): `--aligned-targets 1` (forced-aligner chunk targets,
+T4.1–T4.3) + `--op-mix-frac 0.5` (standard + aligned samples) + the LSP loop
+policy, from the best offline checkpoint; launchers `scripts/qat_stream_aligned*.pbs`,
+evaluation `scripts/eval_streaming_opd.pbs` (`TRUNC=1`, `CHUNK=160|320|1000`,
+`CFG=clean|other`).

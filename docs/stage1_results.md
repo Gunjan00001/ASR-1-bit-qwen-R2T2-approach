@@ -326,3 +326,27 @@ attention added incrementally with an anchored/trust-region objective.
 4. Only then extend training time and data.
 5. `0.3.0` stays untagged: the gate's "WER table emitted" is satisfied and the
    loss is controllable, but recovery is still in progress; keep Stage 1 open.
+
+---
+
+## Stage 4 (streaming) results — aligned-targets recipe (2026-10-13)
+
+Official prefix algorithm, portable streamer, 50 utts, greedy, 32 tokens/chunk,
+LSP loop policy on. Full recipe: `--aligned-targets 1` (Qwen3-ForcedAligner-0.6B
+chunk targets, T4.1–T4.3) + 50 % standard samples + the LSP loop policy,
+`scripts/qat_stream_aligned2.pbs` (from the 7.52 full-cache ternary).
+
+| checkpoint | chunk | config | WER | CER | raw WER | RTF | loops |
+|---|---|---:|---|---:|---:|---:|---:|
+| ternary aligned | 160 ms | clean | 13.24 | 5.11 | 13.03 | 10.28 | 0 |
+| ternary aligned | 320 ms | clean | **12.92** | 5.00 | 12.92 | 3.25 | 0 |
+| ternary aligned | 1 000 ms | clean | **10.59** | 4.07 | 10.49 | 3.15 | 0 |
+| ternary aligned | 320 ms | other | **20.00** | 10.10 | 19.09 | 3.32 | 0 |
+| binary aligned | 320 ms | clean | **18.43** | 11.84 | 17.90 | 5.63 | 0 |
+| FP16 pretrained | 320 ms | clean | 2.33 | — | — | — | — |
+
+History for context: 2026-10-11 the same metric collapsed (WER 203.5, loops);
+the intermediate recipes (DAgger 920.55, distillation v1/v2/v3 448 → 350 → 278,
+LSP loop policy 144.6) are recorded in `docs/LAB_NOTES.md`.
+
+Pending cells: ternary other @160/1000 ms, binary other @320 ms.
