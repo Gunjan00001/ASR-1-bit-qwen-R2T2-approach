@@ -1052,3 +1052,28 @@ environmental, not model bugs):
   final matrix (160/320/1000 ms, clean/other) and the write-up.
 - **Artifacts:** `artifacts/stage1/qat_stream_aligned2bin.log` (OOM),
   `qat_stream_aligned17b.log`, `scripts/qat_stream_aligned2bin2.pbs`.
+
+---
+
+## 2026-10-13 (morning) — 1.7B aligned run training slowly; first STREAM 28.5 @250; binary mirror retried
+
+- **Did:** checked the 1.7B aligned run (`11161`) and retried the binary mirror.
+- **1.7B aligned status:** mix built as configured (39 800 aligned examples →
+  2 400 pooled + 2 400 standard = 4 800); the first 20-utt official-algorithm
+  `STREAM` @250 is **28.47** — from a checkpoint that had *never* seen streaming
+  training (its raw streaming would be in the hundreds), so the recipe is
+  clearly transferring, but the run is slow: **~2.8 steps/min** (batch 1, 1.7B,
+  adam8bit, contended GPU). At that rate the 6 h walltime cuts it near step
+  ~1 000 of 1 500 → a `--resume` continuation is prepared
+  (`qat_stream_aligned17b2.pbs`, 8 h walltime).
+- **Binary mirror:** retried as `11164` and landed on GPU 0 (~36 GB free,
+  enough for the ~12–15 GB needed) after the first attempt died when a
+  co-tenant grew to 52 GB.
+- **Also prepared:** nothing else pending; the 0.6B frontier (12.92 clean /
+  20.00 other, zero loops) stands as the reference the 1.7B is chasing.
+- **Next:** read the 1.7B's ternary EVALs + STREAM curve as they land (the
+  0.6B pattern was *raw streaming ≈ offline WER* after alignment); chain
+  `qat_stream_aligned17b2.pbs` if the walltime cuts it; read the binary mirror's
+  curves; then the final matrix.
+- **Artifacts:** `artifacts/stage1/qat_stream_aligned17b.log`,
+  `qat_stream_aligned2bin2.log`, `scripts/qat_stream_aligned17b2.pbs`.
