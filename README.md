@@ -37,8 +37,12 @@ The official streaming algorithm used to *collapse* for quantized models
 Qwen3-ForcedAligner word timestamps → per-chunk targets ("emit the words whose
 end time falls in this chunk, then stop") + the LSP loop-emission policy
 (`docs/LAB_NOTES.md`, 2026-10-12/13). The `+1.5` gate against the fp16 baseline
-is **not** met yet — the remaining gap is 0.6B model capacity (the 1.7B is the
-next lever); zero repetition loops everywhere. Full matrix, recipe and history:
+is **not** met. The gap is **quantization damage, not streaming capacity**:
+the fp16 *0.6B* streams at `2.54 / 6.27` — close to the 1.7B's `2.24 / 4.61`,
+so size is not what limits the fp16 side — while quantization alone costs
+`+5.4` on the offline path (`2.11 → 7.5`), more than the entire `+1.5` budget.
+Whether that damage shrinks with scale is the open 1.7B question (paused on
+cluster capacity; the recipe itself is fixed, zero repetition loops). Full matrix, recipe and history:
 `docs/PROJECT_STATUS.md`, `docs/stage1_results.md` (offline),
 `docs/stage4_results.md` (streaming), `docs/HANDOFF.md`.
 

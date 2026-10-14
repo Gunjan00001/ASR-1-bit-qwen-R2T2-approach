@@ -1348,3 +1348,25 @@ environmental, not model bugs):
   ≥ 20 GB free (the check's rule).
 - **Artifacts:** `scripts/pick_gpu.sh`, `qat_stream_aligned5r.pbs`,
   `eval_bin_es.pbs` (one job evaluates the binary's step-500/1000/1500 states).
+
+---
+
+## 2026-10-15 — Corrected a claim: the gate gap is quantization damage, not "0.6B capacity"
+
+- **Did:** an accuracy pass over the headline claims in README / HANDOFF /
+  PROJECT_STATUS while auditing the Stage-4 gate arithmetic.
+- **What was wrong:** the docs said the `+1.5` gap (bar 3.74/6.11 against the
+  fp16 **1.7B** anchors 2.24/4.61) was "0.6B model capacity, not the recipe".
+  The Stage-0 record contradicts the capacity story: the fp16 **0.6B** streams
+  at **2.54 / 6.27** (2.0 s rows in `docs/stage0_results.md`) — close to the
+  1.7B's 2.24 / 4.61 — so *size is not what limits the fp16 side*. Quantization
+  alone costs **+5.4** offline on the 0.6B (2.11 → 7.5, `docs/stage1_results.md`),
+  i.e. more than the entire +1.5 budget, before any streaming penalty.
+- **Fixed wording (all three docs):** the remaining gap is *quantization damage*,
+  and the open question behind the 1.7B path is whether that damage shrinks with
+  scale (unproven). The recipe's achievement and the zero-loop status are
+  unchanged.
+- **Why it matters:** the claim decides what the next lever is supposed to be.
+  "0.6B capacity" would point at scale answers; "quantization damage" points at
+  quantizer/precision work (stochastic rounding, co-training) *and* scale. The
+  record now says what the evidence supports.

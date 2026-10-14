@@ -29,8 +29,13 @@
 
   History: collapse 203.5 (10-11) → DAgger 920 → distillation 448/350/278 →
   LSP loop policy 144.6 → **aligned 12.92** (zero loops). The `+1.5` gate
-  (~3.7/6.1) is **not** met; the gap is 0.6B capacity, not the recipe. The
-  binary path is only +5.5 behind ternary in *streaming* (vs +32 offline).
+  (~3.7/6.1, against the **fp16 1.7B** anchors) is **not** met. The gap is
+  **quantization damage, not streaming capacity or the recipe**: the fp16 *0.6B*
+  streams at 2.54/6.27 (near the 1.7B's 2.24/4.61 — size is not what limits the
+  fp16 side), while quantization alone costs +5.4 offline (2.11 → 7.5), above
+  the whole +1.5 budget. Whether the damage shrinks with scale is the open 1.7B
+  question. The binary path is only +5.5 behind ternary in *streaming* (vs +32
+  offline) — the aligned targets are the binding supervision, not the precision.
 - **Stage 3 (1.7B): PAUSED on cluster capacity.** FFN warm start 22.03 and an
   anchor-free attention rollout 20.55 are on disk, but the aligned recipe there
   failed twice: lr 3e-6 + adam8bit + no anchor dipped 20.55 → 30.6 permanently,

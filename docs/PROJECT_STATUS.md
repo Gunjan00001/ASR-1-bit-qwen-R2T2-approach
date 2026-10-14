@@ -35,8 +35,12 @@
   algorithm from total collapse (**WER 203.5**, repetition loops) to
   **12.92 clean / 20.00 other** at 320 ms (**10.59 / 16.59** at 1 000 ms) with
   **zero loops**; the binary aligned checkpoint streams at **18.43 clean /
-  25.45 other**. The `+1.5` gate (~3.7 / 6.1) is **not** met — the remaining gap
-  is 0.6B model capacity (the 1.7B path is paused on cluster capacity). The full
+  25.45 other**. The `+1.5` gate (~3.7 / 6.1, against the fp16 **1.7B**
+  anchors) is **not** met — the gap is **quantization damage, not streaming
+  capacity**: the fp16 *0.6B* streams at 2.54 / 6.27 (near the 1.7B's
+  2.24 / 4.61), while quantization alone costs +5.4 on the offline path
+  (2.11 → 7.5), more than the entire +1.5 budget. Whether that damage shrinks
+  with scale is the open 1.7B question (paused on cluster capacity). The full
   matrix is in the streaming section below and `docs/stage1_results.md` (offline) and `docs/stage4_results.md` (streaming); every
   failed recipe (with numbers) is kept in `docs/LAB_NOTES.md`.
 
@@ -309,8 +313,12 @@ other 6.27; the `+1.5` gate is locked against the fp16 1.7B (clean 2.24 /
 other 4.61 → ~3.7 / 6.1). **The Stage-4 gate is therefore not met** — the
 recipe's achievement is going from total collapse (203.5, 2026-10-11) to
 **12.92 clean / 20.00 other with zero repetition loops**, an order-of-magnitude
-improvement whose remaining gap is base-model capacity (0.6B), not the
-streaming recipe. The binary path is only +5.5 behind ternary in *streaming*
+improvement. The remaining gap is **quantization damage** rather than streaming
+capacity or the recipe: the fp16 0.6B streams at 2.54 / 6.27, close to the
+1.7B's 2.24 / 4.61, so model size does not limit the fp16 side; quantization
+alone costs +5.4 offline (2.11 → 7.5, above the whole +1.5 budget). Whether the
+damage shrinks with scale is the open 1.7B question. The binary path is only
++5.5 behind ternary in *streaming*
 (18.43 vs 12.92) although it is +32 behind in offline WER — the aligned targets
 are the binding supervision, not the precision.
 
