@@ -23,8 +23,8 @@
   |---|---:|---:|---:|
   | ternary aligned — clean | 13.24 | **12.92** | **10.59** |
   | ternary aligned — other | 20.80 | **20.00** | **16.59** |
-  | binary aligned — clean | — | **18.43** | — |
-  | binary aligned — other | — | **25.45** | — |
+  | binary aligned — clean | — | **18.43** (step-1 250 state) / 27.54 (final) | — |
+  | binary aligned — other | — | **25.45** / 26.93 (final) | — |
   | fp16 pretrained (same portable path) | — | 2.33 | — |
 
   History: collapse 203.5 (10-11) → DAgger 920 → distillation 448/350/278 →

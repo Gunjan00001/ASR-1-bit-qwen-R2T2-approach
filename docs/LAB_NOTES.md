@@ -1290,3 +1290,33 @@ environmental, not model bugs):
 - **Artifacts:** `artifacts/stage1/qat_stream_aligned2bin3.log`,
   `stage1_decoder_attn_ffn_bw1.0_gNone_lr3e-06_adamw_delay_ls1_n2400.json`,
   `eval_streaming_opd_aligned2bin_final{,_other}.log`.
+
+---
+
+## 2026-10-15 — Binary final evals: the resume DEGRADED the streaming (clean 27.54 vs the step-1 250 state's 18.43)
+
+- **Did:** collected the binary arm's final 50-utt evals (the 1 500-step
+  checkpoint).
+- **Result:** clean **27.54** (CER 22.11, raw 26.91, **29 loop truncations**) /
+  other **26.93** (CER 17.37, raw 26.70, 40 truncations). The step-1 250
+  snapshot of the same run measured **18.43 / 25.45** with the loop policy
+  doing almost no work — so the resumed 250 steps improved the *offline* binary
+  (41.8 → 35.2) but **broke the streaming arm's loop discipline**.
+- **Two lessons (both recorded):**
+  1. **Snapshot before resuming** — the step-1 250 weights (the better
+     streaming state) were overwritten by the resume and are gone; only its
+     eval JSON survives. A resume is a *new experiment*, not a mere completion.
+  2. The binary arm's ceiling is state-dependent in a way the ternary arm's is
+     not: the loop discipline is the first thing lost when the offline path is
+     pushed, and the LSP loop policy then carries 30–40 truncations instead of
+     0–2.
+- **Reachable binary deliverable:** the documented best is 18.43 clean /
+  25.45 other (from the lost step-1 250 state); the reproducible weights on disk
+  (step 1 500) give 27.54 / 26.93. Re-creating the better state means re-running
+  the binary phase with an *early-stopping* rule (stop when the 50-utt streaming
+  eval degrades), not a fixed schedule.
+- **Next (launched):** `11369` — `qat_stream_aligned5.pbs`: ONE longer aligned
+  cycle (5 000 steps, lr 5e-6) from the 7.5 full-cache base, since the aligned2
+  recipe (2 500 steps) was still descending at its end.
+- **Artifacts:** `streaming_opd_aligned2bin_final{,_other}_quantized.json`,
+  `qat_stream_aligned5.log`.

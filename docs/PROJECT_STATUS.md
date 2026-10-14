@@ -299,8 +299,8 @@ pretrained 0.6B through the same portable path.
 |---|---:|---:|---:|
 | Ternary aligned — clean | 13.24 (CER 5.11) | **12.92** (CER 5.00) | **10.59** (CER 4.07) |
 | Ternary aligned — other | 20.80 (CER 10.83) | **20.00** (CER 10.10) | **16.59** (CER 7.27) |
-| Binary aligned — clean | — | **18.43** (CER 11.84) | — |
-| Binary aligned — other | — | **25.45** (CER 15.31) | — |
+| Binary aligned — clean | — | **18.43** (CER 11.84; step-1 250 state) / 27.54 (final step 1 500) | — |
+| Binary aligned — other | — | **25.45** (step-1 250 state) / 26.93 (final) | — |
 | FP16 pretrained — clean (same portable path) | — | 2.33 | — |
 | FP16 pretrained — other (same portable path) | — | ~4.6 (protocol baseline) | — |
 
