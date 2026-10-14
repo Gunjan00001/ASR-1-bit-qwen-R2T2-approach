@@ -1320,3 +1320,31 @@ environmental, not model bugs):
   recipe (2 500 steps) was still descending at its end.
 - **Artifacts:** `streaming_opd_aligned2bin_final{,_other}_quantized.json`,
   `qat_stream_aligned5.log`.
+
+---
+
+## 2026-10-15 (early) — Cluster saturation kills both aligned runs; a strict GPU picker is added
+
+- **Did:** launched the two 0.6B runs of the day (aligned5 — one longer aligned
+  cycle; bin_es — the binary early-stopping re-run with
+  `--keep-step-checkpoints`), then watched both die.
+- **What happened:** the forced-aligner work (~35 min, 2 400 utts each) finished
+  for both, then:
+  * `11369` (aligned5) OOM'd at its **first** training step — its GPU's
+    co-tenants had grown to 19.4 GB *after* the picker sampled (the cluster
+    showed 67–81 GB/GPU used by then).
+  * `11371` (bin_es) OOM'd the same way a few minutes later.
+  Both were re-picked onto the "least-used" GPU, which was still not free enough
+  once the co-tenants grew — the race the picker cannot win, only avoid.
+- **Fix (code):** `scripts/pick_gpu.sh` — samples 3×, picks the max-free GPU and
+  **refuses** (exit 3, "resubmit later") when nothing has ≥ 20 GB free, instead
+  of falling back onto a doomed GPU and burning half an hour of alignment. All
+  four launchers we resubmit (`qat_stream_aligned5b`, `qat_stream_aligned5r`,
+  `qat_stream_bin_es`, `eval_bin_es`) now call it and exit cleanly when the
+  cluster is saturated; they are re-submitted when capacity appears.
+- **Relaunched:** `11375` (`aligned5r`, the same recipe plus
+  `--keep-step-checkpoints 500`) — running, at risk on the same saturated
+  cluster. If it dies, resubmit; no further spawn attempts until a GPU has
+  ≥ 20 GB free (the check's rule).
+- **Artifacts:** `scripts/pick_gpu.sh`, `qat_stream_aligned5r.pbs`,
+  `eval_bin_es.pbs` (one job evaluates the binary's step-500/1000/1500 states).

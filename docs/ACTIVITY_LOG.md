@@ -11,8 +11,9 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11369` | **0.6B — longer aligned cycle** (`qat_stream_aligned5`: from the 7.5 base, 5 000 steps, lr 5e-6, aligned-n 2 400, GPU 5) | startup (alignment) | pending (aligned2: 2 500 steps → 12.92/20.00) | ~4–8 h (contended) |
-| `11371` | **Binary early-stopping re-run** (`qat_stream_bin_es`: from the ternary aligned2, bit_width 1.0, aligned targets, `--keep-step-checkpoints 500`, GPU 6 ~18 GB free) | startup | pending — then full 50-utt evals on its step-500/1000/1500 states to recover the best binary streaming state (the 18.43 one was lost to a resume) | ~2–3 h + evals |
+| `11375` | **0.6B — longer aligned cycle** (`qat_stream_aligned5r`: from the 7.5 base, 5 000 steps, lr 5e-6, `--keep-step-checkpoints 500`) | alignment (~35 min) | pending — *at risk*: the cluster is saturated (67–81 GB/GPU used) and its predecessors OOM'd at the first step | ~4–8 h if it survives |
+| `11371` | **Binary early-stopping re-run** | **OOM at first step** (co-tenant growth after the picker sampled; the alignment was wasted) | resubmit `qat_stream_bin_es.pbs` when a GPU has ≥20 GB free, then `eval_bin_es.pbs` for its step-500/1000/1500 states | — |
+| — | **Strict GPU picker** (`scripts/pick_gpu.sh`) — refuses (exit 3) when nothing has ≥20 GB free, instead of the least-used fallback that bought two OOMs | done (all resubmittable launchers wired) | — | — |
 | — | **Binary arm** | final evals done | step-1 250 state **18.43 / 25.45** (weights overwritten by the resume ✗) → final step-1 500 state **27.54 / 26.93** (29–40 loop truncations: the resume broke the loop discipline) | re-run with early stopping if needed |
 | — | 1.7B aligned | **paused** — all 8 GPUs 60–78 GB used | — | — |
 

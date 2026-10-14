@@ -44,13 +44,7 @@ else
   CACHE="$ROOT/data/qat_clean_train.100_n8000.pt"
 fi
 
-PICK=$(for _ in 1 2 3; do
-  nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits
-  sleep 1
-done | awk -F', ' '$2 < 25000 {u[$1]+=$3; m[$1]=$2} END {for (g in u) print u[g], m[g], g}' \
-  | sort -n | head -1 | awk '{print $3}')
-[ -z "$PICK" ] && PICK=$(nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits \
-  | sort -t, -k2 -n | head -1 | cut -d, -f1 | tr -d ' ')
+PICK=$(bash scripts/pick_gpu.sh 20000) || exit 0
 PICK="${QAT_GPU:-$PICK}"
 export CUDA_VISIBLE_DEVICES="$PICK"
 
