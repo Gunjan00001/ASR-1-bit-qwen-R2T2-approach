@@ -19,7 +19,7 @@ metric fp16 anchors locked (streaming 320 ms clean `2.24` / other `4.61`) and
 `X = +1.5` absolute. See [`docs/stage0_results.md`](docs/stage0_results.md).
 
 **Stage 1/2 (in progress, branch `stage-1`)** — BitLinear + QAT machinery is
-implemented and tested (325 tests); loss controllability proven (ternary QAT
+implemented and tested (327 tests); loss controllability proven (ternary QAT
 memorizes exactly). A working recovery recipe was found and scaled up on the
 A100 cluster, and the **streaming algorithm is solved at the recipe level**:
 

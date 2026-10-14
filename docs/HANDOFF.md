@@ -52,10 +52,18 @@
   `--keep-step-checkpoints 500`) to recover a binary streaming state better than
   the 27.54/26.93 of the resumed weights (the 18.43/25.45 step-1 250 state was
   lost to that resume).
-- **Next:** (1) the write-up (PROJECT_STATUS/stage1_results carry the complete matrix);
-  (3) optional: resume the binary mirror's last 250 steps; (4) the 1.7B when a
-  quiet GPU appears — its content (offline 1.17 vs 0.6B's 2.44) is the path to
-  the gate.
+- **Next:** (1) the two 0.6B runs in flight — `qat_stream_aligned5r.pbs` (one
+  longer aligned cycle: 5 000 steps at lr 5e-6 from the 7.5 base; decide on
+  *full-sample* evals only, tagged `_aligned5`, one per chunk) and
+  `qat_stream_bin_es.pbs` + `scripts/eval_bin_es.pbs` (the binary early-stopping
+  re-run; pick its best step-500/1 000/1 500 state, since the 18.43/25.45 one
+  was lost to a resume); (2) the **quantizer-side levers** for the
+  quantization-damage gap — stochastic rounding and co-training (precision
+  schedules / mixed ternary-binary) are the untried options, alongside scale;
+  (3) the **1.7B** when a quiet GPU appears (≥45 GB stable free; the anchored
+  fp32-AdamW recipe per §0) — its content (offline 1.17 vs the 0.6B's 2.44) is
+  the other path to the gate; (4) the write-up — `docs/stage4_results.md` is
+  generated from the artifacts, PROJECT_STATUS/stage1_results carry the matrix.
 
 ---
 
@@ -70,7 +78,7 @@
 | LSP emission (append-only) | policy implemented + tested | Stage 4 / T4.4; WER-neutral, reports commit latency |
 
 - Stage 0 gate passed (`0.2.0`); Stage 1/2 machinery is implemented, tested
-  (277 tests, ruff clean), documented, and pushed.
+  (327 tests, ruff clean), documented, and pushed.
 - The quantization pipeline works: ternary/binary weights across the whole
   decoder recover to single-digit/low-teens WER via the recipe in §2.
 - **The open problem is streaming robustness of the official algorithm** — a
