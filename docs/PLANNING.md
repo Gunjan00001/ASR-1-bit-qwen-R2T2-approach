@@ -389,3 +389,21 @@ Dated, append-only. Record what changed, why, and alternatives rejected.
   signal from the previous entry stand. Rejected: another DAgger iteration
   (poisoning compounds), filtered-DAgger only (kept as a fallback if
   distillation underperforms).
+- **2026-10-13/15 — WP1 recipe validated: forced-aligner chunk targets + LSP loop
+  policy.** The official prefix algorithm's collapse is fixed by making the
+  *training target* the words the model has actually heard: T4.1/T4.2
+  (Qwen3-ForcedAligner-0.6B word timestamps → per-320 ms-chunk targets; empty
+  targets are stop samples, `--aligned-stop-stride 2` halves the silence
+  pressure), mixed 50/50 with standard samples from the best offline checkpoint,
+  plus the LSP loop-emission policy at inference (`--lsp-truncate-loops 1`).
+  Result: WER 203.5 → **12.92 clean / 20.00 other** with zero repetition loops
+  (`docs/stage1_results.md` has the full matrix). Alternatives rejected, with
+  numbers: DAgger on the student's own prefixes (920 — poisons the model),
+  streaming-state distillation (448 → 350 → 278), inference repetition controls
+  (438 / 264), a low-share anneal (offline 15.3 but the loops return).
+  **Process rules adopted from this work:** promote on *full-sample* evals only
+  (the fixed 20-utt in-training guardrail diverged from the 50-utt metric),
+  snapshot a checkpoint before resuming (a resume overwrites `last.pt`, and it
+  is a *new* experiment — the binary arm lost a better streaming state that
+  way), and use `--keep-step-checkpoints` so a trajectory's states stay
+  selectable.

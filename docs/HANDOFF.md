@@ -40,6 +40,13 @@
   `gradient_checkpointing_enable()` breaks the frozen-only setup; `adam8bit`
   needs `~/miniconda3` (bitsandbytes 0.50.2) — verify it engaged; GPU pickers
   race with co-tenants that grow, so pin or expect OOMs.
+- **Running (2026-10-15):** `11369` `qat_stream_aligned5.pbs` — one *longer*
+  aligned cycle (5 000 steps at lr 5e-6 from the 7.5 base; the 2 500-step
+  aligned2 was still descending when it ended); `11371` `qat_stream_bin_es.pbs` —
+  the binary early-stopping re-run (from the ternary aligned2, bit_width 1.0,
+  `--keep-step-checkpoints 500`) to recover a binary streaming state better than
+  the 27.54/26.93 of the resumed weights (the 18.43/25.45 step-1 250 state was
+  lost to that resume).
 - **Next:** (1) the write-up (PROJECT_STATUS/stage1_results carry the complete matrix);
   (3) optional: resume the binary mirror's last 250 steps; (4) the 1.7B when a
   quiet GPU appears — its content (offline 1.17 vs 0.6B's 2.44) is the path to
