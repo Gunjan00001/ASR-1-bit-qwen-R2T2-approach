@@ -7,14 +7,21 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 ---
 
-## Live status (updated 2026-10-14 02:35 IST)
+## Live status (updated 2026-10-15 03:35 IST)
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11233` | **Binary mirror resume** (`--resume`, 250 steps to complete its 1 500-step schedule) | running | pending | ~1–2 h |
-| — | **Refinement aligned3** (cut at step ~1 970) | **done (50-utt eval)** | clean **14.41** / zero loops — *worse* than aligned2's 12.92 despite a better guardrail and offline; **not promoted** (guardrail ≠ metric) | — |
-| — | **Matrix complete** (tag `0.2.44`; headlines refreshed, tag `0.2.45`) | done | see the table below | — |
-| — | 1.7B aligned | **paused** — GPUs 0/1 have ~39–42 GB free at 100 % utilization (bar is ≥45 GB *stable*); the rest are 67–79 GB used | — | — |
+| `11369` | **0.6B — longer aligned cycle** (`qat_stream_aligned5`: from the 7.5 base, 5 000 steps, lr 5e-6, aligned-n 2 400, GPU 5) | starting | pending (aligned2: 2 500 steps → 12.92/20.00) | ~4–8 h (contended) |
+| — | **Binary arm** | final evals done | step-1 250 state **18.43 / 25.45** (weights overwritten by the resume ✗) → final step-1 500 state **27.54 / 26.93** (29–40 loop truncations: the resume broke the loop discipline) | re-run with early stopping if needed |
+| — | 1.7B aligned | **paused** — all 8 GPUs 60–78 GB used | — | — |
+
+**This round's lessons:** (1) snapshot before resuming — the binary's better
+streaming state (18.43) is gone because the resume overwrote it; (2) a resume is
+a *new experiment*: it improved the binary's offline (41.8 → 35.2) while the
+streaming arm degraded 18.4 → 27.5, so schedule-based completions need an
+early-stopping rule on the streaming eval; (3) figures were regenerated
+(`MPLBACKEND=Agg`), the matrix cells in PROJECT_STATUS/HANDOFF now show both
+binary states.
 
 **The 0.6B aligned matrix (official algorithm, loop policy on, 50 utts):**
 
