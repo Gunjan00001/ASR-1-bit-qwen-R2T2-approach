@@ -187,6 +187,19 @@ class TestBuildAlignedExamples:
         assert examples == []
 
 
+class TestStepCheckpoints:
+    def test_returns_path_on_multiples(self):
+        module = _load_trainer()
+        assert module.step_checkpoint_path("/ck", 500, 500) == Path("/ck/step500.pt")
+        assert module.step_checkpoint_path("/ck", 1000, 500) == Path("/ck/step1000.pt")
+
+    def test_none_off_interval_or_non_multiple(self):
+        module = _load_trainer()
+        assert module.step_checkpoint_path("/ck", 500, 0) is None
+        assert module.step_checkpoint_path("/ck", 499, 500) is None
+        assert module.step_checkpoint_path("/ck", 0, 500) is None
+
+
 class TestRolloutOnPolicyExamples:
     def test_collects_examples_for_every_kept_state(self):
         module = _load_trainer()

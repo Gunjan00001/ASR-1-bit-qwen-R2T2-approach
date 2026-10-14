@@ -379,6 +379,18 @@ def build_aligned_examples(
     return examples
 
 
+def step_checkpoint_path(save_dir: str | Path, step: int, every: int) -> Path | None:
+    """Step-numbered checkpoint path when ``step`` is a multiple of ``every``.
+
+    Keeps the training trajectory's best states selectable afterwards (a
+    ``last.pt``-only run loses every earlier state; the binary arm's best
+    streaming state was lost that way on 2026-10-15).
+    """
+    if not every or every <= 0 or step <= 0 or step % every != 0:
+        return None
+    return Path(save_dir) / f"step{step}.pt"
+
+
 def shadow_state(model) -> dict:
     """Trainable tensor snapshot (BitLinear shadows and learnable scales)."""
     return {name: p.detach().cpu() for name, p in model.named_parameters() if p.requires_grad}
@@ -473,6 +485,9 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--save-dir", default=None, help="Directory for shadow checkpoints.")
     p.add_argument("--save-every", type=int, default=0, help="Checkpoint interval in steps (0=only at end).")
+    p.add_argument("--keep-step-checkpoints", type=int, default=0,
+                   help="Also write step-numbered checkpoints every N steps (0=off) so the best "
+                        "state stays selectable (a last.pt-only run loses earlier states).")
     p.add_argument("--resume", default=None, help="Checkpoint path to resume shadows from (same run; advances step counter).")
     p.add_argument(
         "--init-from", default=None,
@@ -835,6 +850,9 @@ def main() -> int:
             set_precision(model, args.bit_width, alpha)  # restore training precision
         if args.save_dir and args.save_every and (step + 1) % args.save_every == 0:
             save_checkpoint(Path(args.save_dir) / "last.pt", model, step + 1, args)
+            step_path = step_checkpoint_path(args.save_dir, step + 1, args.keep_step_checkpoints)
+            if step_path is not None:
+                save_checkpoint(step_path, model, step + 1, args)
     results["history"] = history
     results["qat_seconds"] = time.perf_counter() - started
     if args.op_rollout or args.aligned_targets:

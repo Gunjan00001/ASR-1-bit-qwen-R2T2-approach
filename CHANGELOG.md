@@ -20,6 +20,8 @@ gate. `stage-0` was merged to `main` at `0.2.0`.
 | `0.2.0` | 2026-09-20 | `stage-0` → `main` | **Stage 0 gate PASSED** — fp16 baselines reproduced; `X = +1.5` locked | **passed** |
 | `0.2.1`–`0.2.10` | 2026-09-20 | `stage-1` | Stage 1 T1.1–T1.4 implementation; first QAT run invalid (shadow corruption) | — |
 | `0.2.11`–`0.2.28` | 2026-10-10 | `stage-1` | Quantizer audit (math correct), A100 tooling, log-scaled learnable scales, distillation QAT, policy ablations | — |
+| `0.2.29`–`0.2.40` | 2026-10-11 | `stage-1` | Recovery recipe (FFN warm start → attention rollout + frozen anchor → warm restarts; progressive precision for binary); offline 9.2 ternary / 10.7 binary; streaming diagnosed as the critical path | — |
+| `0.2.41`–`0.2.46` | 2026-10-12..15 | `stage-1` | **Stage 4: the streaming algorithm is freed** — LSP emission policy (loop truncation, append-only), on-policy SFT + streaming-state distillation + filtered-DAgger guard, **aligned targets (forced aligner)**; official-algorithm WER 203.5 → **12.92 clean / 20.00 other** (zero loops); offline scale-up to 7.52 ternary (binary at a 10.70 floor) | — (Stage-4 gate open: the `+1.5` target is not met; the 1.7B path is paused on cluster capacity) |
 
 ## 0.2.0 — Stage 0 gate passed
 
@@ -122,6 +124,41 @@ complete; the gate is **not met** and `0.3.0` is intentionally untagged.
   (test-clean 50-utt); distillation ~114 @1k steps; FFN-only queued. fp16
   readouts stay clean. Full WER table and analysis in
   `docs/stage1_results.md` (updated 2026-10-10). `0.3.0` stays untagged.
+
+## 0.2.41 – 0.2.46 — Stage 4: the streaming algorithm is freed (2026-10-12..15)
+
+**Headline.** The official Qwen3-ASR prefix algorithm used to *collapse* for
+quantized models (WER **203.5** with repetition loops). It now runs at
+**12.92 clean / 20.00 other** (320 ms; 10.59 / 16.59 at 1 000 ms) with **zero
+repetition loops**, and the binary arm streams at **18.43 / 25.45** (best
+measured). The recipe: **forced-aligner chunk targets** ("emit the words whose
+end time falls in this chunk, then stop"; Qwen3-ForcedAligner-0.6B) + the **LSP
+loop-emission policy**, from the best offline checkpoint, evaluated with the
+official algorithm at 160/320/1 000 ms on clean/other.
+
+**New code.** `data/align.py` (T4.1 aligner adapter), `data/prefix.py` (T4.2
+chunk targets), `qwen/stream.py` LSP state (`LSPState`, `update_lsp`,
+`emit_stable`, `flush_lsp`, `truncate_trailing_loop`), `train/sft.py`
+(batched on-policy rollout, gold alignment, distillation targets, degenerate
+filter), `run_stage1_qat.py` flags `--op-rollout*`, `--op-distill`,
+`--aligned-targets*`, `--stream-eval-every` (in-training `STREAM` guardrails),
+`eval_streaming.py` `--lsp-margin-words`, `--lsp-truncate-loops`, `--config`.
+Launchers: `qat_stream_{opd,distill,anneal,aligned*}.pbs`, `eval_streaming_opd.pbs`
+(`TRUNC`, `CHUNK`, `CFG` overrides). Tests: 325 passed.
+
+**Research trail (all failures kept, `docs/LAB_NOTES.md`).** DAgger on the
+student's own prefixes *poisons* the model (920 WER) → streaming-state
+distillation (448, metadata conflict; 350 after stripping; 278 with the
+three-way mix, policy correct) → the LSP loop policy halves it (144.6) →
+**aligned targets take it to ~12** (the target no longer has to be inferred from
+the audio). The content/stop balance, the fixed-20-utt guardrail's divergence
+from the full metric, and the "snapshot before resuming" rule are documented.
+
+**Also this window.** Offline scale-up on the full 28 539-utt cache (ternary
+**7.52**, binary at a **10.70 quantizer floor**); Stage 3 began (1.7B: FFN warm
+start 22.03, anchor-free attention rollout 20.55; the aligned recipe there is
+paused on cluster capacity — it needs the anchored fp32-AdamW path and a quiet
+GPU). `0.3.0` stays untagged (the Stage-4 gate's `+1.5` target is not met).
 
 ## 0.1.1 — Stage 0 plan corrections
 
