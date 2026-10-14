@@ -229,7 +229,7 @@ PYTHONPATH=src python scripts/make_plots.py
 - `docs/PROJECT_STATUS.md` — consolidated status + all graphs + future plan.
 - `docs/ACTIVITY_LOG.md` — chronological: every launch, failure, cause, fix.
 - `docs/LAB_NOTES.md` — research notes (append-only, five fields).
-- `docs/stage1_results.md` — detailed Stage 1 tables.
+- `docs/stage1_results.md` (and `docs/stage4_results.md` for the streaming detail) — detailed Stage 1 tables.
 - `rules.md` — binding operating rules (GPU switching, ETAs, logging, git).
 - Git: `stage-1` branch, tags `0.2.19`–`0.2.39+`, remote
   `git@github.com:Gunjan00001/ASR-1-bit-qwen-R2T2-approach.git` (SSH works).

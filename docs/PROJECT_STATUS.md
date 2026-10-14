@@ -37,7 +37,7 @@
   **zero loops**; the binary aligned checkpoint streams at **18.43 clean /
   25.45 other**. The `+1.5` gate (~3.7 / 6.1) is **not** met — the remaining gap
   is 0.6B model capacity (the 1.7B path is paused on cluster capacity). The full
-  matrix is in the streaming section below and `docs/stage1_results.md`; every
+  matrix is in the streaming section below and `docs/stage1_results.md` (offline) and `docs/stage4_results.md` (streaming); every
   failed recipe (with numbers) is kept in `docs/LAB_NOTES.md`.
 
 ---
