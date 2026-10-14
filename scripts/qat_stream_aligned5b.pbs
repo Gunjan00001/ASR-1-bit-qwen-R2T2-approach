@@ -43,7 +43,7 @@ else
   CACHE="$ROOT/data/qat_clean_train.100_n8000.pt"
 fi
 
-PICK=$(bash scripts/pick_gpu.sh 20000) || exit 0
+PICK=$(bash scripts/pick_gpu_wait.sh 35000 "${PICK_WAIT_MIN:-60}") || exit 0
 PICK="${QAT_GPU:-$PICK}"
 export CUDA_VISIBLE_DEVICES="$PICK"
 

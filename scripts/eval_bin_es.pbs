@@ -34,7 +34,7 @@ else
   MODEL=Qwen/Qwen3-ASR-0.6B
 fi
 
-PICK=$(bash scripts/pick_gpu.sh 20000) || exit 0
+PICK=$(bash scripts/pick_gpu_wait.sh 20000 "${PICK_WAIT_MIN:-45}") || exit 0
 PICK="${EVAL_GPU:-$PICK}"
 export CUDA_VISIBLE_DEVICES="$PICK"
 

@@ -1395,3 +1395,22 @@ environmental, not model bugs):
   refreshed (the two live levers, the quantizer-side candidates, the 1.7B, the
   write-up), test counts updated to 327, and `docs/stage4_results.md` generated
   from the artifacts.
+
+## 2026-10-15 — Fourth OOM, now at model *loading*: the churn outruns any margin
+
+- **Did:** resubmitted `aligned5r` with the new self-waiting picker (job `11376`,
+  60-minute wait window).
+- **What happened:** the picker accepted physical GPU 2 (~24 GB free at 04:51),
+  the launcher printed its header, and the **model load** OOM'd a few minutes
+  later: the error shows that card at ~79/80 GB with six processes (29.2 + 20.4
+  + 8.7 + 8.7 + 8.5 + our 3.2 GB).  Co-tenants consumed 20+ GB in the minutes
+  between the pick and the load — earlier failures were at the first training
+  step, this one before the alignment even started.
+- **Reading:** no launcher-level memory margin is safe against this churn; the
+  only honest position is to wait for the cluster to quiet.  The bar for the
+  training launchers is raised to **35 GB free** (the run needs ~15 GB, so ≥2×
+  headroom at pick time) with a 60-minute wait window; the 2-hourly retry check
+  resubmits when `pick_gpu_wait.sh` can satisfy that.
+- **Deliverable status:** unchanged and safe (aligned2 ternary 12.92 / 20.00 at
+  320 ms, zero loops; every artifact on disk).  The queued experiments
+  (`aligned5r` longer cycle, `bin_es` binary early-stopping) wait for capacity.
