@@ -1191,3 +1191,26 @@ environmental, not model bugs):
   12.92/20.00; binary 18.43); the 1.7B waits on cluster capacity.
 - **Artifacts:** `artifacts/stage1/streaming_opd_aligned2_c1000_quantized.json`,
   `streaming_opd_aligned2bin_quantized.json`, `eval_streaming_opd_*.log`.
+
+---
+
+## 2026-10-14 — Refinement (`aligned3`) is the best curve yet: STREAM 8.71 (20 utt) at step 1 000; resume prepared for the walltime
+
+- **Did:** continued the scaled aligned checkpoint at lr 2e-6 (`11213`,
+  `qat_stream_aligned3`, 3 000 steps) and prepared its resume.
+- **Result so far (official algorithm, raw, 20-utt guardrail):** STREAM
+  **8.71 @250** → 11.53 @500 → 9.41 @750 → **8.71 @1000**; offline ternary
+  9.32 @500 → **9.00 @1000**. At the same step count the aligned2 run was
+  ~10.4–11.8 (STREAM) and 9.1–9.7 (offline) — so the gentle continuation is a
+  real improvement on both axes, and 8.7 (20 utt) is the lowest streaming
+  number the project has produced (the 50-utt translation is typically ~2–3
+  points higher: aligned2's 9.65 → 12.92).
+- **Walltime:** ~4 steps/min ⇒ the 6 h limit cuts it near step ~1 500/3 000.
+  Resume prepared: `scripts/qat_stream_aligned4.pbs` (`--resume`, 8 h, same save
+  dir).
+- **1.7B:** still paused — no ≥45 GB-stable-free GPU observed.
+- **Next:** when `aligned3`/`aligned4` end, run the full 160/320/1000 ×
+  clean/other evals; if the 50-utt clean lands below 12.0 the headline tables in
+  README/PROJECT_STATUS get updated and a tag follows.
+- **Artifacts:** `artifacts/stage1/qat_stream_aligned3.log`,
+  `scripts/qat_stream_aligned4.pbs`.

@@ -11,7 +11,7 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11213` | **0.6B aligned refinement** (`qat_stream_aligned3`: continue `aligned2` at lr 2e-6, 3 000 steps, aligned targets, GPU 0) | running | pending | ~2–4 h |
+| `11213` | **0.6B aligned refinement** (`qat_stream_aligned3`, lr 2e-6, 3 000 steps, GPU 0) | step ~1 150/3 000 at ~4 steps/min | **STREAM 8.71 (20 utt) @1 000**; offline 9.00 (best curves yet) | walltime 08:24 → chain `qat_stream_aligned4.pbs` (`--resume`, 8 h) |
 | — | **Matrix complete** (tag `0.2.44`; headlines refreshed, tag `0.2.45`) | done | see the table below | — |
 | — | 1.7B aligned | **paused** — GPUs 0/1 have ~39–42 GB free at 100 % utilization (bar is ≥45 GB *stable*); the rest are 67–79 GB used | — | — |
 
