@@ -1266,3 +1266,27 @@ environmental, not model bugs):
 - **Postscript:** the aligned3 *other* eval OOM'd at model loading (GPU 0 had
   45 MB free — the co-tenant race again). Not re-run: aligned3 is not promoted,
   so its `other` cell is not needed for the deliverable.
+
+---
+
+## 2026-10-15 — Binary arm: 1 500-step schedule completed (offline binary 35.2); final evals running
+
+- **Did:** collected the binary mirror's resumed run (`11233`, finished 2026-10-14
+  10:16) and launched its final 50-utt clean/other evals (`11365`/`11366`).
+- **Result (the run):** offline binary at step 1 500 = **35.17** (41.8 at the
+  step-1 250 snapshot — the resumed steps kept improving the offline path);
+  20-utt streaming guardrail 36.5–38.1 at the tail (vs the earlier step-1 250
+  state whose *50-utt* eval gave **18.43 clean / 25.45 other**). The guardrail
+  and the full-sample numbers disagree in the same way as the ternary
+  refinement — the fixed 20-utt slice is not a reliable proxy.
+- **Process lesson (again):** the resume **overwrote `last.pt`**, so the
+  step-1 250 binary checkpoint that measured 18.43 no longer exists (the number
+  is documented, the weights are not). Snapshot before resuming — done for
+  aligned3, not for the binary; make it a habit for every resume.
+- **Final evals:** running (`11365` clean, `11366` other); when they land, the
+  binary cells get updated in the matrix and the live status.
+- **Cluster:** still no GPU with ≥45 GB free (all 8 are 60–78 GB used) — the
+  1.7B path stays paused.
+- **Artifacts:** `artifacts/stage1/qat_stream_aligned2bin3.log`,
+  `stage1_decoder_attn_ffn_bw1.0_gNone_lr3e-06_adamw_delay_ls1_n2400.json`,
+  `eval_streaming_opd_aligned2bin_final{,_other}.log`.
