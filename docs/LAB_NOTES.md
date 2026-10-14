@@ -1262,3 +1262,7 @@ environmental, not model bugs):
   18.43/25.45, zero loops — tags `0.2.42`–`0.2.45`.
 - **Artifacts:** `artifacts/stage1/streaming_opd_aligned3_quantized.json`,
   `eval_streaming_opd_aligned3{,_other}.log`, `qat_stream_aligned2bin3.log`.
+
+- **Postscript:** the aligned3 *other* eval OOM'd at model loading (GPU 0 had
+  45 MB free — the co-tenant race again). Not re-run: aligned3 is not promoted,
+  so its `other` cell is not needed for the deliverable.
