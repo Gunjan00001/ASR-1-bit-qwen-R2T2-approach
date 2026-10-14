@@ -11,7 +11,8 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11369` | **0.6B — longer aligned cycle** (`qat_stream_aligned5`: from the 7.5 base, 5 000 steps, lr 5e-6, aligned-n 2 400, GPU 5) | starting | pending (aligned2: 2 500 steps → 12.92/20.00) | ~4–8 h (contended) |
+| `11369` | **0.6B — longer aligned cycle** (`qat_stream_aligned5`: from the 7.5 base, 5 000 steps, lr 5e-6, aligned-n 2 400, GPU 5) | startup (alignment) | pending (aligned2: 2 500 steps → 12.92/20.00) | ~4–8 h (contended) |
+| `11371` | **Binary early-stopping re-run** (`qat_stream_bin_es`: from the ternary aligned2, bit_width 1.0, aligned targets, `--keep-step-checkpoints 500`, GPU 6 ~18 GB free) | startup | pending — then full 50-utt evals on its step-500/1000/1500 states to recover the best binary streaming state (the 18.43 one was lost to a resume) | ~2–3 h + evals |
 | — | **Binary arm** | final evals done | step-1 250 state **18.43 / 25.45** (weights overwritten by the resume ✗) → final step-1 500 state **27.54 / 26.93** (29–40 loop truncations: the resume broke the loop discipline) | re-run with early stopping if needed |
 | — | 1.7B aligned | **paused** — all 8 GPUs 60–78 GB used | — | — |
 
