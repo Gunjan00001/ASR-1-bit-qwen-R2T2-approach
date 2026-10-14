@@ -1214,3 +1214,23 @@ environmental, not model bugs):
   README/PROJECT_STATUS get updated and a tag follows.
 - **Artifacts:** `artifacts/stage1/qat_stream_aligned3.log`,
   `scripts/qat_stream_aligned4.pbs`.
+
+---
+
+## 2026-10-14 (morning) — Refinement cut at step ~1 970 with offline **8.90** (best); resume + full evals launched
+
+- **Did:** recorded the refinement's full partial trajectory, snapshotted its
+  checkpoint (`step1950.pt`), chained the resume (`11230`,
+  `qat_stream_aligned4.pbs`, `--resume`, 8 h) and launched the full 50-utt
+  clean/other evals (`11231`/`11232`).
+- **Curves (`11213`, raw official algorithm, 20-utt guardrail):** STREAM
+  8.71 @250 → 8.71 @1000 → 9.88 @1250 → 9.18 @1500 → 10.82 @1750 (noisy plateau
+  ~9–11); offline ternary **9.00 @1000 → 8.90 @1500** — the best offline number
+  the streaming family has produced, 0.8 below the aligned2's 9.7.
+- **The walltime cut it at step ~1 970/3 000** (its ~4 steps/min pace), hence
+  the resume. Snapshot-first (`step1950.pt`) before resuming, because the resume
+  overwrites `last.pt` in the same directory.
+- **Next:** read the 50-utt evals; the acceptance test for promoting the
+  headlines is 50-utt clean < 12.0 (aligned2: 12.92).
+- **Artifacts:** `artifacts/stage1/qat_stream_aligned3.log`,
+  `data/checkpoints/qat_stream_aligned3/step1950.pt`, `qat_stream_aligned4.log`.
