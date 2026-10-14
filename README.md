@@ -39,7 +39,8 @@ end time falls in this chunk, then stop") + the LSP loop-emission policy
 (`docs/LAB_NOTES.md`, 2026-10-12/13). The `+1.5` gate against the fp16 baseline
 is **not** met yet — the remaining gap is 0.6B model capacity (the 1.7B is the
 next lever); zero repetition loops everywhere. Full matrix, recipe and history:
-`docs/PROJECT_STATUS.md`, `docs/stage1_results.md`, `docs/HANDOFF.md`.
+`docs/PROJECT_STATUS.md`, `docs/stage1_results.md` (offline),
+`docs/stage4_results.md` (streaming), `docs/HANDOFF.md`.
 
 ![WER trajectories](docs/figures/wer_trajectories.png)
 
