@@ -11,7 +11,7 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11375` | **0.6B — longer aligned cycle** (`qat_stream_aligned5r`: from the 7.5 base, 5 000 steps, lr 5e-6, `--keep-step-checkpoints 500`) | alignment (~35 min) | pending — *at risk*: the cluster is saturated (67–81 GB/GPU used) and its predecessors OOM'd at the first step | ~4–8 h if it survives |
+| — | **0.6B runs (aligned5r, bin_es) — all three attempts OOM'd at their first training step today** (`11369`, `11371`, `11375`) | **paused by cluster saturation** (10–12 GB free/GPU vs a ~12–15 GB run floor) | queued: `qat_stream_aligned5r.pbs` (longer aligned cycle, `--keep-step-checkpoints 500`) and `qat_stream_bin_es.pbs` + `eval_bin_es.pbs` (binary early-stopping re-run). Rule now in force: resubmit only when `pick_gpu.sh` finds ≥20 GB free | unknown |
 | `11371` | **Binary early-stopping re-run** | **OOM at first step** (co-tenant growth after the picker sampled; the alignment was wasted) | resubmit `qat_stream_bin_es.pbs` when a GPU has ≥20 GB free, then `eval_bin_es.pbs` for its step-500/1000/1500 states | — |
 | — | **Strict GPU picker** (`scripts/pick_gpu.sh`) — refuses (exit 3) when nothing has ≥20 GB free, instead of the least-used fallback that bought two OOMs | done (all resubmittable launchers wired) | — | — |
 | — | **Binary arm** | final evals done | step-1 250 state **18.43 / 25.45** (weights overwritten by the resume ✗) → final step-1 500 state **27.54 / 26.93** (29–40 loop truncations: the resume broke the loop discipline) | re-run with early stopping if needed |

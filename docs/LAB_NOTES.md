@@ -1370,3 +1370,28 @@ environmental, not model bugs):
   "0.6B capacity" would point at scale answers; "quantization damage" points at
   quantizer/precision work (stochastic rounding, co-training) *and* scale. The
   record now says what the evidence supports.
+
+## 2026-10-15 — Third OOM: stop respawning into a saturated cluster (the waiting rule)
+
+- **Did:** watched `11375` (`aligned5r`) align 2 400 utts, build the 4 800-example
+  mix, and OOM at its first training step — the third aligned run of the day to
+  die exactly there (`11369`, `11371`, `11375`).
+- **Reading:** the 0.6B QAT run's floor is ~12–15 GB (base + shadows + the
+  first-step activations; ~2 GB more if an in-training streaming eval
+  coincides), while the cluster's GPUs have had 10–12 GB free all day. No
+  launcher setting fits — the *cluster* is the constraint, not the recipe.
+- **Rule adopted (and now the standing practice):** do not respawn into a
+  saturated cluster. `scripts/pick_gpu.sh` refuses when nothing has ≥20 GB free;
+  the follow-up check resubmits only when that passes. Each doomed attempt costs
+  ~40 min of forced-aligner work plus a queue slot, so waiting is strictly
+  better than retrying.
+- **Queue for when capacity returns:** `qat_stream_aligned5r.pbs` (the longer
+  aligned cycle — its 6 h walltime fits ~2 000–3 500 steps at contended pace,
+  the resume `qat_stream_aligned5b.pbs` chains it) and `qat_stream_bin_es.pbs` +
+  `scripts/eval_bin_es.pbs` (the binary early-stopping re-run). The 1.7B needs
+  ≥45 GB *stable*.
+- **Also this round (docs):** the gate-gap attribution was corrected to
+  *quantization damage* (see the entry above), HANDOFF's next-steps list
+  refreshed (the two live levers, the quantizer-side candidates, the 1.7B, the
+  write-up), test counts updated to 327, and `docs/stage4_results.md` generated
+  from the artifacts.
