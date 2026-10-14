@@ -11,7 +11,8 @@ step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`
 
 | Job | What | Progress | Result | ETA |
 |---|---|---|---|---|
-| `11213` | **0.6B aligned refinement** (`qat_stream_aligned3`, lr 2e-6, 3 000 steps, GPU 0) | step ~1 150/3 000 at ~4 steps/min | **STREAM 8.71 (20 utt) @1 000**; offline 9.00 (best curves yet) | walltime 08:24 → chain `qat_stream_aligned4.pbs` (`--resume`, 8 h) |
+| `11233` | **Binary mirror resume** (`--resume`, 250 steps to complete its 1 500-step schedule) | running | pending | ~1–2 h |
+| — | **Refinement aligned3** (cut at step ~1 970) | **done (50-utt eval)** | clean **14.41** / zero loops — *worse* than aligned2's 12.92 despite a better guardrail and offline; **not promoted** (guardrail ≠ metric) | — |
 | — | **Matrix complete** (tag `0.2.44`; headlines refreshed, tag `0.2.45`) | done | see the table below | — |
 | — | 1.7B aligned | **paused** — GPUs 0/1 have ~39–42 GB free at 100 % utilization (bar is ≥45 GB *stable*); the rest are 67–79 GB used | — | — |
 

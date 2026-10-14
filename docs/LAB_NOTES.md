@@ -1234,3 +1234,31 @@ environmental, not model bugs):
   headlines is 50-utt clean < 12.0 (aligned2: 12.92).
 - **Artifacts:** `artifacts/stage1/qat_stream_aligned3.log`,
   `data/checkpoints/qat_stream_aligned3/step1950.pt`, `qat_stream_aligned4.log`.
+
+---
+
+## 2026-10-14 — Refinement does NOT beat aligned2 on the full sample (14.41 vs 12.92): the 20-utt guardrail diverged from the metric
+
+- **Did:** evaluated the refinement's cut checkpoint (50 utts, clean/other) and
+  redirected the GPU.
+- **Result:** aligned3 (step ~1 950) = **clean 14.41** (CER 5.49, raw 14.19,
+  zero loops) — *worse* than aligned2's 12.92 — even though its in-training
+  20-utt guardrail (8.71–10.82) and its offline (8.90) were both better than
+  aligned2's (9.65 guardrail, 9.7 offline). The other-config eval was still
+  running when this was written.
+- **Lesson (methodological, important):** the in-training `STREAM` guardrail
+  uses a *fixed 20-utterance slice* of the eval sample; its absolute level and,
+  more importantly, its *derivative* do not transfer to the full 50-utt metric
+  (aligned2 guardrail 9.65 → 12.92 full; aligned3 guardrail 8.7–9.2 → 14.41
+  full). **Promote only on the full-sample eval.** A future improvement would be
+  to randomize/alternate the guardrail slice or use the full 50 for end-of-run
+  decisions (which is exactly what the scheduled checks did).
+- **Actions:** killed the aligned3 resume (`11230` — it continued the worse
+  branch, the remaining steps only refine it at lr ~5e-7) and launched the
+  **binary mirror's resume** (`11233`, `--resume`, 250 steps to its 1 500-step
+  schedule) to complete the binary arm's deliverable.
+- **Standing state:** the deliverable stays the **aligned2** recipe — ternary
+  **12.92 clean / 20.00 other** at 320 ms (10.59/16.59 at 1 000 ms), binary
+  18.43/25.45, zero loops — tags `0.2.42`–`0.2.45`.
+- **Artifacts:** `artifacts/stage1/streaming_opd_aligned3_quantized.json`,
+  `eval_streaming_opd_aligned3{,_other}.log`, `qat_stream_aligned2bin3.log`.
