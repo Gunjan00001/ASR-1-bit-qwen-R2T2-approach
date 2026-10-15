@@ -267,8 +267,7 @@ def load_streaming() -> dict:
             continue
         stem = path.name[len("streaming_") : -len(".json")]
         for suffix in ("_quantized", "_50"):
-            if stem.endswith(suffix):
-                stem = stem[: -len(suffix)]
+            stem = stem.removesuffix(suffix)
         out[stem] = {
             "config": payload.get("config") or "clean",
             "chunk_ms": payload.get("chunk_ms"),
