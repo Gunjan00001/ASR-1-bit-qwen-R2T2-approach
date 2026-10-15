@@ -65,3 +65,34 @@ for STEP in 500 1000 1500; do
     --out "artifacts/stage1/streaming_bines_step${STEP}.json" \
     2>&1 | tee -a "$LOG"
 done
+
+# then score the winner's `other` split (the binary's reference cells need both)
+BEST=$("$PY" - <<'PYEOF'
+import glob, json
+best, name = None, None
+for path in sorted(glob.glob("artifacts/stage1/streaming_bines_step*.json")):
+    data = json.load(open(path))
+    wer = (data.get("conditions") or {}).get("quantized", {}).get("wer")
+    if wer is not None and (best is None or wer < best):
+        best, name = wer, path
+print(name.rsplit("step", 1)[-1].split(".json")[0] if name else "")
+PYEOF
+)
+if [ -n "$BEST" ]; then
+  echo "=== best clean state: step $BEST -> other split ===" | tee -a "$LOG"
+  "$PY" scripts/eval_streaming.py \
+    --model "$MODEL" \
+    --checkpoint "$CKPT_DIR/step${BEST}.pt" \
+    --policy decoder_attn_ffn \
+    --bit-width 1.0 \
+    --chunk-ms 320 \
+    --n 50 \
+    --max-new-tokens 32 \
+    --unfixed-token-num 5 \
+    --lsp-margin-words 3 \
+    --lsp-truncate-loops 1 \
+    --conditions quantized \
+    --config other \
+    --out "artifacts/stage1/streaming_bines_step${BEST}_other.json" \
+    2>&1 | tee -a "$LOG"
+fi
