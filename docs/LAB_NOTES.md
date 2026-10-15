@@ -1431,3 +1431,32 @@ environmental, not model bugs):
   step 1 250) was overwritten by a resume; with `--keep-step-checkpoints` the
   trajectory is now selectable, so the adaptation curve itself is measured
   instead of guessed.
+
+## 2026-10-15 (14:55) — New best on the longer cycle (11.55 clean) and the binary arm's instability
+
+- **The longer aligned cycle produced a new full-sample best.** `11486` scored
+  the walltime-cut run's states: **step 1 000 → 11.55 WER clean** (CER 6.41, 1
+  loop truncation, raw = policy, RTF 5.6, 50 utts) — **better than the promoted
+  12.92** by 1.37 points, on the identical evaluation protocol. Step 1 500 and
+  the final snapshot are still being scored; the winner then gets the `other`
+  split. Promotion (README/PROJECT_STATUS/HANDOFF headlines + tag) is held until
+  the winner's `other` and chunk sweep land — one clean cell is not a promotion
+  dossier.
+- **The binary early-stopping re-run did NOT recover the 18.43 state.** Its
+  three selectable states score 56.14 (step 500) / 40.25 (step 1000) / 36.44
+  clean + 43.18 other (step 1500). Two facts matter:
+  1. Its own curve was still descending (56 → 40 → 36) when the 1 500-step
+     schedule ended — the binary transition needs *longer*, not just selection.
+  2. The nominally identical recipe has now produced 18.4 / 27.5 / 36.4 across
+     three runs (same init `aligned2/step2500.pt`, same flags — verified by
+     diffing the launchers; only the save cadence differs). The ternary→binary
+     switch is **seed-sensitive**: the early-stopping idea needs a longer budget
+     (3 000 steps) *and* the quantizer-side fix (stochastic rounding) to be
+     reliable.
+- **The 1.7B retry is training and healthy** (`11470`, GPU 5, picked
+  immediately at 11:38 with ≥45 GB free): 0 OOMs, aligned targets built (39 800
+  examples → 2 400 pooled), step ~1 000 @14:55, guardrail STREAM 35.5 @250 →
+  30.4 @500, offline ternary 27.97 @500 (vs the attn5 init's 20.55 — the
+  aligned recipe always costs some offline content; the question this run
+  answers is whether the anchored fp32-AdamW path avoids the *permanent* dip
+  that killed v2). Watch its next offline EVAL.

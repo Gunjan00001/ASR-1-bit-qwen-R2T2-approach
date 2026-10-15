@@ -12,6 +12,11 @@ filter — the honest "what the model actually emitted" figure).
 
 ## Headline: the promoted recipe
 
+> 2026-10-15: the longer aligned cycle (`aligned5`, cut at step ~1 776) scored
+> **11.55 clean** at its step-1 000 state (see the trajectory table) — better
+> than the promoted 12.92. Its step-1 500 and final states are being scored; the
+> winner gets the `other` split before any headline change.
+
 | state | chunk | clean | other |
 |---|---|---|---|
 | **ternary, aligned targets (T4.1/T4.2) + LSP** | 160 ms | **13.24** | 20.80 |
@@ -65,6 +70,7 @@ problem.
 | `opd_aligned2bin_other` | other | 320 | **25.45** | 15.31 | 9 | 312 | 25.23 |
 | `opd_aligned2bin_final_other` | other | 320 | **26.93** | 17.37 | 40 | 306 | 26.70 |
 | `opd_aligned2_other_c1000` | other | 1000 | **16.59** | 7.27 | 0 | 93 | 16.59 |
+| `al5_step1000` | clean | 320 | **11.55** | 6.41 | 1 | 171 | 11.55 |
 
 ## What moved the number
 
