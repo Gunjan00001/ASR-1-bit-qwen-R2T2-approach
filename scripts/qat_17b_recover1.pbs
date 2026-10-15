@@ -1,10 +1,10 @@
 #!/bin/bash
-#PBS -N asr1bit-qat-17b-attn5
+#PBS -N asr1bit-17b-recover1
 #PBS -q gpu
 #PBS -l select=1:ncpus=4:ngpus=1:mem=64gb
 #PBS -l walltime=10:00:00
 #PBS -j oe
-#PBS -o /home/jiit_992401210050/qat_17b_attn5.out
+#PBS -o /home/jiit_992401210050/qat_17b_recover1.out
 #
 # Stage 3 SCAFFOLD — 1.7B FFN warm start (NOT VALIDATED YET).
 #

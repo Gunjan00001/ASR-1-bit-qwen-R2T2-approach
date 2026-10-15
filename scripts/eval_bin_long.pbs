@@ -1,0 +1,98 @@
+#!/bin/bash
+#PBS -N asr1bit-eval-binlong
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=48gb
+#PBS -l walltime=04:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/eval_binlong.out
+#
+# Evaluate the binary early-stopping run's step-checkpoints (clean, loop policy
+# on) in ONE job so the best state can be picked even on a crowded queue.
+# Submit after scripts/qat_stream_bin_es.pbs ends (the step checkpoints must
+# exist): qsub scripts/eval_bin_es.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage1/eval_bin_long.log"
+CKPT_DIR="${CKPT_DIR:-data/checkpoints/qat_stream_bin_long}"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-0.6B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
+else
+  MODEL=Qwen/Qwen3-ASR-0.6B
+fi
+
+PICK=$(bash scripts/pick_gpu_wait.sh 20000 "${PICK_WAIT_MIN:-45}") || exit 0
+PICK="${EVAL_GPU:-$PICK}"
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt dir $CKPT_DIR | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+for STEP in 500 1000 1500 2000 2500 3000; do
+  CKPT="$CKPT_DIR/step${STEP}.pt"
+  if [ ! -f "$CKPT" ]; then
+    echo "skip step $STEP (no $CKPT)" | tee -a "$LOG"
+    continue
+  fi
+  echo "=== step $STEP ===" | tee -a "$LOG"
+  "$PY" scripts/eval_streaming.py \
+    --model "$MODEL" \
+    --checkpoint "$CKPT" \
+    --policy decoder_attn_ffn \
+    --bit-width 1.0 \
+    --chunk-ms 320 \
+    --n 50 \
+    --max-new-tokens 32 \
+    --unfixed-token-num 5 \
+    --lsp-margin-words 3 \
+    --lsp-truncate-loops 1 \
+    --conditions quantized \
+    --out "artifacts/stage1/streaming_binlong_step${STEP}.json" \
+    2>&1 | tee -a "$LOG"
+done
+
+# then score the winner's `other` split (the binary's reference cells need both)
+BEST=$("$PY" - <<'PYEOF'
+import glob, json
+best, name = None, None
+for path in sorted(glob.glob("artifacts/stage1/streaming_binlong_step*.json")):
+    data = json.load(open(path))
+    wer = (data.get("conditions") or {}).get("quantized", {}).get("wer")
+    if wer is not None and (best is None or wer < best):
+        best, name = wer, path
+print(name.rsplit("step", 1)[-1].split(".json")[0] if name else "")
+PYEOF
+)
+if [ -n "$BEST" ]; then
+  echo "=== best clean state: step $BEST -> other split ===" | tee -a "$LOG"
+  "$PY" scripts/eval_streaming.py \
+    --model "$MODEL" \
+    --checkpoint "$CKPT_DIR/step${BEST}.pt" \
+    --policy decoder_attn_ffn \
+    --bit-width 1.0 \
+    --chunk-ms 320 \
+    --n 50 \
+    --max-new-tokens 32 \
+    --unfixed-token-num 5 \
+    --lsp-margin-words 3 \
+    --lsp-truncate-loops 1 \
+    --conditions quantized \
+    --config other \
+    --out "artifacts/stage1/streaming_binlong_step${BEST}_other.json" \
+    2>&1 | tee -a "$LOG"
+fi
