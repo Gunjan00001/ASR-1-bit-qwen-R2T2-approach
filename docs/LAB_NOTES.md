@@ -1633,3 +1633,26 @@ environmental, not model bugs):
   evals isolate cause (1). Launcher discipline applied this time: every intended
   field (`-N`, `-o`, log, save-dir, the absent SR flag) grepped before
   submission.
+
+## 2026-10-16 (01:40) — recover1's verdict: the 1.7B recovery cycle as configured does NOT improve the base
+
+- **Final curve** (in-loop offline ternary, 50-utt protocol — this readout
+  matched full-sample offline numbers throughout the project, unlike the
+  streaming guardrail): **24.15 (500) → 23.09 (1000) → 24.79 (1500) → 22.78
+  (2000) → 24.36 (2500)** against an init of **20.55**. Read honestly: no
+  permanent dip (the 24.79 recovered), but the cycle never reaches its starting
+  point — the anchored recovery recipe that lifted the 0.6B costs the 1.7B about
+  +2.5 absolute at this scale/schedule.
+- **States on disk:** `last.pt` (the 2 500 state, 5.6 GB, 01:27) and
+  `step2000.pt` (its best readout). No snapshot copies were made because nothing
+  will resume this run; if a future run does, copy `step2000.pt` first.
+- **`bin_long`'s first full-sample state:** step 500 → **61.12** (CER 44.30, 10
+  loop truncations, raw 59.96 — the policy *raised* the number, i.e. truncation
+  hurt). Its in-training guardrail had descended 66.6 → 21.2 by step 2 500, so
+  the later states (being scored) are the real candidates; step 500 of a binary
+  adaptation is a transition state, as the earlier binary runs showed.
+- **The controlled pair now running:** recover1 (SR, lr 1.5e-6) vs recover2
+  (no SR, lr 1.5e-6) vs recover3 (prepared: no SR, lr 5e-6). This is the first
+  *designed* A/B in the project's 1.7B work — one variable at a time, same init,
+  same data, same anchor — and it exists because recover1 changed two things at
+  once, which is exactly how attribution gets lost.

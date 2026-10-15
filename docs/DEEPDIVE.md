@@ -334,6 +334,32 @@ quantization damage under an equal recipe. So the culprit is the recipe's
 completeness — not model size. (Earlier docs blamed "0.6B capacity"; the record
 was corrected on 2026-10-15.)
 
+### 3.5b The recovery cycle that didn't work — and the controlled pair that will explain it
+
+The first attempt to give the 1.7B its missing offline recovery (anchored cycle,
+lr 1.5e-6, 2,500 steps, plus the newly implemented stochastic rounding) **did
+not improve the base**: its offline readout ran 24.15 / 23.09 / 24.79 / 22.78 /
+24.36 across its five in-loop evaluations, against an init of 20.55. No permanent
+dip — but no gain either; the recipe that lifted the 0.6B costs the 1.7B about
++2.5 absolute.
+
+That run changed **two** things relative to the proven 0.6B recipe (it added
+stochastic rounding, and it used a much gentler LR), which is precisely how
+attribution gets lost. So the follow-up is a **controlled pair**, one variable at
+a time, same init, same data, same anchor:
+
+| arm | stochastic rounding | learning rate |
+|---|---|---|
+| `recover1` | **on** | 1.5e-6 |
+| `recover2` | off | 1.5e-6 |
+| `recover3` (prepared) | off | **5e-6** |
+
+`recover1` vs `recover2` isolates stochastic rounding; `recover2` vs `recover3`
+isolates "the schedule is too gentle". Only after those two questions are
+answered is it worth spending more GPU-days on the 1.7B — and the viva answer to
+"what did the negative result teach you?" is: *it taught us to run one variable
+at a time, which the project now does by construction.*
+
 ### 3.6 What is running right now, and how we know
 
 - `qat_stream_aligned5b` — a resume of the longer cycle (to step 5,000).
