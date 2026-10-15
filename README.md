@@ -28,7 +28,7 @@ a JSON under `artifacts/stage1/` (regenerate the summary with
 | Binary, all 196 decoder projections — offline | 10.70 | — | `qat_binary_full` |
 | Streaming, *naive chunked re-feed* variant (not the official algorithm) | 9.43 | — | `streaming_ternary_noprefix128` |
 | **STREAMING, official prefix algorithm — aligned targets + LSP (NEW BEST)** | **11.55** | **18.98** | `streaming_al5_step1000` |
-| ↳ its 160 ms / 1000 ms sweep | (running) | — | `*_al5best*` |
+| ↳ its 160 ms / 1000 ms sweep | 13.77 / **10.70** | — | `streaming_opd_al5best_*` |
 | ↳ previous promoted state — `aligned2`, 2 500-step cycle | 12.92 | 20.00 | `streaming_opd_aligned2` |
 | ↳ that state at 160 ms / 1000 ms | 13.24 / 10.59 | 20.80 / 16.59 | `*_c160`, `*_c1000` |
 | Streaming, binary arm, same recipe (best measured) | 18.43 | 25.45 | step-1 250 state (weights lost to a resume ✗; final weights give 27.54 / 26.93) |
@@ -168,15 +168,26 @@ always better. "50-utt" means a fixed 50-utterance `test-clean` slice (seed 0),
     visible degeneration.
   - `long2 state` — **33.6** — the offline state itself as the streaming base.
   - `binary + aligned` — **18.4** — the binary arm with aligned targets.
-  - `ternary + aligned` — **12.9** — **the promoted recipe** (blue bar).
-- **Right panel — the promoted matrix.** Grouped bars, one group per chunk
-  size (160/320/1 000 ms) plus the binary arm at 320 ms; **blue = test-clean**,
-  **orange = test-other**; each bar is annotated with its WER. The four
-  horizontal reference lines are the Stage-0 anchors and the gate:
-  `fp16 1.7B clean 2.24` and `fp16 1.7B other 4.61` (dotted, the baseline)
-  and `gate clean 3.74` / `gate other 6.11` (dashed, baseline + 1.5 — the
-  Stage-4 success criteria). The visible gap between the bars and the dashed
-  lines *is* the open gate.
+  - `ternary + aligned (prev)` — **12.9** — the previously promoted recipe
+    (blue bar).
+  - `ternary + LSP, longer cycle (BEST)` — **11.5** — **the current promoted
+    state** (red bar): the same aligned recipe on a single 5 000-step cycle,
+    selected at its *step-1 000* checkpoint (the trajectory peaks early:
+    11.55 @1 000 → 12.82 @1 500 → 14.30 @~1 750), evaluated on full samples.
+- **Right panel — the promoted matrix, current best vs previous.** Grouped
+  bars, one group per chunk size (160/320/1 000 ms) plus the binary arm at
+  320 ms. Each group has up to four bars: **pale blue = previous state,
+  test-clean**, **pale orange = previous state, test-other**, **solid blue =
+  current best, test-clean**, **solid orange = current best, test-other**;
+  every bar is annotated with its WER, and a missing cell (the current best has
+  no `other` eval at 160/1 000 ms, no binary counterpart) is simply not drawn.
+  The four horizontal reference lines are the Stage-0 anchors and the gate:
+  `fp16 1.7B clean 2.24` and `fp16 1.7B other 4.61` (dotted, the baseline) and
+  `gate clean 3.74` / `gate other 6.11` (dashed, baseline + 1.5 — the Stage-4
+  success criteria). The visible gap between the bars and the dashed lines *is*
+  the open gate. Read the 320 ms group carefully: the current best (11.55)
+  clearly beats the previous state (12.92), while at 160/1 000 ms the two are
+  within ~0.5 of each other.
 - **Why it is two panels:** the left answers "was the algorithm fixable?"
   (yes, 951.8 → 12.9), the right answers "where does the promoted recipe stand
   against the gate?" (close on clean at 1 000 ms, far on other).
@@ -243,23 +254,32 @@ always better. "50-utt" means a fixed 50-utterance `test-clean` slice (seed 0),
 ## Plan — what happens next
 
 1. **In flight (0.6B, cluster permitting).**
-   - `qat_stream_aligned5r.pbs` — one **longer** aligned cycle (5 000 steps at
-     lr 5e-6 from the 7.5 offline state; the 2 500-step aligned2 cosine was
-     still descending when it ended). Promotion only on full-sample evals.
-   - `qat_stream_bin_es.pbs` + `eval_bin_es.pbs` — the binary
-     **early-stopping** re-run with `--keep-step-checkpoints 500`, whose goal
-     is to recover a binary streaming state better than the final 27.54/26.93
-     (the 18.43/25.45 one was overwritten by a resume).
-   - Cluster rules that now gate all of this: submit only when a GPU genuinely
-     has ≥20 GB free (`scripts/pick_gpu.sh`), and prefer 35 GB for training
-     runs (co-tenants grow mid-run; that OOM'd four attempts on 2026-10-15).
+   - `qat_stream_aligned5b.pbs` — the resume of the longer cycle (to step 5 000,
+     ending ~21:15); its step-2000/2500/3000 states are being scored on full
+     samples (`eval_aligned5b.pbs`) because the 20-utt guardrail *improved*
+     (8.94 @2 000, 9.18 @2 750) while the same schedule's early full samples
+     fell (11.55 → 12.82 → 14.30) — the fourth guardrail-vs-metric divergence in
+     this project, so only full samples decide.
+   - `qat_stream_bin_long.pbs` — a **3 000-step** binary run starting from the
+     new best ternary state (the 1 500-step budget was too short; the binary
+     transition spread 18.4/27.5/36.4 across nominally identical runs), with six
+     selectable checkpoints.
+   - Cluster rules that gate all of this: submit only when a GPU genuinely has
+     ≥20 GB free, ≥35 GB for training runs (`scripts/pick_gpu_wait.sh` waits
+     inside the job); co-tenants grow mid-run and OOM'd four attempts on
+     2026-10-15.
 2. **Quantizer-side levers** for the quantization-damage gap — stochastic
-   rounding and co-training (precision schedules / mixed ternary-binary) are
-   the untried options, alongside scale.
-3. **Stage 3 — the 1.7B.** Resume the aligned recipe when a GPU with ≥45 GB
-   *stable* free appears (anchored fp32-AdamW, lr 1e-6, 1200 steps, from
-   `qat_17b_attn5`); its content (offline 1.17 vs the 0.6B's 2.44) is the other
-   path to the gate.
+   rounding and co-training (precision schedules / mixed ternary-binary) are the
+   untried options, alongside scale.
+3. **Stage 3 — the 1.7B.** The anchored fp32-AdamW retry ran clean (1 200 steps,
+   **no permanent dip**) and gave the first streaming number: **29.24 clean**
+   from an offline **24.05**. That is the finding: the streaming recipe
+   transfers (gap +5.2 vs the 0.6B's +4.0), but the 1.7B's quantization damage
+   is **+22.4** against its fp16 offline (1.63) versus the 0.6B's **+5.4** —
+   because it never received the *complete* offline recovery recipe. **Next:**
+   full-cache QAT + anneal cycles on the 1.7B (offline target sub-10) *before*
+   repeating the aligned streaming SFT. 1.7B jobs need `mem=64gb` (host-RAM
+   SIGKILL otherwise, as its own final eval showed).
 4. **Stage 5 (edge)** — CPU/RTF work once the accuracy gates are judged.
 5. **Stage 6 (write-up)** — keep the docs and figures regenerated from
    artifacts; `docs/stage4_results.md` holds the full streaming record.

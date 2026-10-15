@@ -279,6 +279,16 @@ def load_streaming() -> dict:
     return out
 
 
+def _stream_wer(filename: str):
+    """Quantized WER from a single streaming artifact JSON (None if absent)."""
+    path = ART / filename
+    if not path.exists():
+        return None
+    payload = json.loads(path.read_text())
+    quant = (payload.get("conditions") or {}).get("quantized")
+    return float(quant["wer"]) if quant else None
+
+
 def fig_streaming_results() -> dict:
     """Stage-4 figure: the collapse -> fix history and the promoted matrix.
 
@@ -298,7 +308,7 @@ def fig_streaming_results() -> dict:
         ("opd_lspdistill3", "+ LSP loop\npolicy", "fail"),
         ("ternary_long2", "long2 state", "fail"),
         ("opd_aligned2bin", "binary +\naligned", "promoted-binary"),
-        ("opd_aligned2", "ternary +\naligned", "promoted"),
+        ("opd_aligned2", "ternary +\naligned\n(prev)", "promoted"),
     ]
     labels, values, colors = [], [], []
     for stem, label, kind in evolution:
@@ -308,6 +318,16 @@ def fig_streaming_results() -> dict:
         values.append(streams[stem]["wer"])
         colors.append({"collapse": "#8c564b", "fail": "#c7c7c7",
                        "promoted-binary": "#2ca02c", "promoted": "#1f77b4"}[kind])
+
+    # the current best state: the longer cycle's selected step-1000 checkpoint
+    al5 = {"clean_160": _stream_wer("streaming_opd_al5best_c160_quantized.json"),
+           "clean_320": _stream_wer("streaming_al5_step1000.json"),
+           "other_320": _stream_wer("streaming_al5_step1000_other.json"),
+           "clean_1000": _stream_wer("streaming_opd_al5best_c1000_quantized.json")}
+    if al5["clean_320"] is not None:
+        labels.append("ternary +LSP\nlonger cycle\n(BEST)")
+        values.append(al5["clean_320"])
+        colors.append("#d62728")
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13.5, 5.6), width_ratios=[1.25, 1])
 
@@ -329,22 +349,33 @@ def fig_streaming_results() -> dict:
     def cell(stem: str) -> float:
         return streams[stem]["wer"]
 
-    groups = ["160 ms", "320 ms", "1000 ms"]
-    clean = [cell("opd_aligned2_c160"), cell("opd_aligned2"), cell("opd_aligned2_c1000")]
-    other = [cell("opd_aligned2_other_c160"), cell("opd_aligned2_other"),
-             cell("opd_aligned2_other_c1000")]
-    groups.append("binary 320 ms")
-    clean.append(cell("opd_aligned2bin"))
-    other.append(cell("opd_aligned2bin_other"))
+    groups = ["160 ms", "320 ms", "1000 ms", "binary 320 ms"]
+    # per-group series: previous promoted state, then the current best state
+    prev_clean = [cell("opd_aligned2_c160"), cell("opd_aligned2"), cell("opd_aligned2_c1000"),
+                  cell("opd_aligned2bin")]
+    prev_other = [cell("opd_aligned2_other_c160"), cell("opd_aligned2_other"),
+                  cell("opd_aligned2_other_c1000"), cell("opd_aligned2bin_other")]
+    best_clean = [al5["clean_160"], al5["clean_320"], al5["clean_1000"], None]
+    best_other = [None, al5["other_320"], None, None]
 
     x = range(len(groups))
-    width = 0.36
-    bars_c = ax2.bar([i - width / 2 for i in x], clean, width, label="test-clean", color="#1f77b4")
-    bars_o = ax2.bar([i + width / 2 for i in x], other, width, label="test-other", color="#ff7f0e")
-    for bars in (bars_c, bars_o):
-        for bar in bars:
-            ax2.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.4,
-                     f"{bar.get_height():.2f}", ha="center", fontsize=8)
+    width = 0.20
+    bars = []
+    bars.append(ax2.bar([i - 1.5 * width for i in x], prev_clean, width,
+                        label="previous state — clean", color="#9ecae1"))
+    bars.append(ax2.bar([i - 0.5 * width for i in x], prev_other, width,
+                        label="previous state — other", color="#fdd0a2"))
+    bars.append(ax2.bar([i + 0.5 * width for i in x],
+                        [v if v is not None else 0 for v in best_clean], width,
+                        label="current best — clean", color="#1f77b4"))
+    bars.append(ax2.bar([i + 1.5 * width for i in x],
+                        [v if v is not None else 0 for v in best_other], width,
+                        label="current best — other", color="#ff7f0e"))
+    for series, valueset in zip(bars, (prev_clean, prev_other, best_clean, best_other)):
+        for bar, value in zip(series, valueset):
+            if value:
+                ax2.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.4,
+                         f"{value:.2f}", ha="center", fontsize=7)
     for y, label, side in ((2.24, "fp16 1.7B clean 2.24", "right"),
                            (4.61, "fp16 1.7B other 4.61", "right"),
                            (3.74, "gate clean = 2.24 + 1.5", "left"),
@@ -358,7 +389,8 @@ def fig_streaming_results() -> dict:
     ax2.set_xticks(list(x))
     ax2.set_xticklabels(groups, fontsize=9)
     ax2.set_ylabel("WER %")
-    ax2.set_ylim(0, max(other) * 1.25)
+    top = max(v for v in prev_clean + prev_other + best_clean + best_other if v is not None)
+    ax2.set_ylim(0, top * 1.25)
     ax2.set_title("Promoted recipe (aligned targets + LSP policy):\n"
                   "mean WER per chunk and split", fontsize=10)
     ax2.legend(fontsize=8, loc="upper left")
@@ -370,7 +402,9 @@ def fig_streaming_results() -> dict:
     fig.savefig(FIG / "streaming_results.png", dpi=150)
     plt.close(fig)
     return {"evolution": {"labels": labels, "wer": values},
-            "promoted": {"groups": groups, "clean": clean, "other": other}}
+            "promoted": {"groups": groups,
+                         "previous_clean": prev_clean, "previous_other": prev_other,
+                         "best_clean": best_clean, "best_other": best_other}}
 
 
 def main() -> int:
