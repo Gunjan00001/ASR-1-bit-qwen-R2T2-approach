@@ -1508,3 +1508,28 @@ environmental, not model bugs):
   training (step ~840, zero OOMs); its guardrail is descending 66.6 @250 →
   47.8 @500 → 36.5 @750 — the binary adaptation curve, but the full-sample evals
   at its end are the decider.
+
+## 2026-10-15 (19:15) — The 1.7B's first streaming measurement: the bottleneck is its offline base
+
+- **Result:** the 1.7B retry's final checkpoint (1 200 steps, anchored fp32-AdamW,
+  no dip) streams at **29.24 WER clean** on the official algorithm (320 ms,
+  50 utts; CER 16.99, 5 loop truncations, raw 31.36 → the LSP policy helps by
+  2.1). Its `other` split is still computing.
+- **The comparison that matters.** The 0.6B's promoted state: **11.55** from an
+  offline ternary of **7.52** (streaming gap +4.0). The 1.7B: **29.24** from an
+  offline ternary of **24.05** (gap +5.2). So the *streaming recipe transfers
+  fine* — the same ~4–5 point streaming penalty — but the 1.7B's **offline base
+  is the bottleneck**: its quantization damage is +22.4 absolute against its
+  fp16 offline (1.63), versus the 0.6B's +5.4 (2.11 → 7.52).
+- **Why:** the 1.7B never received the 0.6B's *complete* offline recovery recipe.
+  Its chain was FFN warm start → attention rollout (20.55) and then straight to
+  streaming SFT; the 0.6B, at the equivalent point, was only at ~9–16 and needed
+  the full-cache cycle + anneals to reach 7.52. A *bigger* model should show
+  *less* quantization damage under an equal recipe — so the recipe, not
+  capacity, is what these numbers indict. (This also supersedes the earlier
+  "0.6B capacity" story definitively: capacity is not the limiter on either
+  size; the recovery recipe's completeness is.)
+- **Next Stage-3 step (when GPUs allow):** apply the full offline recovery
+  recipe to the 1.7B — full-cache QAT with the frozen anchor, then anneal
+  cycles — *before* the aligned streaming SFT, and measure the offline target
+  first (sub-10 would be a working base; the 0.6B analogue is 7.52).

@@ -38,11 +38,19 @@
   the whole +1.5 budget. Whether the damage shrinks with scale is the open 1.7B
   question. The binary path is only +5.5 behind ternary in *streaming* (vs +32
   offline) — the aligned targets are the binding supervision, not the precision.
-- **Stage 3 (1.7B): PAUSED on cluster capacity.** FFN warm start 22.03 and an
-  anchor-free attention rollout 20.55 are on disk, but the aligned recipe there
-  failed twice: lr 3e-6 + adam8bit + no anchor dipped 20.55 → 30.6 permanently,
-  and the gentler anchored retry OOM'd (needs ~45 GB *stable* free). Resume
-  prerequisites: a quiet GPU **and** the anchored fp32-AdamW recipe.
+- **Stage 3 (1.7B): first streaming measurement done — the bottleneck is the
+  offline base, not the streaming recipe.** FFN warm start 22.03 → anchor-free
+  attention rollout 20.55 → the **anchored fp32-AdamW aligned retry ran clean**
+  (1 200 steps, zero OOMs, no permanent dip; offline recovering 27.97 → 24.05)
+  → **streams at 29.24 clean** (official algorithm, 320 ms, 50 utts; CER 16.99,
+  5 loop truncations; `other` pending). The streaming recipe transfers — its
+  streaming-vs-offline gap is +5.2 versus the 0.6B's +4.0 — but the 1.7B's
+  quantization damage is **+22.4** against its fp16 offline (1.63), versus the
+  0.6B's **+5.4** (2.11 → 7.52), because it never received the 0.6B's *complete*
+  offline recovery recipe before the streaming SFT. **Next:** finish that
+  offline recovery on the 1.7B (full-cache QAT + anneal cycles, offline target
+  sub-10) *before* repeating the streaming SFT — and note 1.7B jobs need
+  `mem=64gb` or they die in their own final eval (host-RAM SIGKILL).
 - **Binding cluster lessons:** never set `PYTORCH_CUDA_ALLOC_CONF` (driver 525);
   `gradient_checkpointing_enable()` breaks the frozen-only setup; `adam8bit`
   needs `~/miniconda3` (bitsandbytes 0.50.2) — verify it engaged; GPU pickers

@@ -177,7 +177,7 @@ conversion collapses; recovery must come from training, not from the quantizer.
 | 0 — baselines & harness | **gate passed** (`0.2.0`) | fp16 numbers reproduced on T4 |
 | 1 — BitLinear + QAT | **machinery done; gate open** | loss controllable; WER tables emitted; recovery delivered by Stage 2 recipe |
 | 2 — accuracy recovery | **in progress** | rollout + anchor + progressive precision → 14.4/16.2 ternary, 17.5 binary |
-| 3 — scale to 1.7B | not started | memory stack + checkpointing ready (`--resume`) |
+| 3 — scale to 1.7B | **in progress** | anchored fp32-AdamW retry ran clean; first streaming number 29.24 clean from an offline 24.05 — the **offline base** is the bottleneck (full recovery recipe next) |
 | 4 — streaming parity (LSP) | not started | aligner + stable-prefix targets |
 | 5 — edge deployment | not started | packing/GGUF/CPU kernels |
 | 6 — evaluation & writeup | not started | full matrix + report |
@@ -274,7 +274,13 @@ python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_f
    The full 28.5 k cache is the next scale-up for the offline recipe.
 
 **Stage 3 — scale to 1.7B**
-6. Memory stack (LoRA / partial QAT), checkpoint/resume (ready), run + eval.
+6. ✅ The anchored fp32-AdamW aligned retry ran clean (1 200 steps, no dip).
+7. First streaming measurement: **29.24 clean** (CER 16.99, 5 truncations) from
+   an offline 24.05 — the streaming recipe transfers (gap +5.2), but the 1.7B's
+   quantization damage (+22.4 against its fp16 1.63) is far above the 0.6B's
+   (+5.4) because it never received the *complete* offline recovery recipe.
+8. **Next:** full-cache QAT + anneal cycles on the 1.7B (offline target
+   sub-10), *then* repeat the aligned streaming SFT. 1.7B jobs: `mem=64gb`.
 
 **Stage 5 — edge deployment**
 7. Pack 1-bit/2-bit weights, GGUF export, CPU SIMD kernels, RTF < 1 and
