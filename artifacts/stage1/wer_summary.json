@@ -153,6 +153,58 @@
         10.699152542372882
       ]
     },
+    "Recovery recipe \u2014 ternary (full cache)": {
+      "steps": [
+        2000,
+        4000,
+        6000,
+        8000
+      ],
+      "wer": [
+        10.699152542372882,
+        11.970338983050848,
+        9.216101694915254,
+        7.521186440677965
+      ]
+    },
+    "Full-cache anneal \u2014 ternary (2nd cycle)": {
+      "steps": [
+        10000
+      ],
+      "wer": [
+        7.627118644067797
+      ]
+    },
+    "Recovery recipe \u2014 binary (full cache)": {
+      "steps": [
+        2000,
+        4000,
+        6000,
+        8000
+      ],
+      "wer": [
+        19.597457627118644,
+        13.877118644067796,
+        11.016949152542372,
+        10.699152542372882
+      ]
+    },
+    "Aligned streaming SFT \u2014 ternary": {
+      "steps": [
+        500,
+        1000,
+        1500,
+        2000,
+        2500
+      ],
+      "wer": [
+        11.440677966101696,
+        9.110169491525424,
+        10.699152542372882,
+        9.745762711864407,
+        9.427966101694915
+      ]
+    },
     "FFN-only resume (LR-restart artifact)": {
       "steps": [
         2500,
@@ -203,6 +255,18 @@
     },
     "Binary long3\n(8k, 3000 steps)": {
       "ternary": 22.35,
+      "binary": 10.7
+    },
+    "Ternary full cache\n(28.5k, recovery recipe)": {
+      "ternary": 7.52,
+      "binary": 100.0
+    },
+    "Ternary full cache\n(28.5k, 2nd cycle anneal)": {
+      "ternary": 7.63,
+      "binary": 100.0
+    },
+    "Binary full cache\n(28.5k, recovery recipe)": {
+      "ternary": 100.0,
       "binary": 10.7
     }
   },
@@ -308,6 +372,34 @@
         48.728813559322035,
         37.18220338983051
       ]
+    },
+    "Ternary full cache (28.5k)": {
+      "steps": [
+        2000,
+        4000,
+        6000,
+        8000
+      ],
+      "fp16_wer": [
+        36.652542372881356,
+        27.966101694915253,
+        31.673728813559322,
+        21.716101694915256
+      ]
+    },
+    "Binary full cache (28.5k)": {
+      "steps": [
+        2000,
+        4000,
+        6000,
+        8000
+      ],
+      "fp16_wer": [
+        21.822033898305087,
+        24.258474576271187,
+        21.716101694915256,
+        27.64830508474576
+      ]
     }
   },
   "roadmap": {
@@ -316,31 +408,31 @@
         "Stage 0: baselines & harness",
         1.0,
         "#2ca02c",
-        "gate passed 0.2.0"
+        "gate passed 0.2.0 (fp16 anchors locked: streaming 320 ms 2.24/4.61; X=+1.5)"
       ],
       [
         "Stage 1: BitLinear + QAT",
-        0.8,
-        "#1f77b4",
-        "loss controllable; tables emitted; recovery via Stage 2 recipe"
+        1.0,
+        "#2ca02c",
+        "machinery written, tested, audited; loss controllable; naive run's offline gate missed -> Stage 2"
       ],
       [
         "Stage 2: accuracy recovery",
-        0.6,
-        "#ff7f0e",
-        "rollout+anchor: ternary 14.4-16.2 / binary 17.5"
+        0.9,
+        "#2ca02c",
+        "recipe scaled on the full 28 539-utt cache: ternary 7.52 / binary 10.70 offline (best 9.1/10.7); +1.5 offline bar open"
       ],
       [
         "Stage 3: scale to 1.7B",
-        0.0,
-        "#bbbbbb",
-        "not started"
+        0.35,
+        "#ff7f0e",
+        "FFN warm start 22.03 -> attention rollout 20.55; aligned recipe paused on cluster capacity (needs >=45 GB stable)"
       ],
       [
         "Stage 4: streaming parity (LSP)",
-        0.0,
-        "#bbbbbb",
-        "not started"
+        0.75,
+        "#ff7f0e",
+        "official algorithm fixed at the recipe level: 203.5 -> 12.92 clean / 20.00 other, zero loops; gate (~3.7/6.1) open - gap is quantization damage"
       ],
       [
         "Stage 5: edge deployment",
@@ -350,10 +442,58 @@
       ],
       [
         "Stage 6: evaluation & writeup",
-        0.0,
-        "#bbbbbb",
-        "not started"
+        0.15,
+        "#1f77b4",
+        "started: status/handoff/results docs + figures regenerated from artifacts"
       ]
     ]
+  },
+  "streaming": {
+    "evolution": {
+      "labels": [
+        "ternary prefix\n(first attempt)",
+        "+ DAgger",
+        "+ distill v1",
+        "distill v2",
+        "distill v3",
+        "adapt5",
+        "+ LSP loop\npolicy",
+        "long2 state",
+        "binary +\naligned",
+        "ternary +\naligned"
+      ],
+      "wer": [
+        951.8008474576271,
+        920.5508474576271,
+        448.3050847457627,
+        349.89406779661016,
+        278.1779661016949,
+        175.0,
+        144.59745762711864,
+        33.58050847457627,
+        18.43220338983051,
+        12.923728813559322
+      ]
+    },
+    "promoted": {
+      "groups": [
+        "160 ms",
+        "320 ms",
+        "1000 ms",
+        "binary 320 ms"
+      ],
+      "clean": [
+        13.241525423728815,
+        12.923728813559322,
+        10.59322033898305,
+        18.43220338983051
+      ],
+      "other": [
+        20.795454545454543,
+        20.0,
+        16.590909090909093,
+        25.454545454545453
+      ]
+    }
   }
 }
