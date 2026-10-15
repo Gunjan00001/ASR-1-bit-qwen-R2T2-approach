@@ -131,7 +131,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--save-every", type=int, default=0, help="Checkpoint interval in steps (0=only at end).")
     p.add_argument("--quant-stochastic", type=int, default=0,
                    help="1 = unbiased stochastic rounding of the quantized weights during training "
-                        "(the 'stochastic precision' lever); evals always round deterministically.")
+                        "(the 'stochastic precision' lever); evals always round deterministically. "
+                        "CAVEAT: the first controlled A/B (1.7B recovery, 2026-10-16) measured it "
+                        "costing ~3.4 WER at step 500 (24.15 vs 20.76 without) - do not enable "
+                        "without a measured reason (docs/LAB_NOTES.md).")
     p.add_argument("--keep-step-checkpoints", type=int, default=0,
                    help="Also write step-numbered checkpoints every N steps (0=off) so the best "
                         "state stays selectable (a last.pt-only run loses earlier states).")
