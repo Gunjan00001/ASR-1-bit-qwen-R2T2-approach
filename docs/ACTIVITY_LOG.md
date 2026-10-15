@@ -1,5 +1,9 @@
 # Activity log (append-only)
 
+> New here — or preparing a viva/interview? Read
+> [`docs/DEEPDIVE.md`](DEEPDIVE.md) first: it explains the project from the
+> ground up and indexes every failed and successful attempt with its number.
+
 Step-by-step record for **future agents and developers**. Every entry: what we
 did, failure symptom, root cause, fix, evidence. Update after every meaningful
 step (see `rules.md` R3). For protocol-level detail see `docs/LAB_NOTES.md`

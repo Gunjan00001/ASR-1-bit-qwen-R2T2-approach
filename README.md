@@ -14,6 +14,43 @@ published streaming quality on CPU/edge.
 
 ---
 
+## At a glance (for a first-time reader)
+
+**The problem.** Take Qwen3-ASR — a state-of-the-art English speech recogniser —
+and force its weights to be *ternary* `{−1, 0, +1}` (with a binary `{−1, +1}`
+target). Few-bit weights replace multiplications with additions and
+comparisons, which is what makes real-time, low-power, on-device speech
+recognition possible. The catch: quantization destroys accuracy, and for
+*streaming* recognition it destroyed the model completely.
+
+**The headline.** The official Qwen streaming algorithm used to **collapse** for
+quantized weights — WER **203.5 %** with endless repetition loops. It now
+streams at **11.55 % clean / 18.98 % other** (320 ms chunks, 50-utt test sets)
+with **zero loops**, on ternary weights, while the best offline quantized model
+reaches **7.52 %** (ternary) / **10.70 %** (binary) on the full 28,539-utterance
+training cache.
+
+**The fix, in one line.** A forced-aligner supplies word-level time-stamps, from
+which we build per-chunk training targets ("say exactly the words that end in
+this 320 ms window, or say nothing") plus an append-only loop-suppressing
+emission policy — so the model is *taught* the streaming question instead of
+having to infer it.
+
+**The honest status.** The project's fixed bar is "within `+1.5` WER of the fp16
+1.7B model" (≤ 3.74 / 6.11). It is **not met yet**; the measured bottleneck is
+*quantization damage*, not capacity or the recipe, and the next two levers are
+identified (a complete offline recovery for the 1.7B, and unbiased stochastic
+rounding). Everything is reproducible from committed launchers, tags and
+per-evaluation JSONs.
+
+**Start here:** [`docs/DEEPDIVE.md`](docs/DEEPDIVE.md) — the whole project
+explained from the ground up, including every failed attempt with its number
+(also written as viva/interview preparation). Current state:
+[`docs/HANDOFF.md`](docs/HANDOFF.md). The plan of record:
+[`docs/PLANNING.md`](docs/PLANNING.md).
+
+---
+
 ## Where the project stands (2026-10-15)
 
 All numbers are WER % at **320 ms chunks** unless stated; every row is backed by

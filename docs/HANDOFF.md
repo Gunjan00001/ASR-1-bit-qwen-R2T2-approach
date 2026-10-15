@@ -4,6 +4,9 @@
 **Read this first**, then `docs/PROJECT_STATUS.md` (status + graphs),
 `docs/ACTIVITY_LOG.md` (every step, failure, fix), `rules.md` (operating rules),
 `docs/GPU_ACCESS.md` (cluster access).
+**Want the whole story from zero — or preparing a viva/interview?**
+[`docs/DEEPDIVE.md`](DEEPDIVE.md) explains the project from the ground up and
+indexes every failed/successful attempt with its number.
 
 ---
 
