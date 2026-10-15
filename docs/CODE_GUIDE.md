@@ -33,7 +33,7 @@
    (`train/opd.py`, removed 2026-10-15) is worse than nothing: it implies work
    that does not exist. Unused imports, flags and helpers go the same way.
 5. **Every new behaviour gets a test, and the suite stays green.** `pytest -q`
-   (336 tests) plus `ruff check .` are the contract; a refactor that has not run
+   (340 tests) plus `ruff check .` are the contract; a refactor that has not run
    both is not finished. Tests import from `src/asr1bit/**`, not from the CLI
    scripts.
 
@@ -72,7 +72,7 @@ scripts/
   run_stage1_qat.py   trainer CLI (orchestration only — see its docstring)
   eval_streaming.py   streaming evaluator (official algorithm + LSP policy)
   eval_bin_es.pbs     examples of focused PBS launchers, one per experiment
-  run_stage1_qat.py   ... plus ~30 more launchers, all committed with the runs
+  ...                 ~30 more launchers (.pbs/.sh), all committed with the runs
 tests/                one test file per module, named after it
 docs/                 planning, results, lab notes, this guide
 ```
@@ -118,7 +118,29 @@ docs/                 planning, results, lab notes, this guide
 - a results JSON next to the checkpoints with the full config, the history and
   the timings — this is what `docs/` and the figures are generated from.
 
-## 6. Documentation duties (non-negotiable)
+## 6. Repo hygiene — what must never be committed
+
+- **Secrets** (tokens, API keys, SSH material) live in the environment or in
+  `~/.commandcode/` / `~/.ssh/`, never here. The repo's collected evidence:
+  `settings.json` is a *permissions allowlist* (no secrets), the git-push helper
+  reads `GITHUB_TOKEN` from the env and redacts it from output, and the Kaggle
+  doc *instructs* how to store tokens as Kaggle Secrets. If a real secret ever
+  lands in a commit: **rotate/revoke it first** — deleting the file afterwards
+  does not undo the exposure, because the history still holds it; history
+  rewrites are a last resort and require a forced push.
+- **Tool / session state.** `.commandcode/` (the agent assistant's permissions
+  and learned-taste files) was swept into a refactor commit by `git add -A`;
+  it is now untracked and `.gitignore`d (the files stay on disk so the tool keeps
+  its state). Before any broad `git add`, run `git status` and *see* what would
+  be swept.
+- **Caches and models.** `data/` (checkpoints, several GB) is ignored;
+  `artifacts/**` are tracked *deliberately* — the docs and figures are generated
+  from those JSONs. Keep result JSONs; never model weights.
+- **No network services** exist in this codebase (no HTTP servers), and model
+  downloads are anonymous hub fetches of Apache-2.0 weights, i.e. there is no
+  API key to leak.
+
+## 7. Documentation duties (non-negotiable)
 
 - `docs/LAB_NOTES.md` — **append-only**: every attempt, successful or failed,
   with its number and root cause. Never rewrite history; add a correction.

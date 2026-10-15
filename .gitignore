@@ -30,3 +30,6 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Command Code session state (taste, permissions) — local tool data, never project code
+.commandcode/
