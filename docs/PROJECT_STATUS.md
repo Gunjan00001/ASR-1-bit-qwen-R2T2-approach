@@ -175,12 +175,12 @@ conversion collapses; recovery must come from training, not from the quantizer.
 | Stage | Status | Notes |
 |---|---|---|
 | 0 — baselines & harness | **gate passed** (`0.2.0`) | fp16 numbers reproduced on T4 |
-| 1 — BitLinear + QAT | **machinery done; gate open** | loss controllable; WER tables emitted; recovery delivered by Stage 2 recipe |
-| 2 — accuracy recovery | **in progress** | rollout + anchor + progressive precision → 14.4/16.2 ternary, 17.5 binary |
+| 1 — BitLinear + QAT | **written gate MET; accuracy outcome poor** | the gate was "loss controllable; WER table emitted" — both true (audited quantizer, exact-memorization test, `stage1_results.md`) — but the naive run collapsed (≈100 WER), which is why Stage 2 exists |
+| 2 — accuracy recovery | **delivered in practice** | full-cache recipe + anneal → ternary **7.52** / binary **10.70** offline (mid-way it was 14.4/16.2 etc.); the `+1.5` *offline* bar remains open |
 | 3 — scale to 1.7B | **in progress** | anchored fp32-AdamW retry ran clean; first streaming number 29.24 clean from an offline 24.05 — the **offline base** is the bottleneck (full recovery recipe next) |
-| 4 — streaming parity (LSP) | not started | aligner + stable-prefix targets |
+| 4 — streaming parity (LSP) | **recipe delivered; gate open** | official algorithm 203.5 → **11.55 clean / 18.98 other**, zero loops (tag 0.2.47); gate (320 ms ≤ 3.74/6.11) unmet — gap is quantization damage |
 | 5 — edge deployment | not started | packing/GGUF/CPU kernels |
-| 6 — evaluation & writeup | not started | full matrix + report |
+| 6 — evaluation & writeup | **begun** | docs + figures regenerated from artifacts; `stage4_results.md` holds the streaming record |
 
 ---
 
