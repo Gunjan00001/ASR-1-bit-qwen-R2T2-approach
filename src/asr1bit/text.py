@@ -42,7 +42,9 @@ def normalize_text(text: str | None, mode: str = DEFAULT_MODE) -> str:
 
     Args:
         text: Raw transcript. ``None`` is treated as the empty string.
-        mode: ``"librispeech"`` (default) lowercases, removes punctuation, and
+        mode: ``"librispeech_hyph"`` (the default) keeps syllable-splitting hyphens
+        while lowercasing and removing punctuation; ``"librispeech"`` is the
+        plainer variant kept for the historical baselines, and
             collapses whitespace; ``"identity"`` returns the input unchanged.
 
     Returns:
