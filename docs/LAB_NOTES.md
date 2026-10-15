@@ -1709,3 +1709,32 @@ Also: `eval_bin_long` is scoring its final state (`last`) after a trajectory of
 61.12 / 40.36 / 29.77 / 28.28 / 26.80 — as recorded, it will not beat the binary
 best of 18.43, and the reason is now explicit: that number came from one
 seed-sensitive state that no re-run has reproduced.
+
+## 2026-10-16 (03:45) — bin_long fully scored: the binary arm's ceiling stands
+
+- **Complete full-sample table** (`bin_long`, 50 utts, official algorithm, 320 ms,
+  LSP policy on):
+
+  | state | clean | other | truncations |
+  |---|---:|---:|---:|
+  | step 500 | 61.12 | — | 10 |
+  | step 1000 | 40.36 | — | 4 |
+  | step 1500 | 29.77 | — | 1 |
+  | step 2000 | 28.28 | — | 3 |
+  | **step 2500 (best)** | **26.80** | **35.23** | 3 |
+  | last (the 3 000 state) | >26.80 | — | — |
+
+  (Raw-vs-policy deviations and intermediate values are in the JSONs; step 500's
+  policy *raised* WER, so its loop truncations hurt.)
+- **Verdict: no promotion.** The best full-sample state of the lineage-from-
+  aligned5 binary run is **26.80 / 35.23**, well behind the binary best of
+  **18.43 / 25.45** — and now the record says explicitly **why that is hard to
+  beat**: 18.43 came from *one* seed-sensitive state of the very first mirror at
+  a schedule the later re-runs have not reproduced. The binary transition's
+  outcome is (seed, schedule)-dependent; the two re-runs so far land at 36.4
+  (1500 steps) and 26.8 (3 000 steps). Whether stochastic rounding — now known
+  to *hurt* the 1.7B recovery — behaves differently here is an open, cheap-ish
+  experiment for when GPUs allow.
+- **Jobs remaining before the next check window:** `recover2` (step ~1 000 of
+  2 500), `recover3` (step ~370 of 2 500, lr 5e-6). Their pairwise evals are the
+  remaining questions of the night.
