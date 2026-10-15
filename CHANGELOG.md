@@ -4,7 +4,13 @@ Versioning is **`MAJOR.MINOR.BUGS`**:
 
 - **MAJOR** — an end-to-end milestone (e.g. `1.0.0` = 1.7B binary streaming
   pipeline works end-to-end).
-- **MINOR** — a **completed stage** (its gate in `docs/PLANNING.md` has passed).
+- **MINOR** — a **completed stage**: its `docs/PLANNING.md` gate met *and* an
+  outcome the project stands behind (the fixed bars in `PLANNING.md` §3 are the
+  standing guard). Clarified 2026-10-15 to match practice: **Stage 1's** gate
+  (*binary/ternary loss controllable; WER table emitted*) and **Stage 2's**
+  (*measurable WER recovery vs Stage 1*) are both **met**, yet `0.3.0` stays
+  untagged because the `+1.5` accuracy bars are still open — work continues on
+  `stage-1` under the `0.2.x` series.
 - **BUGS** — fixes and non-stage checkpoints.
 
 Stage work lands on a per-stage branch; `main` only advances on a passed stage
