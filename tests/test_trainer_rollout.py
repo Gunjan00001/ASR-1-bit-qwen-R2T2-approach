@@ -23,10 +23,22 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "run_stage1_qat.py"
 
 
 def _load_trainer():
+    """Load the trainer CLI plus the helper functions that now live in
+    ``src/asr1bit/train/{aligned,checkpoints,onpolicy,...}``.
+
+    The helpers were moved out of the 900-line script into focused modules
+    (readability + testability).  This shim re-exposes them on the loaded
+    module so the tests below keep reading as "the trainer's functions".
+    """
     sys.path.insert(0, str(SCRIPT.parent))
     spec = importlib.util.spec_from_file_location("run_stage1_qat_under_test", SCRIPT)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    from asr1bit.train import aligned, checkpoints, inloop_eval, onpolicy
+    for helper_module in (aligned, checkpoints, inloop_eval, onpolicy):
+        for name in dir(helper_module):
+            if not name.startswith("_"):
+                setattr(module, name, getattr(helper_module, name))
     return module
 
 

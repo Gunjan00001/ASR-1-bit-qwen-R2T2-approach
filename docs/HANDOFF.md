@@ -3,7 +3,8 @@
 **Date:** 2026-10-11 · **Branch:** `stage-1` · **Owner:** Gunjan00001
 **Read this first**, then `docs/PROJECT_STATUS.md` (status + graphs),
 `docs/ACTIVITY_LOG.md` (every step, failure, fix), `rules.md` (operating rules),
-`docs/GPU_ACCESS.md` (cluster access).
+`docs/GPU_ACCESS.md` (cluster access), `docs/CODE_GUIDE.md`
+(code layout + commenting rules).
 **Want the whole story from zero — or preparing a viva/interview?**
 [`docs/DEEPDIVE.md`](DEEPDIVE.md) explains the project from the ground up and
 indexes every failed/successful attempt with its number.

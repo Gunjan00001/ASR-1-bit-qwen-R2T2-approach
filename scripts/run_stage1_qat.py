@@ -1,4 +1,27 @@
-"""Stage 1 (T1.4/T1.5): progressive QAT on Qwen3-ASR-0.6B + offline WER ablations.
+"""Trainer CLI for quantized (ternary / near-binary) Qwen3-ASR fine-tuning.
+
+This file is intentionally the *orchestrator only*: argument parsing, the
+phase order, and the training loop. The pieces it drives live in focused
+modules so each one can be read (and tested) on its own::
+
+    src/asr1bit/train/checkpoints.py   save/load/select checkpoints
+    src/asr1bit/train/dataset.py       ordinary transcription examples + batching
+    src/asr1bit/train/aligned.py       forced-aligner streaming targets (the fix)
+    src/asr1bit/train/onpolicy.py      rollouts, distillation, degenerate filtering
+    src/asr1bit/train/inloop_eval.py   cheap in-training evaluations (guardrails)
+    src/asr1bit/train/schedules.py     warmup + cosine LR
+    src/asr1bit/train/qat.py           the loss, labels and distillation terms
+    src/asr1bit/train/sft.py           example builders shared by the above
+
+Run phases (each marked in ``main`` with a comment):
+
+    1. read config + dump the environment (reproducibility)
+    2. load the model, optionally a frozen fp16 teacher (the KL "anchor")
+    3. evaluate the untouched model  -> the ruler for everything after
+    4. replace chosen projections with quantized layers (the policy)
+    5. build the batch: ordinary samples + (optional) streaming samples
+    6. train: clip, step, log, save, and run the cheap in-loop checks
+    7. final save + end-of-run evaluation, all recorded into one JSON
 
 Stabilized debug configuration (see docs/LAB_NOTES.md):
 - only BitLinear shadows are trainable (frozen QAT setup, not a fallback),
@@ -8,14 +31,13 @@ Stabilized debug configuration (see docs/LAB_NOTES.md):
 - per-layer gradient norms logged and finiteness asserted before every step.
 
 Enable the risky features one at a time via flags to find which one breaks
-training. Streaming/vLLM eval is deferred.
+training. Streaming/vLLM eval is deferred to scripts/eval_streaming.py.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 import time
 from pathlib import Path
@@ -23,421 +45,42 @@ from pathlib import Path
 import torch
 
 from asr1bit.bitlinear import BitLinear
-from asr1bit.data.load import iter_librispeech, load_utterance_cache
-from asr1bit.eval.wer import corpus_cer, corpus_wer
+from asr1bit.data.load import iter_librispeech
 from asr1bit.qwen import backends
 from asr1bit.replace import apply_layer_policy
+from asr1bit.train.aligned import build_aligned_examples
+from asr1bit.train.checkpoints import (
+    load_checkpoint,
+    save_checkpoint,
+    step_checkpoint_path,
+)
+from asr1bit.train.dataset import build_examples, collate, load_train_utterances
+from asr1bit.train.inloop_eval import (
+    evaluate,
+    evaluate_precisions,
+    evaluate_streaming,
+    set_precision,
+)
+from asr1bit.train.model_prep import patch_outer_forward
+from asr1bit.train.onpolicy import (
+    collect_op_examples,
+)
 from asr1bit.train.qat import (
     build_optimizer,
     check_finite_grads,
     distillation_loss,
     grad_norms,
-    make_sft_labels,
     progressive_alpha,
     quantization_delay_alpha,
     scale_stats,
     set_activation_quant,
     set_qat_alpha,
 )
+from asr1bit.train.schedules import build_lr_lambda
 from asr1bit.train.sft import (
-    build_distill_examples,
-    build_onpolicy_examples,
-    collect_streaming_samples,
     interleave_with_ratio,
     select_evenly,
 )
-
-
-def patch_outer_forward(model) -> None:
-    """Route the outer forward to ``model.thinker`` (official Qwen3-ASR API)."""
-    cls = model.__class__
-    if getattr(cls, "_forward_patched", False):
-        return
-    if not hasattr(model, "thinker"):
-        raise RuntimeError("model has no .thinker; cannot patch forward")
-
-    def forward(self, input_ids=None, attention_mask=None, input_features=None,
-                feature_attention_mask=None, labels=None, **kwargs):
-        return self.thinker.forward(
-            input_ids=input_ids, attention_mask=attention_mask,
-            input_features=input_features, feature_attention_mask=feature_attention_mask,
-            labels=labels, **kwargs)
-
-    cls.forward = forward
-    cls._forward_patched = True
-
-
-def build_examples(
-    utterances, processor, prompt: str = "", prefix_fracs=None, silence_sec: float | None = None
-) -> list[dict]:
-    """Build (audio, prefix_text, target) triples.
-
-    Mirrors Qwen's official ``finetuning/qwen3_asr_sft.py``: the prefix template
-    is rendered with a *dummy* audio placeholder (``audio=None``); the real audio
-    is passed separately to the processor. Using the real audio here changes the
-    rendered prefix and misaligns the label mask.
-
-    ``prefix_fracs`` (e.g. ``(0.0, 0.5, 0.8, 0.95)``) additionally creates
-    **prefix-continuation** samples for streaming robustness: the chat template
-    prefix is followed by the first ``frac`` of the transcript words and the
-    target is the remaining words — mimicking the streaming algorithm's
-    rolled-back self-prefix.
-
-    ``silence_sec`` additionally creates a **near-empty-audio** sample per
-    utterance (audio truncated to ``silence_sec``, empty target) so the model
-    learns to emit EOS instead of hallucinating on the streaming warm-up chunks.
-    """
-    examples = []
-    for utt in utterances:
-        messages = [
-            {"role": "system", "content": prompt or ""},
-            {"role": "user", "content": [{"type": "audio", "audio": None}]},
-        ]
-        prefix = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-        if isinstance(prefix, list):
-            prefix = prefix[0]
-        if prefix_fracs:
-            words = utt.text.split()
-            for frac in prefix_fracs:
-                k = round(len(words) * frac)
-                partial = " ".join(words[:k])
-                target = " ".join(words[k:])
-                if not target:
-                    continue
-                examples.append(
-                    {"audio": utt.audio, "prefix_text": prefix + partial, "target": target}
-                )
-        else:
-            examples.append({"audio": utt.audio, "prefix_text": prefix, "target": utt.text})
-        if silence_sec:
-            n = max(1, int(silence_sec * 16000))
-            examples.append(
-                {"audio": utt.audio[:n], "prefix_text": prefix, "target": ""}
-            )
-    return examples
-
-
-def collate(examples: list[dict], processor) -> dict:
-    audios = [e["audio"] for e in examples]
-    prefixes = [e["prefix_text"] for e in examples]
-    eos = processor.tokenizer.eos_token or ""
-    full = [p + e["target"] + eos for p, e in zip(prefixes, examples)]
-    full_inputs = processor(text=full, audio=audios, return_tensors="pt", padding=True, truncation=False)
-    prefix_inputs = processor(text=prefixes, audio=audios, return_tensors="pt", padding=True, truncation=False)
-    prefix_lens = prefix_inputs["attention_mask"].sum(dim=1).tolist()
-    full_inputs["labels"] = make_sft_labels(
-        full_inputs["input_ids"], prefix_lens, processor.tokenizer.pad_token_id
-    )
-    return full_inputs
-
-
-def evaluate(wrapper, utterances, limit: int) -> dict:
-    refs, hyps = [], []
-    for utt in utterances[:limit]:
-        hyps.append(backends.offline_transcribe(wrapper, utt.audio, language=None))
-        refs.append(utt.text)
-    return {"n": len(refs), "wer": corpus_wer(refs, hyps), "cer": corpus_cer(refs, hyps)}
-
-
-def set_precision(model, bit_width: float, alpha: float) -> None:
-    for module in model.modules():
-        if isinstance(module, BitLinear):
-            module.bit_width = bit_width
-            module.alpha = alpha
-
-
-def evaluate_precisions(
-    wrapper, model, utterances, n, *, bit_width: float = 1.0, both: bool = True,
-    include_fp16: bool = False,
-) -> dict:
-    """WER at alpha=1 for binary and/or ternary (used for periodic/zero-shot).
-
-    With ``both=False`` only the training precision (``bit_width``) is scored,
-    halving eval time on long runs. ``include_fp16`` adds the alpha=0 readout,
-    which detects shadow drift during QAT.
-    """
-    model.eval()
-    results: dict = {}
-    with torch.no_grad():
-        if include_fp16:
-            set_precision(model, 1.0, 0.0)
-            results["fp16"] = evaluate(wrapper, utterances, n)
-        if both or bit_width == 1.0:
-            set_precision(model, 1.0, 1.0)
-            results["binary"] = evaluate(wrapper, utterances, n)
-        if both or bit_width != 1.0:
-            set_precision(model, 1.58, 1.0)
-            results["ternary"] = evaluate(wrapper, utterances, n)
-    model.train()
-    return results
-
-
-def build_op_keep(args: argparse.Namespace):
-    """State-selection policy for the on-policy rollout.
-
-    Always keep the warm-up chunks (the runaway-generation fix) and the last
-    chunk; keep mid-stream chunks on a fixed stride to bound memory.
-    """
-
-    def keep(chunk_id: int, final: bool) -> bool:
-        if chunk_id < 2 or final:
-            return True
-        if args.op_max_rounds and chunk_id >= args.op_max_rounds - 1:
-            return True
-        return args.op_chunk_stride > 0 and chunk_id % args.op_chunk_stride == 0
-
-    return keep
-
-
-def rollout_onpolicy_examples(
-    args: argparse.Namespace, wrapper, utterances, *, teacher_wrapper=None
-) -> list[dict]:
-    """Build streaming training examples by replaying the official algorithm.
-
-    Two modes:
-    - **on-policy SFT** (default): the *current* model generates the prefixes and
-      the target is the reference remainder (own-prefix distribution);
-    - **streaming-state distillation** (``--op-distill``): the *frozen pretrained
-      teacher* generates them and the target is the teacher's own continuation —
-      behavior cloning of a clean streaming policy at exactly the inference
-      states (the student's own states can be degenerate loops, which DAgger
-      would reinforce).
-    """
-    if args.op_distill:
-        if teacher_wrapper is None:
-            raise ValueError("--op-distill requires --frozen-teacher 1 (teacher rollout)")
-        decode_batch = backends.build_transformers_batch_generate_fn(
-            teacher_wrapper, max_new_tokens=args.op_max_new_tokens
-        )
-    else:
-        decode_batch = backends.build_transformers_batch_decode_fn(
-            wrapper, max_new_tokens=args.op_max_new_tokens
-        )
-    codec = backends.TokenizerCodec(wrapper.processor.tokenizer)
-    prompt_raw = wrapper._build_text_prompt(context="", force_language=None)
-    audios = [utt.audio for utt in utterances]
-    started = time.perf_counter()
-
-    def progress(done: int, total: int) -> None:
-        if done == total or (done > 0 and done % 50 == 0):
-            elapsed = time.perf_counter() - started
-            eta = elapsed / done * (total - done)
-            print(
-                f"rollout {done}/{total} utts ({elapsed:.0f}s elapsed, ~{eta:.0f}s left)",
-                flush=True,
-            )
-
-    samples = collect_streaming_samples(
-        decode_batch,
-        codec,
-        prompt_raw,
-        audios,
-        chunk_size_sec=args.op_chunk_ms / 1000.0,
-        unfixed_chunk_num=2,
-        unfixed_token_num=5,
-        keep=build_op_keep(args),
-        batch_size=args.op_batch_size,
-        max_rounds=args.op_max_rounds or None,
-        progress=progress,
-    )
-    if args.op_distill:
-        examples = build_distill_examples(samples, prompt_raw=prompt_raw)
-    else:
-        examples = build_onpolicy_examples(
-            samples,
-            [utt.text for utt in utterances],
-            warmup_target_eos=bool(args.op_warmup_eos),
-            drop_degenerate=bool(args.op_filter_degenerate),
-        )
-    total_states = sum(len(utt_samples) for utt_samples in samples)
-    print(
-        f"rollout states {total_states} -> {len(examples)} examples after filtering",
-        flush=True,
-    )
-    return select_evenly(examples, args.op_max_samples)
-
-
-def collect_op_examples(
-    args: argparse.Namespace,
-    wrapper,
-    model,
-    teacher_wrapper,
-    op_utterances,
-    *,
-    restore_alpha: float | None = None,
-) -> list[dict]:
-    """Roll out and return streaming examples, restoring the training state."""
-    if args.op_distill:
-        with torch.no_grad():
-            return rollout_onpolicy_examples(
-                args, wrapper, op_utterances, teacher_wrapper=teacher_wrapper
-            )
-    set_precision(model, args.bit_width, 1.0)
-    model.eval()
-    try:
-        with torch.no_grad():
-            return rollout_onpolicy_examples(args, wrapper, op_utterances)
-    finally:
-        model.train()
-        if restore_alpha is not None:
-            set_precision(model, args.bit_width, restore_alpha)
-
-
-def evaluate_streaming(
-    wrapper, model, utterances, n: int, *, chunk_ms: int = 320, max_new_tokens: int = 32,
-    unfixed_token_num: int = 5,
-) -> dict:
-    """Official-algorithm streaming WER on a small eval slice (training feedback).
-
-    The periodic eval is offline-only, which made the streaming iterations blind
-    (docs/ACTIVITY_LOG.md 2026-10-12). This runs the portable streamer on the
-    first ``n`` eval utterances, exactly like ``scripts/eval_streaming.py``.
-    """
-    refs, hyps = [], []
-    previous = getattr(wrapper, "max_new_tokens", None)
-    try:
-        wrapper.max_new_tokens = max_new_tokens
-        for utt in utterances[:n]:
-            trace = backends.stream_transcribe_portable(
-                wrapper,
-                utt.audio,
-                chunk_size_sec=chunk_ms / 1000.0,
-                step_sec=chunk_ms / 1000.0,
-                unfixed_token_num=unfixed_token_num,
-            )
-            refs.append(utt.text)
-            hyps.append(trace.text)
-    finally:
-        if previous is not None:
-            wrapper.max_new_tokens = previous
-    return {"n": len(refs), "wer": corpus_wer(refs, hyps), "cer": corpus_cer(refs, hyps)}
-
-
-def build_aligned_examples(
-    utterances,
-    processor,
-    aligner,
-    *,
-    prompt: str = "",
-    chunk_ms: int = 320,
-    lookahead_ms: int = 0,
-    stop_stride: int = 2,
-    progress=None,
-) -> list[dict]:
-    """Chunk-aligned SFT samples from forced-aligner word timestamps (T4.3).
-
-    For every utterance: align the reference (T4.1) → chunk targets (T4.2) →
-    ``(audio_slice, template + prefix, target)`` examples. The target is exactly
-    the words the model should have emitted at that chunk ("what I have heard,
-    then stop"), which is the behaviour the official prefix algorithm needs.
-
-    Roughly half of all chunks have *no* new words (an empty target = a stop
-    sample); ``stop_stride`` keeps only every N-th of those so the mix is not
-    dominated by silence teaching.
-    """
-    from asr1bit.data.align import align_words
-    from asr1bit.data.prefix import chunk_examples
-
-    examples: list[dict] = []
-    empty_seen = 0
-    for index, utt in enumerate(utterances):
-        words = align_words(utt.audio, utt.text, aligner=aligner)
-        if not words:
-            continue
-        empty_seen = 0
-        for example in chunk_examples(
-            words,
-            chunk_sec=chunk_ms / 1000.0,
-            lookahead_sec=lookahead_ms / 1000.0,
-            total_sec=utt.duration,
-        ):
-            if not example.target_text:
-                empty_seen += 1
-                if stop_stride > 1 and (empty_seen - 1) % stop_stride != 0:
-                    continue
-            samples = max(1, round(example.audio_sec * 16000))
-            audio = utt.audio[:samples]
-            prefix = processor.apply_chat_template(
-                [
-                    {"role": "system", "content": prompt or ""},
-                    {"role": "user", "content": [{"type": "audio", "audio": None}]},
-                ],
-                add_generation_prompt=True,
-                tokenize=False,
-            )
-            if isinstance(prefix, list):
-                prefix = prefix[0]
-            examples.append(
-                {
-                    "audio": audio,
-                    "prefix_text": prefix + example.prefix_text,
-                    "target": example.target_text,
-                }
-            )
-        if progress is not None and (index + 1) % 50 == 0:
-            progress(index + 1, len(utterances))
-    return examples
-
-
-def step_checkpoint_path(save_dir: str | Path, step: int, every: int) -> Path | None:
-    """Step-numbered checkpoint path when ``step`` is a multiple of ``every``.
-
-    Keeps the training trajectory's best states selectable afterwards (a
-    ``last.pt``-only run loses every earlier state; the binary arm's best
-    streaming state was lost that way on 2026-10-15).
-    """
-    if not every or every <= 0 or step <= 0 or step % every != 0:
-        return None
-    return Path(save_dir) / f"step{step}.pt"
-
-
-def shadow_state(model) -> dict:
-    """Trainable tensor snapshot (BitLinear shadows and learnable scales)."""
-    return {name: p.detach().cpu() for name, p in model.named_parameters() if p.requires_grad}
-
-
-def save_checkpoint(path: Path, model, step: int, args: argparse.Namespace) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save({"step": step, "config": vars(args), "shadows": shadow_state(model)}, path)
-    print(f"saved checkpoint {path}", flush=True)
-
-
-def load_checkpoint(path: str | Path, model) -> int:
-    payload = torch.load(path, map_location="cpu", weights_only=False)
-    shadows = payload.get("shadows", {})
-    restored = 0
-    with torch.no_grad():
-        for name, param in model.named_parameters():
-            if name in shadows and shadows[name].shape == param.shape:
-                param.copy_(shadows[name])
-                restored += 1
-    print(f"resumed {restored} tensors from {path} (step {payload.get('step')})", flush=True)
-    return int(payload.get("step", 0))
-
-
-def build_lr_lambda(args: argparse.Namespace):
-    """Warmup then constant or cosine decay to zero over ``--steps``."""
-    warmup = max(1, args.warmup_steps)
-
-    def lr_lambda(step: int) -> float:
-        if step < warmup:
-            return (step + 1) / warmup
-        if args.lr_schedule == "cosine":
-            progress = (step - warmup) / max(1, args.steps - warmup)
-            return 0.5 * (1.0 + math.cos(math.pi * min(1.0, progress)))
-        return 1.0
-
-    return lr_lambda
-
-
-def load_train_utterances(args: argparse.Namespace) -> list:
-    """Training utterances from a local cache when given, else Hub validation sample."""
-    if args.train_cache:
-        utterances = load_utterance_cache(args.train_cache)
-        if args.train_n and args.train_n < len(utterances):
-            return utterances[: args.train_n]
-        return utterances
-    return list(iter_librispeech("clean", "validation", sample_n=args.train_n, sample_seed=0))
 
 
 def parse_args() -> argparse.Namespace:
@@ -559,12 +202,16 @@ def main() -> int:
         print("--op-rollout enables --lazy-collate (the mix changes across refreshes)", flush=True)
         args.lazy_collate = 1
     group_size = args.group_size or None
+# Freeze the exact configuration into the results: every number a run
+# produces must be traceable to the flags that produced it.
     config_record = vars(args) | {"group_size": group_size}
     print("=== environment ===")
     print(json.dumps(backends.environment_report(), indent=2), flush=True)
     print("=== config ===")
     print(json.dumps(config_record, indent=2), flush=True)
 
+# Load the ASR model through our portable backend (transformers rather than
+# vLLM: the cluster's driver predates what vLLM needs).
     wrapper = backends.load_model(
         args.model, backend="transformers", dtype=torch.float32, device="cuda:0",
         max_new_tokens=args.max_new_tokens,
@@ -575,6 +222,9 @@ def main() -> int:
 
     teacher = None
     teacher_wrapper = None
+# Optional frozen fp16 teacher (the 'anchor'). Its KL term is what stops a
+# quantized model from drifting into a bad basin and never coming back - the
+# exact failure the 1.7B retry hit before the anchor was added.
     if args.frozen_teacher:
         if not args.distill_weight:
             raise ValueError("--frozen-teacher requires --distill-weight > 0")
@@ -589,6 +239,8 @@ def main() -> int:
             param.requires_grad_(False)
         print("frozen teacher loaded", flush=True)
 
+# Training data: a small cache while developing, the full 28.5k-utterance
+# cache for production runs. Cached audio means the GPU never waits on I/O.
     train_utts = load_train_utterances(args)
     eval_utts = list(iter_librispeech("clean", "test", sample_n=args.eval_n, sample_seed=0))
     prefix_fracs = None
@@ -604,6 +256,8 @@ def main() -> int:
     results: dict = {"config": config_record, "eval_n": len(eval_utts), "frozen_teacher": teacher is not None}
 
     print("=== baseline (pretrained) ===", flush=True)
+# Measure the model BEFORE any modification, on the same fixed utterances
+# used later. This is the ruler for every comparison that follows.
     results["pretrained"] = evaluate(wrapper, eval_utts, args.eval_n)
     print(json.dumps(results["pretrained"]), flush=True)
 
@@ -615,6 +269,9 @@ def main() -> int:
         learnable_scale=bool(args.learnable_scale),
         stochastic=bool(args.quant_stochastic),
     )
+# Replace the chosen projections with quantized layers. The policy decides
+# *which* matrices (attention only / +FFN / all), the bit width decides how
+# aggressive the quantization is.
     model.to("cuda:0")
     results["bitlinear_replaced"] = getattr(model, "bitlinear_replaced", 0)
 
@@ -632,6 +289,8 @@ def main() -> int:
         if hasattr(model.config, "use_cache"):
             model.config.use_cache = False
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+# Count what we are about to train. Frozen modules must not require grad, or
+# the optimizer silently allocates buffers for them and the run OOMs.
     results["trainable_params"] = trainable
     print(f"replaced={results['bitlinear_replaced']} trainable={trainable}", flush=True)
 
@@ -650,6 +309,9 @@ def main() -> int:
         print("wrote", out_dir / f"stage1_{tag}.json", flush=True)
         return 0
 
+# Optimizer + LR schedule (warmup then cosine). adam8bit trades a little
+# precision for ~4x less optimizer memory; fp32 AdamW is the conservative
+# choice for the 1.7B, where a bad update can be permanent.
     optimizer = build_optimizer(model, lr=args.lr, use_8bit=(args.optimizer == "adam8bit"))
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=build_lr_lambda(args))
     scaler = torch.amp.GradScaler("cuda") if args.autocast else None
@@ -661,6 +323,9 @@ def main() -> int:
     alpha_warmup = max(1, int(args.steps * args.alpha_warmup_frac))
     history = []
     start_step = 0
+# Two ways to continue: init_from starts a fresh phase with a new schedule
+# (the recipe's 'warm start'); resume also restores optimizer + scheduler
+# state and continues the same schedule.
     if args.init_from:
         loaded = load_checkpoint(args.init_from, model)
         print(f"initialized shadows from {args.init_from} (checkpoint step {loaded}); new phase starts at 0", flush=True)
@@ -675,6 +340,9 @@ def main() -> int:
     standard_examples = train_examples
     op_utterances: list = []
     op_examples: list[dict] = []
+# Assemble the training batch. The aligned-targets path builds streaming
+# examples from forced-aligner timestamps and interleaves them with ordinary
+# transcription samples so content quality does not regress.
     if args.aligned_targets:
         strip = min(args.aligned_n, len(train_utts))
         print(f"=== forced-aligner targets: aligning {strip} train utterances (T4.1) ===", flush=True)
@@ -728,6 +396,10 @@ def main() -> int:
 
     print("=== QAT ===", flush=True)
     started = time.perf_counter()
+# --- the training loop -------------------------------------------------
+# Each iteration: build the batch (possibly with a fresh on-policy rollout),
+# forward/backward, step the scheduler, and - at the requested cadence -
+# run the cheap in-loop evaluations and write checkpoints.
     for step in range(start_step, args.steps):
         if args.alpha_mode == "ramp":
             alpha = progressive_alpha(step, alpha_warmup)
@@ -857,6 +529,8 @@ def main() -> int:
             step_path = step_checkpoint_path(args.save_dir, step + 1, args.keep_step_checkpoints)
             if step_path is not None:
                 save_checkpoint(step_path, model, step + 1, args)
+# Wrap up: persist the history, the timings, the final checkpoint, and run
+# the end-of-run evaluation. The run's JSON is the artifact of record.
     results["history"] = history
     results["qat_seconds"] = time.perf_counter() - started
     if args.op_rollout or args.aligned_targets:

@@ -1,0 +1,176 @@
+{
+  "checkpoint": "data/checkpoints/qat_stream_distill3/last.pt",
+  "utterance_id": "672-122797-0048",
+  "reference": "IF IT ONLY WERE NOT SO DARK HERE AND SO TERRIBLY LONELY",
+  "final_text": "IF IT ONLY WERE NOT SO DARK HERE AND SO TERRIBLY LONELY",
+  "chunks": [
+    {
+      "chunk": 0,
+      "audio_sec": 0.32,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 1,
+      "audio_sec": 0.64,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 2,
+      "audio_sec": 0.96,
+      "prompt_chars": 121,
+      "generated_tokens": 2,
+      "eos": true,
+      "text": "If"
+    },
+    {
+      "chunk": 3,
+      "audio_sec": 1.28,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 4,
+      "audio_sec": 1.6,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 5,
+      "audio_sec": 1.92,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 6,
+      "audio_sec": 2.24,
+      "prompt_chars": 121,
+      "generated_tokens": 3,
+      "eos": true,
+      "text": "It."
+    },
+    {
+      "chunk": 7,
+      "audio_sec": 2.56,
+      "prompt_chars": 121,
+      "generated_tokens": 3,
+      "eos": true,
+      "text": "language None"
+    },
+    {
+      "chunk": 8,
+      "audio_sec": 2.88,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 9,
+      "audio_sec": 3.2,
+      "prompt_chars": 121,
+      "generated_tokens": 3,
+      "eos": true,
+      "text": "So."
+    },
+    {
+      "chunk": 10,
+      "audio_sec": 3.52,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 11,
+      "audio_sec": 3.84,
+      "prompt_chars": 121,
+      "generated_tokens": 3,
+      "eos": true,
+      "text": "Here."
+    },
+    {
+      "chunk": 12,
+      "audio_sec": 4.16,
+      "prompt_chars": 121,
+      "generated_tokens": 3,
+      "eos": true,
+      "text": "And."
+    },
+    {
+      "chunk": 13,
+      "audio_sec": 4.48,
+      "prompt_chars": 121,
+      "generated_tokens": 2,
+      "eos": true,
+      "text": "language"
+    },
+    {
+      "chunk": 14,
+      "audio_sec": 4.8,
+      "prompt_chars": 121,
+      "generated_tokens": 3,
+      "eos": true,
+      "text": "So."
+    },
+    {
+      "chunk": 15,
+      "audio_sec": 5.12,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 16,
+      "audio_sec": 5.44,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 17,
+      "audio_sec": 5.76,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 18,
+      "audio_sec": 6.08,
+      "prompt_chars": 121,
+      "generated_tokens": 1,
+      "eos": true,
+      "text": ""
+    },
+    {
+      "chunk": 19,
+      "audio_sec": 6.4,
+      "prompt_chars": 121,
+      "generated_tokens": 19,
+      "eos": true,
+      "text": "IF IT ONLY WERE NOT SO DARK HERE AND SO TERRIBLY LONELY"
+    },
+    {
+      "chunk": 20,
+      "audio_sec": 6.55,
+      "prompt_chars": 165,
+      "generated_tokens": 6,
+      "eos": true,
+      "text": "IBLY LONELY"
+    }
+  ]
+}

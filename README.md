@@ -354,6 +354,11 @@ baselines run on GPU hosts, not on the local dev machine.
 
 ## Layout
 
+Contributing or extending the code? Start with
+[`docs/CODE_GUIDE.md`](docs/CODE_GUIDE.md) (file-per-concern rules, commenting
+style, the safe way to split a large file, and the telemetry/docs every run
+must emit).
+
 ```
 src/asr1bit/   # package (quant, bitlinear, replace, data, qwen, train, eval, deploy)
 tests/         # unit tests

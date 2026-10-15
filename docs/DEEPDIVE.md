@@ -667,6 +667,9 @@ docs/HANDOFF.md             state of the world for the next person/agent
 CHANGELOG.md                tagged checkpoints and what each tag contains
 ```
 
+**For the code itself:** [`CODE_GUIDE.md`](CODE_GUIDE.md) — where every
+file lives, the commenting rules, and how to split a file safely.
+
 **Reading order for a newcomer:** this document → `PLANNING.md` (the plan) →
 `stage4_results.md` (the numbers) → `LAB_NOTES.md` (the failures) →
 `HANDOFF.md` (the current state).
