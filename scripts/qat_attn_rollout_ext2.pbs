@@ -9,7 +9,7 @@
 # Stage 2a extension — warm restart from the step-2000 rollout checkpoint with a
 # second cosine cycle (lr 2.5e-5 -> 0 over 5000 steps). The first cycle
 # plateaued at ternary 22.6 as the LR reached 0; this continues the descent.
-# Submit: qsub scripts/qat_attn_rollout_ext.pbs
+# Submit: qsub scripts/qat_attn_rollout_ext2.pbs
 
 set -u
 unset CUDA_VISIBLE_DEVICES

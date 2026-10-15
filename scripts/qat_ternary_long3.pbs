@@ -9,7 +9,7 @@
 # Stage 2: second ternary continuation — from the 11.4/10.6 WER checkpoint
 # (ternary long, step 8000) with a gentle fresh cycle (lr 1e-5, anchor 0.05,
 # 8k cache, 4 000 steps).
-# Submit: qsub scripts/qat_ternary_long2.pbs
+# Submit: qsub scripts/qat_ternary_long3.pbs
 
 set -u
 unset CUDA_VISIBLE_DEVICES

@@ -18,7 +18,7 @@
 # Stage 3: aligned targets on the 1.7B (from attn5, ternary 20.55). The frozen
 # teacher is dropped to fit shared-GPU memory; watch the ternary EVALs closely.
 # Guardrail: 20-utt official-algorithm `STREAM` evals every 250 steps.
-# Submit: qsub scripts/qat_stream_aligned.pbs
+# Submit: qsub scripts/qat_stream_aligned17b2.pbs
 
 set -u
 unset CUDA_VISIBLE_DEVICES

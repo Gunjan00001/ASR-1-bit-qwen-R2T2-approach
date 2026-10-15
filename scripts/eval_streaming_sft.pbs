@@ -9,7 +9,7 @@
 # Decisive test: streaming 320 ms with the OFFICIAL prefix-continuation
 # algorithm (unfixed_token_num=5) on the prefix-continuation-trained checkpoint.
 # Baseline: pretrained fp16 = 2.33 WER on the same 50 utts (measured earlier).
-# Submit: qsub scripts/eval_streaming_prefix.pbs
+# Submit: qsub scripts/eval_streaming_sft.pbs
 
 set -u
 unset CUDA_VISIBLE_DEVICES

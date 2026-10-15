@@ -9,7 +9,7 @@
 # Stage 2: third binary continuation — from the 11.1 WER checkpoint (binary
 # long2, step 4000) with a very gentle fresh cycle (lr 5e-6, anchor 0.05,
 # 8k cache, 3 000 steps).
-# Submit: qsub scripts/qat_binary_long3.pbs
+# Submit: qsub scripts/qat_binary_long4.pbs
 
 set -u
 unset CUDA_VISIBLE_DEVICES

@@ -19,7 +19,7 @@
 # (bit_width 1.0; never train binary from fp). # Init old: (offline 7.52 — the best offline base);
 # 2 400 aligned utterances (base quality was the limit of the 12.61 run).
 # Guardrail: 20-utt official-algorithm `STREAM` evals every 250 steps.
-# Submit: qsub scripts/qat_stream_aligned.pbs
+# Submit: qsub scripts/qat_stream_bin_long.pbs
 
 set -u
 unset CUDA_VISIBLE_DEVICES

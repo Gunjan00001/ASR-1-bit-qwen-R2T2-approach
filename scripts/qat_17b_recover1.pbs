@@ -18,7 +18,8 @@
 # teacher ~6.8 GB + ~1.4B trainable shadow params (5.6 GB) + grads (5.6 GB) +
 # fp32 Adam moments (11.2 GB) + activations at batch 1 ≈ 40-50 GB of the 80 GB
 # A100 — keep batch 1, no grad checkpointing, and check `nvidia-smi` in the log.
-# If it OOMs: `--grad-checkpointing 1 --optimizer adam8bit`.
+# If it OOMs: reduce --train-n/--steps. Do NOT add --grad-checkpointing
+# (broken in this frozen-only setup)..
 #
 # Note: Qwen3-ASR-1.7B ships no tokenizer.json either — run
 # `scripts/install_fast_tokenizer.py` against the model dir first (pitfall 2 in

@@ -18,7 +18,7 @@
 # 0.6B refinement: continue the scaled aligned checkpoint with a gentle
 # 3 000-step cycle (lr 2e-6) to anneal further. Watch the STREAM curve.
 # Guardrail: 20-utt official-algorithm `STREAM` evals every 250 steps.
-# Submit: qsub scripts/qat_stream_aligned.pbs
+# Submit: qsub scripts/qat_stream_aligned3.pbs
 
 set -u
 unset CUDA_VISIBLE_DEVICES

@@ -12,7 +12,7 @@
 #   (3) binary long3 (10.7 WER offline) at its trained precision.
 # The fp16 readout of QAT-trained shadows is NOT a valid baseline (drift →
 # runaway generation; measured WER 1860 in the first attempt).
-# Submit: qsub scripts/eval_streaming_quantized.pbs
+# Submit: qsub scripts/eval_streaming_noprefix128.pbs
 
 set -u
 unset CUDA_VISIBLE_DEVICES
