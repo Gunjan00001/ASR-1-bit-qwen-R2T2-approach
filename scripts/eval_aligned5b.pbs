@@ -92,6 +92,6 @@ if [ -n "$BEST" ] && [ -f "$CKPT_DIR/$BEST.pt" ]; then
     --lsp-truncate-loops 1 \
     --conditions quantized \
     --config other \
-    --out "artifacts/stage1/streaming_al5_${BEST}_other.json" \
+    --out "artifacts/stage1/streaming_al5b_${BEST}_other.json" \
     2>&1 | tee -a "$LOG"
 fi

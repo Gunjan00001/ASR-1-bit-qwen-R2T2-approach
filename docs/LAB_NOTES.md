@@ -1553,3 +1553,30 @@ environmental, not model bugs):
 - **Next use:** the 1.7B offline recovery run (full-cache QAT + anneals) should
   carry `--quant-stochastic 1` — that is the highest-value place to test it,
   since its damage is the project's dominant remaining error.
+
+## 2026-10-15 (20:50) — The resume's states do not beat 11.55; the 1.7B's pair is complete; recovery-1 launched
+
+- **The resume's selectable states, scored on full samples:** step 2 000
+  **11.76**, step 2 500 **11.76**, step 3 000 **11.76** (clean, 320 ms; CERs
+  5.02 / 4.56 / 4.56; 0 / 3 / 0 loop truncations). **None beats the promoted
+  11.55**, so nothing is promoted. This is the *fifth* guardrail-vs-metric
+  divergence: the in-training guardrail had improved to 8.94–9.88 across exactly
+  these steps, and the full samples say the model merely held still. The
+  variation is fully characterised now — early peak (11.55 @1 000), drift
+  (12.82, 14.30), plateau (11.76 ×3) — and the plateau is *stable*, which is
+  good news for future long cycles but not a new best.
+- **The 1.7B's first full streaming row:** **29.24 clean / 33.75 other**
+  (320 ms, official algorithm, 50 utts; `other` CER 19.93, 6 truncations). With
+  the 0.6B's 11.55/18.98 this completes the comparison in DEEPDIVE §3.5: the
+  streaming *recipe* transfers (gap +5.2 vs +4.0), the *offline base* is the
+  1.7B's bottleneck (24.05 vs 7.52; damage +22.4 vs +5.4).
+- **Launched:** `11532` = `qat_17b_recover1.pbs` — **the 1.7B's offline recovery
+  cycle**, the next step the evidence prescribes: init from
+  `qat_17b_attn5/last.pt` (its best offline, 20.55), policy `decoder_attn_ffn`,
+  2 500 steps at lr 1.5e-6 (the value proven stable by v4), warmup 200, batch 1,
+  **frozen-teacher anchor (`--distill-weight 0.05 --frozen-teacher 1`)** and —
+  for the first time in a real run — **`--quant-stochastic 1`**, the unbiased
+  rounding lever implemented earlier today. 8 000-utterance training sample,
+  `--keep-step-checkpoints 400`, 10 h, `mem=64gb`, self-waiting picker at
+  ≥45 GB. Success criterion: the offline ternary readout dropping meaningfully
+  under 20.55 at the in-loop evaluations, with *no permanent dip*.

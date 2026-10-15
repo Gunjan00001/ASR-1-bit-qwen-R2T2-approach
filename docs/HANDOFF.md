@@ -46,14 +46,15 @@ indexes every failed/successful attempt with its number.
   offline base, not the streaming recipe.** FFN warm start 22.03 → anchor-free
   attention rollout 20.55 → the **anchored fp32-AdamW aligned retry ran clean**
   (1 200 steps, zero OOMs, no permanent dip; offline recovering 27.97 → 24.05)
-  → **streams at 29.24 clean** (official algorithm, 320 ms, 50 utts; CER 16.99,
-  5 loop truncations; `other` pending). The streaming recipe transfers — its
+  → **streams at 29.24 clean / 33.75 other** (official algorithm, 320 ms,
+  50 utts; CER 16.99/19.93; 5/6 loop truncations). The streaming recipe transfers — its
   streaming-vs-offline gap is +5.2 versus the 0.6B's +4.0 — but the 1.7B's
   quantization damage is **+22.4** against its fp16 offline (1.63), versus the
   0.6B's **+5.4** (2.11 → 7.52), because it never received the 0.6B's *complete*
-  offline recovery recipe before the streaming SFT. **Next:** finish that
-  offline recovery on the 1.7B (full-cache QAT + anneal cycles, offline target
-  sub-10) *before* repeating the streaming SFT — and note 1.7B jobs need
+  offline recovery recipe before the streaming SFT. **In flight:** `qat_17b_recover1` (offline
+  recovery cycle: anchored, lr 1.5e-6, 2 500 steps, `--quant-stochastic 1`).
+  **Next:** add anneal cycles until the offline target (~sub-10) is reached,
+  *then* repeat the streaming SFT — and note 1.7B jobs need
   `mem=64gb` or they die in their own final eval (host-RAM SIGKILL).
 - **Binding cluster lessons:** never set `PYTORCH_CUDA_ALLOC_CONF` (driver 525);
   `gradient_checkpointing_enable()` breaks the frozen-only setup; `adam8bit`
