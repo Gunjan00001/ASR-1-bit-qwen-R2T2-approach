@@ -1414,3 +1414,20 @@ environmental, not model bugs):
 - **Deliverable status:** unchanged and safe (aligned2 ternary 12.92 / 20.00 at
   320 ms, zero loops; every artifact on disk).  The queued experiments
   (`aligned5r` longer cycle, `bin_es` binary early-stopping) wait for capacity.
+
+## 2026-10-15 (midday) — Binary early-stopping run finished; its step-500 state is still mid-transition
+
+- **Did:** `11384` (`bin_es`) completed its 1 500-step schedule with **zero OOMs**
+  and all three step checkpoints on disk (`step500/1000/1500.pt`). Submitted
+  `11474` (`eval_bin_es.pbs`) to score them on full samples.
+- **First full-sample read:** step 500 streams at **56.14 WER** (CER 38.55, 4
+  loop truncations, raw 54.45, RTF 6.9). That is *worse* than the previous
+  binary mirror's step-1 250 state (18.43) — as expected: the binary readout
+  needs ~1 000+ steps to adapt after the progressive-precision switch, so the
+  early checkpoint is mid-transition, not a candidate. The step-1 000 and
+  step-1 500 evals (running) plus the winner's `other` split decide whether
+  this run recovers a state at or below 18.43.
+- **Why this design was necessary:** the previous run's best state (18.43 at
+  step 1 250) was overwritten by a resume; with `--keep-step-checkpoints` the
+  trajectory is now selectable, so the adaptation curve itself is measured
+  instead of guessed.
