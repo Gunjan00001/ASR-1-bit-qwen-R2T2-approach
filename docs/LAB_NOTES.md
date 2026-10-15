@@ -1656,3 +1656,33 @@ environmental, not model bugs):
   *designed* A/B in the project's 1.7B work — one variable at a time, same init,
   same data, same anchor — and it exists because recover1 changed two things at
   once, which is exactly how attribution gets lost.
+
+## 2026-10-16 (02:50) — First controlled A/B result: stochastic rounding HURT the 1.7B recovery
+
+The one-variable-at-a-time pair answers its first question at their first common
+evaluation point (step 500, in-loop offline ternary, 50-utt protocol):
+
+| arm | stochastic rounding | lr | offline @step 500 | vs its init (20.55) |
+|---|---|---|---|---|
+| `recover1` | **on** | 1.5e-6 | **24.15** | +3.6 (worse) |
+| `recover2` | off | 1.5e-6 | **20.76** | +0.2 (flat) |
+
+**Reading:** the unbiased-rounding lever — implemented earlier today as the
+*first untried quantizer lever* and expected to *help* — is instead costing
+about **3.4 points** at this point of training. Hypothesis: stochastic rounding
+adds gradient variance to a model already far from its optimum (the 1.7B's
+quantization damage is +22.4); unbiasedness buys nothing when the training
+signal is dominated by that noise. The no-SR arm additionally starts *flat*
+instead of dipping, which is the healthier shape.
+
+**Caveats, stated:** this is one evaluation point, and the arms are not
+seed-matched (same init and data, but the shuffler's order differs), so part of
+the 3.4 could be batch-order luck. The later evals (steps 1000, 1500, …) will
+confirm or dissolve it. But the direction matches the hypothesis and the size is
+large; the flag's help text now carries the caveat, and **no future 1.7B run
+should use `--quant-stochastic 1` without a reason**.
+
+**Also this round:** `bin_long`'s full-sample trajectory is 61.12 (500) → 40.36
+(1000) → 29.77 (1500) → **28.28 (2000)** (CER 18.00, 3 truncations, raw 27.22).
+Still above the binary best (18.43), but it is the *only* binary run whose curve
+was still improving at the end; step 2500 and the final state are being scored.
