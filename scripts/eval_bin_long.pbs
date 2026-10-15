@@ -43,13 +43,13 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
 } | tee "$LOG"
 
-for STEP in 500 1000 1500 2000 2500 3000; do
-  CKPT="$CKPT_DIR/step${STEP}.pt"
+for NAME in step500 step1000 step1500 step2000 step2500 last; do
+  CKPT="$CKPT_DIR/${NAME}.pt"
   if [ ! -f "$CKPT" ]; then
-    echo "skip step $STEP (no $CKPT)" | tee -a "$LOG"
+    echo "skip $NAME (no $CKPT)" | tee -a "$LOG"
     continue
   fi
-  echo "=== step $STEP ===" | tee -a "$LOG"
+  echo "=== $NAME ===" | tee -a "$LOG"
   "$PY" scripts/eval_streaming.py \
     --model "$MODEL" \
     --checkpoint "$CKPT" \
@@ -62,7 +62,7 @@ for STEP in 500 1000 1500 2000 2500 3000; do
     --lsp-margin-words 3 \
     --lsp-truncate-loops 1 \
     --conditions quantized \
-    --out "artifacts/stage1/streaming_binlong_step${STEP}.json" \
+    --out "artifacts/stage1/streaming_binlong_${NAME}.json" \
     2>&1 | tee -a "$LOG"
 done
 
@@ -75,14 +75,14 @@ for path in sorted(glob.glob("artifacts/stage1/streaming_binlong_step*.json")):
     wer = (data.get("conditions") or {}).get("quantized", {}).get("wer")
     if wer is not None and (best is None or wer < best):
         best, name = wer, path
-print(name.rsplit("step", 1)[-1].split(".json")[0] if name else "")
+print(name.split("streaming_binlong_", 1)[-1].removesuffix(".json") if name else "")
 PYEOF
 )
 if [ -n "$BEST" ]; then
   echo "=== best clean state: step $BEST -> other split ===" | tee -a "$LOG"
   "$PY" scripts/eval_streaming.py \
     --model "$MODEL" \
-    --checkpoint "$CKPT_DIR/step${BEST}.pt" \
+    --checkpoint "$CKPT_DIR/${BEST}.pt" \
     --policy decoder_attn_ffn \
     --bit-width 1.0 \
     --chunk-ms 320 \
@@ -93,6 +93,6 @@ if [ -n "$BEST" ]; then
     --lsp-truncate-loops 1 \
     --conditions quantized \
     --config other \
-    --out "artifacts/stage1/streaming_binlong_step${BEST}_other.json" \
+    --out "artifacts/stage1/streaming_binlong_${BEST}_other.json" \
     2>&1 | tee -a "$LOG"
 fi

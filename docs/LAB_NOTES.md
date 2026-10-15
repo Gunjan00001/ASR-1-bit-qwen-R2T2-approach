@@ -1604,3 +1604,32 @@ environmental, not model bugs):
   job ran under the template's name and stdout file. Fix applied, and the
   lesson: grep-verify **every intended field** of a generated launcher, not just
   a representative few.
+
+## 2026-10-16 (00:50) — bin_long completed its 3000 steps; the 1.7B recovery cycle is NOT improving the offline base
+
+- **`11491` (`bin_long`) finished all 3 000 steps** — the first binary run in this
+  project to complete a full budget (zero OOMs) — with checkpoints 500–2500 plus
+  `last.pt` (the 3 000 state). `11542` (`eval_bin_long.pbs`) is scoring all six
+  on full samples (clean first, then the winner's `other`); its in-training
+  guardrail fell 66.6 → 36.5 over the first 750 steps and its last in-loop
+  binary eval is recorded in WORKLOG.  Nothing is promoted until the full-sample
+  numbers land.
+- **The 1.7B offline recovery is not recovering.** In-loop offline ternary
+  readout: **24.15 (step 500) → 23.09 (1000) → 24.79 (1500)** against its init
+  (`attn5`) of **20.55**. So the anchored cycle as configured costs ~+2.5–4
+  offline rather than reducing it. Candidate causes, recorded as hypotheses
+  (this run changed more than one thing, which is itself the lesson):
+  1. **`--quant-stochastic 1`** — its first use in a real run. Unbiased
+     rounding adds gradient variance; the proven 0.6B recipe used deterministic
+     rounding. *This is testable in isolation and is being tested.*
+  2. **A too-gentle schedule** — lr 1.5e-6 with a 200-step warmup is a *tiny*
+     total update over 2 500 steps; the 0.6B's winning cycle used lr 1e-5.
+  3. **The anchor may bind harder at this scale** — KL toward the *fp16*
+     teacher pulls toward a full-precision optimum that a heavily damaged
+     quantized student cannot occupy (the 0.6B tolerated it; the 1.7B's damage
+     is +22.4 vs the 0.6B's +5.4, so the same pull may dominate).
+- **Launched the control:** `11543` = `qat_17b_recover2.pbs` — **byte-identical
+  recipe minus `--quant-stochastic`** (asserted absent in the launcher), so its
+  evals isolate cause (1). Launcher discipline applied this time: every intended
+  field (`-N`, `-o`, log, save-dir, the absent SR flag) grepped before
+  submission.
