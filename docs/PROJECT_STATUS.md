@@ -275,7 +275,7 @@ python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_f
 
 **Stage 3 — scale to 1.7B**
 6. ✅ The anchored fp32-AdamW aligned retry ran clean (1 200 steps, no dip).
-7. First streaming measurement: **29.24 clean** (CER 16.99, 5 truncations) from
+7. First streaming measurement: **29.24 clean / 33.75 other** (CER 16.99/19.93) from
    an offline 24.05 — the streaming recipe transfers (gap +5.2), but the 1.7B's
    quantization damage (+22.4 against its fp16 1.63) is far above the 0.6B's
    (+5.4) because it never received the *complete* offline recovery recipe.
