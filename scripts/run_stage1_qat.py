@@ -48,7 +48,6 @@ from pathlib import Path
 
 import torch
 
-from asr1bit.bitlinear import BitLinear
 from asr1bit.data.load import iter_librispeech
 from asr1bit.qwen import backends
 from asr1bit.replace import apply_layer_policy
@@ -73,7 +72,9 @@ from asr1bit.train.qat import (
     build_optimizer,
     check_finite_grads,
     distillation_loss,
+    freeze_non_bitlinear,
     grad_norms,
+    make_sft_labels,
     progressive_alpha,
     quantization_delay_alpha,
     scale_stats,
@@ -280,13 +281,7 @@ def main() -> int:
     results["bitlinear_replaced"] = getattr(model, "bitlinear_replaced", 0)
 
     # QAT-only: freeze everything except BitLinear shadows and learnable scales.
-    for param in model.parameters():
-        param.requires_grad_(False)
-    for module in model.modules():
-        if isinstance(module, BitLinear):
-            for param in (module.weight, module.bias, module.weight_scale):
-                if param is not None:
-                    param.requires_grad_(True)
+    trainable = freeze_non_bitlinear(model)
     set_activation_quant(model, bool(args.activation_quant))
     if args.grad_checkpointing:
         model.gradient_checkpointing_enable()

@@ -10,8 +10,7 @@ the helper logic is unit-testable without them.
 from __future__ import annotations
 
 import warnings
-from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Sequence
 from typing import Any
 
 import torch
@@ -78,55 +77,6 @@ def scale_stats(model: nn.Module) -> dict[str, float]:
     }
 
 
-def non_bitlinear_linear_names(model: nn.Module) -> list[str]:
-    """Names of ``nn.Linear`` modules that were *not* replaced by BitLinear."""
-    return [
-        name
-        for name, module in model.named_modules()
-        if isinstance(module, nn.Linear) and not isinstance(module, BitLinear)
-    ]
-
-
-def lora_targets(model: nn.Module, exclude: Sequence[str] = ("lm_head",)) -> list[str]:
-    """Base module names for LoRA on the non-binary (non-BitLinear) linears."""
-    names = set()
-    for name in non_bitlinear_linear_names(model):
-        base = name.rpartition(".")[2] or name
-        if base not in exclude:
-            names.add(base)
-    return sorted(names)
-
-
-def enable_gradient_checkpointing(model: nn.Module) -> None:
-    """Enable gradient checkpointing if supported and disable the KV cache."""
-    enable = getattr(model, "gradient_checkpointing_enable", None)
-    if callable(enable):
-        enable()
-    config = getattr(model, "config", None)
-    if config is not None and hasattr(config, "use_cache"):
-        config.use_cache = False
-
-
-def apply_lora(
-    model: nn.Module,
-    r: int = 8,
-    lora_alpha: int = 16,
-    lora_dropout: float = 0.05,
-    target_modules: Sequence[str] | None = None,
-) -> nn.Module:
-    """Wrap the non-binary linear layers with LoRA adapters (lazy peft import)."""
-    from peft import LoraConfig, get_peft_model
-
-    targets = list(target_modules) if target_modules else lora_targets(model)
-    config = LoraConfig(
-        r=r,
-        lora_alpha=lora_alpha,
-        lora_dropout=lora_dropout,
-        bias="none",
-        target_modules=targets,
-        task_type="CAUSAL_LM",
-    )
-    return get_peft_model(model, config)
 
 
 def freeze_non_bitlinear(model: nn.Module) -> int:
@@ -249,60 +199,6 @@ def distillation_loss(
     )
 
 
-@dataclass
-class QATConfig:
-    """Settings for a progressive QAT run."""
-
-    steps: int = 200
-    lr: float = 1e-4
-    alpha_warmup_frac: float = 0.3
-    grad_accum: int = 4
-    lora_r: int = 8
-    lora_alpha: int = 16
-    lora_dropout: float = 0.05
-    max_grad_norm: float = 1.0
-    use_8bit: bool = True
-    seed: int = 0
-    log_every: int = 10
-    history: list[dict[str, float]] = field(default_factory=list)
-
-
-def run_qat(
-    model: nn.Module,
-    batches: Iterable[tuple[torch.Tensor, torch.Tensor]],
-    config: QATConfig,
-    optimizer: torch.optim.Optimizer | None = None,
-) -> list[dict[str, float]]:
-    """Run progressive QAT over ``batches``; returns the loss history.
-
-    Each item of a batch is a list of scalar losses (for gradient accumulation).
-    ``batches`` yields ``(inputs, labels)`` tensors for a single forward loss.
-    """
-    if optimizer is None:
-        optimizer = build_optimizer(model, lr=config.lr, use_8bit=config.use_8bit)
-
-    warmup = max(1, int(config.steps * config.alpha_warmup_frac))
-    history: list[dict[str, float]] = []
-    data = list(batches)
-    if not data:
-        return history
-
-    accumulation: list[float] = []
-    for step in range(config.steps):
-        alpha = progressive_alpha(step, warmup)
-        set_qat_alpha(model, alpha)
-        inputs, labels = data[step % len(data)]
-        loss = train_step(model, inputs, labels, optimizer, config.max_grad_norm)
-        accumulation.append(loss)
-        if (step + 1) % config.grad_accum == 0:
-            mean_loss = sum(accumulation) / len(accumulation)
-            accumulation = []
-            record = {"step": float(step + 1), "alpha": alpha, "loss": mean_loss}
-            history.append(record)
-            config.history.append(record)
-            if config.log_every and (len(history) % config.log_every == 0):
-                print(f"step {step + 1}/{config.steps} alpha={alpha:.3f} loss={mean_loss:.4f}", flush=True)
-    return history
 
 
 def trainable_parameter_count(model: nn.Module) -> int:

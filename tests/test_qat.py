@@ -1,6 +1,5 @@
 """Tests for the progressive QAT loop helpers (Stage 1, T1.4)."""
 
-import types
 
 import pytest
 import torch
@@ -12,11 +11,9 @@ from asr1bit.train.qat import (
     build_optimizer,
     check_finite_grads,
     distillation_loss,
-    enable_gradient_checkpointing,
     freeze_non_bitlinear,
     grad_norms,
     make_sft_labels,
-    non_bitlinear_linear_names,
     progressive_alpha,
     quantization_delay_alpha,
     scale_stats,
@@ -93,17 +90,6 @@ class TestSetQatAlpha:
                 assert module.alpha == 0.5
 
 
-class TestNonBitlinearLinearNames:
-    def test_excludes_replaced_decoder_attn(self):
-        model = _FakeASR()
-        apply_layer_policy(model, "decoder_attn")
-        names = non_bitlinear_linear_names(model)
-        assert "model.layers.0.self_attn.q_proj" not in names
-        assert "model.layers.0.mlp.gate_proj" in names
-        assert "audio_tower.layers.0.self_attn.q_proj" in names
-        assert "lm_head" in names
-
-
 class TestSetActivationQuant:
     def test_toggles_all_bitlinear(self):
         model = _FakeASR()
@@ -168,20 +154,6 @@ class TestFreezeNonBitlinear:
         assert sum(1 for name in trainable if name.endswith("weight_scale")) == 8
         for name, param in model.named_parameters():
             assert param.requires_grad == (name in trainable), name
-
-
-class TestGradientCheckpointing:
-    def test_enables_and_disables_cache(self):
-        model = _FakeASR()
-        model.config = types.SimpleNamespace(use_cache=True)
-        calls = []
-        model.gradient_checkpointing_enable = lambda: calls.append(True)
-        enable_gradient_checkpointing(model)
-        assert calls == [True]
-        assert model.config.use_cache is False
-
-    def test_missing_method_is_noop(self):
-        enable_gradient_checkpointing(nn.Linear(2, 2))
 
 
 class TestBuildOptimizer:

@@ -1744,3 +1744,29 @@ seed-sensitive state that no re-run has reproduced.
 - **Jobs remaining before the next check window:** `recover2` (step ~1 000 of
   2 500), `recover3` (step ~370 of 2 500, lr 5e-6). Their pairwise evals are the
   remaining questions of the night.
+
+## 2026-10-16 (04:25) — the recovery flat-lines even without SR; LR/optimizer arms decide what could still work
+
+- **`recover2`'s step-1 000 offline readout: 20.55** — *exactly* its `attn5`
+  init value. Combined with `recover2`'s step-500 = 20.76, the picture is: after
+  1 000 steps of the "recovery" recipe at lr 1.5e-6, the 1.7B is precisely where
+  it started. Meanwhile `recover1` (same recipe + SR) was *worse* (24.15 → 24.36
+  across its run). So: (a) the SR A/B is confirmed — the flag costs ~3.5–4 WER
+  here; (b) **as configured, the recovery cycle is a no-op for the base**: the
+  LR is too gentle for a model this damaged to move, and the anchor (KL toward
+  the fp16 teacher) may then be what keeps the loss pinned.
+- **What this means for Stage 3** (the decision the arms produce): the 0.6B
+  never recovered with *2 500 gentle steps* either — it needed the full-cache
+  campaign at lr 1e-5 for 10 k steps, then warm restarts and anneals. The 1.7B
+  needs the same *scale* (more steps, warmer schedule, several cycles), or a
+  different anchor — not a single gentle pass. The LR arm (`recover3`, 5e-6) and
+  the optimizer arm (`recover4`, fp32 AdamW — a hypothesis that had been
+  *described* in docs but never shipped until now) test the two knobs that were
+  varied fastest; multi-cycle/schedule-scale tests follow after them.
+- Code debt from the audit finished in the same breath as the numbers landed:
+  `train/qat.py` went 319 → **215** lines (the dead `run_qat`/`QATConfig`
+  LoRA path and `enable_gradient_checkpointing` deleted, their tests with them),
+  and the trainer's inline duplicate of the freeze rule was replaced by
+  `freeze_non_bitlinear` — one source of truth for "which parameters a QAT run
+  updates", which is exactly the kind of thing both copies had to agree on for
+  the optimizer to be trusted at all.
