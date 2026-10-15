@@ -1487,3 +1487,24 @@ environmental, not model bugs):
   1.7B training runs: skip the in-training streaming evals or raise the host
   memory request — the checkpoint survives either way, but the log's final
   records are lost otherwise.
+
+## 2026-10-15 (18:55) — The new best's chunk sweep; the guardrail diverges again
+
+- **Chunk sweep of the promoted state** (`aligned5/step1000`, 50-utt clean):
+  160 ms **13.77**, 320 ms **11.55**, 1000 ms **10.70**. So the new state wins
+  decisively at the *gate metric* (320 ms: 11.55 vs 12.92) and is marginally
+  behind the old state at the extremes (13.24/10.59) — worth stating plainly in
+  the results tables rather than smoothing over.
+- **The 20-utt guardrail vs the full sample diverged again** — third instance
+  this project. `aligned5b`'s guardrail *improved* after the resume
+  (8.94 @2 000, 9.88 @2 500, 9.18 @2 750, 10.59 @3 500 — all better than the
+  promoted 11.5–12.9 range), while the *full-sample* numbers of the same
+  schedule's early states fell (11.55 @1 000 → 12.82 @1 500 → 14.30 @1 750). The
+  low-LR tail of a cosine can genuinely recover — or the guardrail can lie
+  again. Only full samples settle it, so `11526` (`eval_aligned5b.pbs`) is
+  scoring the resume's `step2000/2500/3000` states clean, then the winner's
+  `other`, against 11.55/18.98.
+- **Longer binary run** (`bin_long`, from the new best ternary state) is
+  training (step ~840, zero OOMs); its guardrail is descending 66.6 @250 →
+  47.8 @500 → 36.5 @750 — the binary adaptation curve, but the full-sample evals
+  at its end are the decider.

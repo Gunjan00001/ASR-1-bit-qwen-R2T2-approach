@@ -20,11 +20,20 @@ filter — the honest "what the model actually emitted" figure).
 
 | state | chunk | clean | other |
 |---|---|---|---|
-| **ternary, aligned targets (T4.1/T4.2) + LSP** | 160 ms | **13.24** | 20.80 |
-| **ternary, aligned targets + LSP** | 320 ms | **12.92** | **20.00** |
-| **ternary, aligned targets + LSP** | 1000 ms | **10.59** | **16.59** |
+| **ternary, aligned targets + LSP — NEW BEST (5 000-step cycle, step 1 000)** | 160 ms | **13.77** | — |
+| **ternary, aligned targets + LSP — NEW BEST (step 1 000)** | 320 ms | **11.55** | **18.98** |
+| **ternary, aligned targets + LSP — NEW BEST (step 1 000)** | 1000 ms | **10.70** | — |
+| ternary, aligned targets (T4.1/T4.2) + LSP (previous promoted state) | 160 ms | 13.24 | 20.80 |
+| ternary, aligned targets + LSP (previous promoted state) | 320 ms | 12.92 | 20.00 |
+| ternary, aligned targets + LSP (previous promoted state) | 1000 ms | 10.59 | 16.59 |
 | binary, same recipe (best measured) | 320 ms | 18.43 | 25.45 |
 | binary, same recipe (final weights, resumed) | 320 ms | 27.54 | 26.93 |
+
+Trade-off stated plainly: the new state wins at the **gate metric** (320 ms,
+11.55 vs 12.92 clean and 18.98 vs 20.00 other) but is marginally *behind* the
+previous state at the extremes (160 ms 13.77 vs 13.24; 1000 ms 10.70 vs 10.59).
+The Stage-4 success criterion is defined at 320 ms, which is why the promotion
+is on that cell; both tables stay side by side here.
 
 Zero repetition loops at every promoted **ternary** cell: 0 truncations, and
 `WER raw ≈ WER` in the table below — the loop filter had almost nothing to cut,

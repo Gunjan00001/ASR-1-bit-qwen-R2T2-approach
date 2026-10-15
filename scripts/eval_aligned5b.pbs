@@ -1,0 +1,97 @@
+#!/bin/bash
+#PBS -N asr1bit-eval-al5b
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=48gb
+#PBS -l walltime=05:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/eval_al5b.out
+#
+# Full-sample (50-utt) evaluations of the longer aligned cycle's selectable
+# states: the walltime-cut run's step-1000/1500 checkpoints plus its final
+# `last.pt` snapshot (last_aligned5r_end.pt), clean first, then the winner's
+# `other` split.  Ternary readout (bit-width 1.58), loop policy on.
+# Submit after the run is cut: qsub scripts/eval_aligned5.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage1/eval_aligned5b.log"
+CKPT_DIR="${CKPT_DIR:-data/checkpoints/qat_stream_aligned5}"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-0.6B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-0.6B
+else
+  MODEL=Qwen/Qwen3-ASR-0.6B
+fi
+
+PICK=$(bash scripts/pick_gpu_wait.sh 20000 "${PICK_WAIT_MIN:-45}") || exit 0
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $CKPT_DIR | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+for NAME in step2000 step2500 step3000; do
+  CKPT="$CKPT_DIR/$NAME.pt"
+  if [ ! -f "$CKPT" ]; then
+    echo "skip $NAME (missing $CKPT)" | tee -a "$LOG"
+    continue
+  fi
+  echo "=== $NAME (clean) ===" | tee -a "$LOG"
+  "$PY" scripts/eval_streaming.py \
+    --model "$MODEL" \
+    --checkpoint "$CKPT" \
+    --policy decoder_attn_ffn \
+    --bit-width 1.58 \
+    --chunk-ms 320 \
+    --n 50 \
+    --max-new-tokens 32 \
+    --unfixed-token-num 5 \
+    --lsp-margin-words 3 \
+    --lsp-truncate-loops 1 \
+    --conditions quantized \
+    --out "artifacts/stage1/streaming_al5b_${NAME}.json" \
+    2>&1 | tee -a "$LOG"
+done
+
+BEST=$("$PY" - <<'PYEOF'
+import glob, json
+best, name = None, None
+for path in sorted(glob.glob("artifacts/stage1/streaming_al5b_*.json")):
+    data = json.load(open(path))
+    wer = (data.get("conditions") or {}).get("quantized", {}).get("wer")
+    if wer is not None and (best is None or wer < best):
+        best, name = wer, path
+print(name.split("streaming_al5b_", 1)[-1].removesuffix(".json") if name else "")
+PYEOF
+)
+if [ -n "$BEST" ] && [ -f "$CKPT_DIR/$BEST.pt" ]; then
+  echo "=== best clean state: $BEST -> other split ===" | tee -a "$LOG"
+  "$PY" scripts/eval_streaming.py \
+    --model "$MODEL" \
+    --checkpoint "$CKPT_DIR/$BEST.pt" \
+    --policy decoder_attn_ffn \
+    --bit-width 1.58 \
+    --chunk-ms 320 \
+    --n 50 \
+    --max-new-tokens 32 \
+    --unfixed-token-num 5 \
+    --lsp-margin-words 3 \
+    --lsp-truncate-loops 1 \
+    --conditions quantized \
+    --config other \
+    --out "artifacts/stage1/streaming_al5_${BEST}_other.json" \
+    2>&1 | tee -a "$LOG"
+fi
