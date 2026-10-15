@@ -10,8 +10,9 @@
 
 1. **One concern per file.** If a file has two reasons to change, it is two
    files. Practical size guide: *a file over ~400 lines is almost always two
-   modules wearing one name*. Current largest: `train/sft.py` (476) — the next
-   split candidate, tracked as debt.
+   modules wearing one name*. (History: the trainer script 897 → 571, and
+   `train/sft.py` 476 → `samples/gold/filters/rollout/examples` — the largest
+   file today is `train/qat.py` at 319, which is one concern.)
 2. **The CLI stays thin.** `scripts/*.py` parse arguments and orchestrate; the
    *logic* lives in `src/asr1bit/**` where it can be imported and unit-tested.
    `scripts/run_stage1_qat.py` is the model for this: its docstring is the run's
@@ -52,7 +53,11 @@ src/asr1bit/
     stream.py         LSP policy: append-only emission, loop truncation
   train/
     qat.py            losses (CE, KL distillation), label construction
-    sft.py            example builders shared by the streaming paths
+    samples.py        the streaming-sample record + prompt/continuation + mixing
+    gold.py           aligning the transcript against what the model already said
+    filters.py        degenerate-output detection (the DAgger guard)
+    rollout.py        batched replay of the official streaming algorithm
+    examples.py       on-policy + distilled example builders
     dataset.py        ordinary transcription examples, collation, batching
     aligned.py        aligned-target examples (the streaming fix)
     onpolicy.py       rollouts, distillation targets, degenerate filtering
@@ -89,12 +94,20 @@ docs/                 planning, results, lab notes, this guide
    that list is your new file list.
 2. Move the bodies **verbatim** with an AST extraction (`ast.get_source_segment`)
    rather than retyping; retyping introduces silent typos.
+   *Decorators live **outside** the AST node* — re-attach `@dataclass`,
+   `@property` etc. by hand, or a dataclass silently becomes a plain class that
+   "takes no arguments" (exactly what happened to `StreamingSample`).
 3. Give each new module a docstring (why it exists) and a minimal import header.
 4. Run `ruff check . --fix` and `pytest -q` and read the failures — missing
    imports (F821) and unused ones (F401) locate themselves.
 5. If tests reached into the old file's namespace, either update them to import
    the new modules, or add a *documented* shim (see `tests/test_trainer_rollout.py`)
    rather than weakening the tests.
+   **Grep-verify every patch**: a `str.replace` whose target does not match fails
+   *silently*, and a later `ruff --fix` will then "helpfully" delete the import
+   you thought you had added (this cost three round-trips during the sft.py
+   split). Run `ruff check` (read-only) after each patch, and only `--fix` once
+   the code is coherent.
 6. Verify the CLI still runs: `python scripts/<script>.py --help` (launchers
    depend on it) and re-run the suite once more.
 

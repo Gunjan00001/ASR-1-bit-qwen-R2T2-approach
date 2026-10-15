@@ -17,13 +17,10 @@ import time
 import torch
 
 from asr1bit.qwen import backends
+from asr1bit.train.examples import build_distill_examples, build_onpolicy_examples
 from asr1bit.train.inloop_eval import set_precision
-from asr1bit.train.sft import (
-    build_distill_examples,
-    build_onpolicy_examples,
-    collect_streaming_samples,
-    select_evenly,
-)
+from asr1bit.train.rollout import collect_streaming_samples
+from asr1bit.train.samples import select_evenly
 
 
 def build_op_keep(args: argparse.Namespace):

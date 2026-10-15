@@ -7,15 +7,14 @@ CPU-testable: the model is replaced by a scripted ``decode_batch``.
 import numpy as np
 
 from asr1bit.qwen.stream import WhitespaceTokenCodec
-from asr1bit.train.sft import (
+from asr1bit.train.examples import build_distill_examples, build_onpolicy_examples
+from asr1bit.train.filters import is_degenerate
+from asr1bit.train.gold import gold_coverage
+from asr1bit.train.rollout import collect_streaming_samples
+from asr1bit.train.samples import (
     StreamingSample,
-    build_distill_examples,
-    build_onpolicy_examples,
-    collect_streaming_samples,
     continuation,
-    gold_coverage,
     interleave_with_ratio,
-    is_degenerate,
     prompt_tail,
     select_evenly,
 )

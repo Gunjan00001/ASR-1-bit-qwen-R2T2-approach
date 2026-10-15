@@ -11,7 +11,11 @@ modules so each one can be read (and tested) on its own::
     src/asr1bit/train/inloop_eval.py   cheap in-training evaluations (guardrails)
     src/asr1bit/train/schedules.py     warmup + cosine LR
     src/asr1bit/train/qat.py           the loss, labels and distillation terms
-    src/asr1bit/train/sft.py           example builders shared by the above
+    src/asr1bit/train/samples.py       the streaming-sample record + mixing
+    src/asr1bit/train/gold.py          aligning the transcript against what was said
+    src/asr1bit/train/filters.py       degenerate-output detection (the DAgger guard)
+    src/asr1bit/train/rollout.py       batched replay of the official streaming algorithm
+    src/asr1bit/train/examples.py      on-policy + distilled example builders
 
 Run phases (each marked in ``main`` with a comment):
 
@@ -76,11 +80,8 @@ from asr1bit.train.qat import (
     set_activation_quant,
     set_qat_alpha,
 )
+from asr1bit.train.samples import interleave_with_ratio, select_evenly
 from asr1bit.train.schedules import build_lr_lambda
-from asr1bit.train.sft import (
-    interleave_with_ratio,
-    select_evenly,
-)
 
 
 def parse_args() -> argparse.Namespace:
