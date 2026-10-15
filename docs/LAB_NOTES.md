@@ -1580,3 +1580,27 @@ environmental, not model bugs):
   `--keep-step-checkpoints 400`, 10 h, `mem=64gb`, self-waiting picker at
   ≥45 GB. Success criterion: the offline ternary readout dropping meaningfully
   under 20.55 at the in-loop evaluations, with *no permanent dip*.
+
+## 2026-10-15 (22:50) — 1.7B recovery cycle is training on a quiet card; a launcher-hygiene lesson
+
+- **`11532` (`qat_17b_recover1`) got the card it was waiting for**: GPU 1 with
+  only 20.1 GB in use (~60 GB free) — the first time the ≥45 GB bar was
+  satisfied all evening. It is at **step ~1 000 of 2 500** (~8.5 steps/min, much
+  faster than the usual contended pace). **First in-loop offline eval: step 500
+  → ternary 24.15** (its init, `attn5`, was 20.55). That is an early cost, the
+  same shape as v4's — the criterion this run is judged by is whether it
+  *recovers* (no permanent dip) at the next evals. It is also the **first real
+  run in the project using `--quant-stochastic 1`**, so part of any early
+  difference may be the unbiased-rounding variance; the eval itself is
+  deterministic.
+- **`11491` (`bin_long`)** reached step 2 441 with zero OOMs; its 8 h walltime
+  will cut it near step 2 500–2 700 (checkpoints 500–2500 on disk).
+  `scripts/eval_bin_long.pbs` is prepared to score those states (clean, then the
+  winner's other) as soon as it ends — no need to re-derive the evaluator.
+- **Launcher-hygiene lesson (reinforces docs/CODE_GUIDE.md §4):** my patch of the
+  recover1 launcher renamed the log and save-dir but **missed `#PBS -N` and
+  `#PBS -o`** — the replace targets did not match and `str.replace` fails
+  *silently*. The run itself was unaffected (the log path was correct), but the
+  job ran under the template's name and stdout file. Fix applied, and the
+  lesson: grep-verify **every intended field** of a generated launcher, not just
+  a representative few.
