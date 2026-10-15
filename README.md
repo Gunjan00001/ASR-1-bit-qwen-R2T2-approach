@@ -27,8 +27,10 @@ a JSON under `artifacts/stage1/` (regenerate the summary with
 | **Ternary, all 196 decoder projections — offline** (28 539-utt cache) | **7.52** | — | `qat_ternary_full` |
 | Binary, all 196 decoder projections — offline | 10.70 | — | `qat_binary_full` |
 | Streaming, *naive chunked re-feed* variant (not the official algorithm) | 9.43 | — | `streaming_ternary_noprefix128` |
-| **STREAMING, official prefix algorithm — aligned-targets recipe** | **12.92** | **20.00** | `streaming_opd_aligned2` |
-| ↳ same recipe at 160 ms / 1000 ms | 13.24 / **10.59** | 20.80 / 16.59 | `*_c160`, `*_c1000` |
+| **STREAMING, official prefix algorithm — aligned targets + LSP (NEW BEST)** | **11.55** | **18.98** | `streaming_al5_step1000` |
+| ↳ its 160 ms / 1000 ms sweep | (running) | — | `*_al5best*` |
+| ↳ previous promoted state — `aligned2`, 2 500-step cycle | 12.92 | 20.00 | `streaming_opd_aligned2` |
+| ↳ that state at 160 ms / 1000 ms | 13.24 / 10.59 | 20.80 / 16.59 | `*_c160`, `*_c1000` |
 | Streaming, binary arm, same recipe (best measured) | 18.43 | 25.45 | step-1 250 state (weights lost to a resume ✗; final weights give 27.54 / 26.93) |
 | Naive QAT, before the recovery recipe (history) | ≈100 | — | `docs/stage1_results.md` |
 
@@ -53,8 +55,9 @@ open 1.7B question.
 3. **The official streaming algorithm is fixed at the recipe level** — it used
    to collapse outright for quantized models (**203.5 WER, repetition loops**);
    with **forced-aligner chunk targets + the LSP loop-emission policy** it now
-   streams at **12.92 clean / 20.00 other with zero repetition loops**, and the
-   binary arm follows (18.43 / 25.45).
+   streams at **11.55 clean / 18.98 other** (the longer 5 000-step cycle's
+   step-1 000 state; the earlier promoted state was 12.92 / 20.00), zero
+   repetition loops, and the binary arm follows (best measured 18.43 / 25.45).
 
 **What is open:** the `+1.5` gate (quantization damage), the 1.7B scale test
 (paused on cluster capacity), edge deployment (Stage 5) and the final write-up

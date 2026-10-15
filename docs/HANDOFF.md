@@ -21,8 +21,10 @@
 
   | checkpoint | 160 ms | 320 ms | 1 000 ms |
   |---|---:|---:|---:|
-  | ternary aligned — clean | 13.24 | **12.92** | **10.59** |
-  | ternary aligned — other | 20.80 | **20.00** | **16.59** |
+  | **ternary aligned5 — clean (NEW BEST)** | (running) | **11.55** | (running) |
+  | **ternary aligned5 — other (NEW BEST)** | — | **18.98** | — |
+  | ternary aligned (prev) — clean | 13.24 | 12.92 | **10.59** |
+  | ternary aligned (prev) — other | 20.80 | 20.00 | **16.59** |
   | binary aligned — clean | — | **18.43** (step-1 250 state) / 27.54 (final) | — |
   | binary aligned — other | — | **25.45** / 26.93 (final) | — |
   | fp16 pretrained (same portable path) | — | 2.33 | — |

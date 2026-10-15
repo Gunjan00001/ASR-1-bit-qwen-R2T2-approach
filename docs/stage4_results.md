@@ -12,10 +12,11 @@ filter — the honest "what the model actually emitted" figure).
 
 ## Headline: the promoted recipe
 
-> 2026-10-15: the longer aligned cycle (`aligned5`, cut at step ~1 776) scored
-> **11.55 clean** at its step-1 000 state (see the trajectory table) — better
-> than the promoted 12.92. Its step-1 500 and final states are being scored; the
-> winner gets the `other` split before any headline change.
+> 2026-10-15 (PROMOTED): the longer aligned cycle (`aligned5`, cut at step ~1 776) scored
+> **11.55 clean / 18.98 other** at its step-1 000 state — better than the
+> previous promoted 12.92 / 20.00 on *both* splits. Its trajectory peaks early
+> (11.55 @1 000 → 12.82 @1 500 → 14.30 @~1 750), so the state is selected, not
+> the schedule's end. The 160/1 000 ms sweep is running.
 
 | state | chunk | clean | other |
 |---|---|---|---|

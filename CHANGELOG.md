@@ -21,6 +21,7 @@ gate. `stage-0` was merged to `main` at `0.2.0`.
 | `0.2.1`–`0.2.10` | 2026-09-20 | `stage-1` | Stage 1 T1.1–T1.4 implementation; first QAT run invalid (shadow corruption) | — |
 | `0.2.11`–`0.2.28` | 2026-10-10 | `stage-1` | Quantizer audit (math correct), A100 tooling, log-scaled learnable scales, distillation QAT, policy ablations | — |
 | `0.2.29`–`0.2.40` | 2026-10-11 | `stage-1` | Recovery recipe (FFN warm start → attention rollout + frozen anchor → warm restarts; progressive precision for binary); offline 9.2 ternary / 10.7 binary; streaming diagnosed as the critical path | — |
+| `0.2.47` | 2026-10-15 | `stage-1` | **Streaming best improved**: the longer aligned cycle's step-1 000 state streams at **11.55 clean / 18.98 other** (was 12.92 / 20.00) with zero loops; the 1.7B anchored fp32-AdamW retry completed 1 200 steps (no permanent dip) | — |
 | `0.2.41`–`0.2.46` | 2026-10-12..15 | `stage-1` | **Stage 4: the streaming algorithm is freed** — LSP emission policy (loop truncation, append-only), on-policy SFT + streaming-state distillation + filtered-DAgger guard, **aligned targets (forced aligner)**; official-algorithm WER 203.5 → **12.92 clean / 20.00 other** (zero loops); offline scale-up to 7.52 ternary (binary at a 10.70 floor) | — (Stage-4 gate open: the `+1.5` target is not met; the 1.7B path is paused on cluster capacity) |
 
 ## 0.2.0 — Stage 0 gate passed
