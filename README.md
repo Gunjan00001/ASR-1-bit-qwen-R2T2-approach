@@ -330,6 +330,8 @@ rules.md       # operating rules for agents/developers
 
 Tags use `MAJOR.MINOR.BUGS`: **MAJOR** = end-to-end milestone, **MINOR** = a
 completed stage (gate passed), **BUGS** = fixes and non-stage checkpoints.
-Stage work lands on a per-stage branch (e.g. `stage-0`) and `main` advances only
-when a stage gate passes. Checkpoints are documented in
-[`CHANGELOG.md`](CHANGELOG.md).
+Stage work lands on the **current working branch** — `stage-1` today — and `main`
+advances only when a stage gate passes (it still sits at the `stage-0` merge,
+`0.2.0`). Branch names track *gates*, not the plan's stage numbers: the work of
+plan-Stages 1–4 all lands on `stage-1` until the next gate passes. Checkpoints
+are documented in [`CHANGELOG.md`](CHANGELOG.md).
