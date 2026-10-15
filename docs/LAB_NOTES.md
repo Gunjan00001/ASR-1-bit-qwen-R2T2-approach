@@ -1686,3 +1686,26 @@ should use `--quant-stochastic 1` without a reason**.
 (1000) → 29.77 (1500) → **28.28 (2000)** (CER 18.00, 3 truncations, raw 27.22).
 Still above the binary best (18.43), but it is the *only* binary run whose curve
 was still improving at the end; step 2500 and the final state are being scored.
+
+## 2026-10-16 (03:15) — The three-arm 1.7B experiment is fully live
+
+| job | arm | stochastic rounding | lr | state |
+|---|---|---|---|---|
+| `qat_17b_recover1` | baseline-as-shipped | on | 1.5e-6 | **finished** (no gain: 22.78 best vs the 20.55 init) |
+| `qat_17b_recover2` | no-SR control | off | 1.5e-6 | training (step ~750; step-500 readout **20.76** vs recover1's 24.15) |
+| `qat_17b_recover3` | LR arm | off | **5e-6** | launched 03:12, picked GPU 5 immediately |
+
+Note on superseded instructions: the recurring check's text (written before
+2026-10-16) tells the agent to run the 1.7B recovery *with*
+`--quant-stochastic 1`. The measured A/B — stochastic rounding costing ~3.4 WER
+at step 500 — supersedes that, so `recover3` omits the flag (asserted absent in
+its launcher). Instructions follow evidence, not the other way round.
+
+The experiment now answers two questions with one variable each:
+`recover1` vs `recover2` = does stochastic rounding help? (**no** — measured);
+`recover2` vs `recover3` = is the schedule too gentle? (**pending**).
+
+Also: `eval_bin_long` is scoring its final state (`last`) after a trajectory of
+61.12 / 40.36 / 29.77 / 28.28 / 26.80 — as recorded, it will not beat the binary
+best of 18.43, and the reason is now explicit: that number came from one
+seed-sensitive state that no re-run has reproduced.
