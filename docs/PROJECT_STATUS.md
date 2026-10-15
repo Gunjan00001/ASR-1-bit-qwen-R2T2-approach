@@ -33,9 +33,10 @@
   timestamps → per-chunk targets ("emit the words whose end time falls in this
   chunk, then stop") + the **LSP loop-emission policy** — takes the official
   algorithm from total collapse (**WER 203.5**, repetition loops) to
-  **12.92 clean / 20.00 other** at 320 ms (**10.59 / 16.59** at 1 000 ms) with
-  **zero loops**; the binary aligned checkpoint streams at **18.43 clean /
-  25.45 other**. The `+1.5` gate (~3.7 / 6.1, against the fp16 **1.7B**
+  **11.55 clean / 18.98 other** at 320 ms with **zero loops** (the longer
+  5 000-step cycle's step-1 000 state; the previous promoted state was
+  12.92 / 20.00, and its 160/1 000 ms sweep continues to be reported); the
+  binary aligned checkpoint streams at **18.43 clean / 25.45 other**. The `+1.5` gate (~3.7 / 6.1, against the fp16 **1.7B**
   anchors) is **not** met — the gap is **quantization damage, not streaming
   capacity**: the fp16 *0.6B* streams at 2.54 / 6.27 (near the 1.7B's
   2.24 / 4.61), while quantization alone costs +5.4 on the offline path

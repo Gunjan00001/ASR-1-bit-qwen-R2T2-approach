@@ -1460,3 +1460,30 @@ environmental, not model bugs):
   aligned recipe always costs some offline content; the question this run
   answers is whether the anchored fp32-AdamW path avoids the *permanent* dip
   that killed v2). Watch its next offline EVAL.
+
+## 2026-10-15 (17:00) — PROMOTION: 11.55 / 18.98 (aligned5 step-1 000); the 1.7B retry trained clean
+
+- **New promoted streaming state (tag `0.2.47`).** The longer aligned cycle's
+  **step-1 000** checkpoint scores **11.55 clean / 18.98 other** at 320 ms on
+  full 50-utt evals with 0–1 loop truncations — better than the previous
+  promoted state (12.92 / 20.00) on **both** splits. The trajectory it was
+  selected from peaks early and then *degrades*: 11.55 @1 000 → 12.82 @1 500 →
+  14.30 @~1 750. So the value of the longer cycle is its *early states*, not its
+  end — the third time this lineage has shown the pattern (offline recipe,
+  binary mirror, and now the streaming cycle). `--keep-step-checkpoints` is what
+  made the win visible; without it the run's final state would have been the
+  only candidate.
+- **The 1.7B anchored fp32-AdamW retry worked as a training run**: 1 200/1 200
+  steps, **zero GPU OOMs**, picked a ≥45 GB card within three minutes, and — the
+  key question — **no permanent dip**: offline ternary recovered 27.97 @500 →
+  **24.05 @1 000** (v2 fell 20.55 → 30.6 and stayed). Its streaming guardrail
+  ran 35.5 @250 → 30.4 @500 → 23.8 @750 → 25.4 @1 000 (peaking late, like the
+  0.6B runs). Its checkpoint (`last.pt`, 5.6 GB) is on disk.
+- **How the 1.7B job ended (new lesson):** it was killed during its own *final
+  in-training streaming eval* — no traceback, no GPU OOM, log simply stops.
+  That signature is a **host-RAM SIGKILL** (the job's `mem=48gb` budget vs the
+  eval's footprint), not a GPU failure. Fix in use: evaluate the checkpoint in a
+  dedicated job with `mem=64gb` (`scripts/eval_streaming_17b.pbs`). For future
+  1.7B training runs: skip the in-training streaming evals or raise the host
+  memory request — the checkpoint survives either way, but the log's final
+  records are lost otherwise.

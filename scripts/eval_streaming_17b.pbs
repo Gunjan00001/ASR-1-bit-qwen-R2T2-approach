@@ -1,0 +1,66 @@
+#!/bin/bash
+#PBS -N asr1bit-eval17b
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=64gb
+#PBS -l walltime=06:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/eval_17b.out
+#
+# Full-sample (50-utt) streaming evaluations of the 1.7B aligned retry's final
+# checkpoint (qat_stream_aligned17b4).  The training job itself was killed during
+# its own final eval (host-RAM SIGKILL, no traceback), so the checkpoint is
+# evaluated here in a dedicated job with a larger host-memory request.
+# Clean first, then the `other` split.  Ternary readout (bit-width 1.58).
+# Submit: qsub scripts/eval_streaming_17b.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage1/eval_streaming_17b.log"
+CKPT="${CKPT:-data/checkpoints/qat_stream_aligned17b4/last.pt}"
+
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
+  PY=/tmp/asr1bit/miniconda3/bin/python
+else
+  PY=/home/jiit_992401210050/miniconda3/bin/python
+fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-1.7B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-1.7B
+else
+  MODEL=Qwen/Qwen3-ASR-1.7B
+fi
+
+PICK=$(bash scripts/pick_gpu_wait.sh 20000 "${PICK_WAIT_MIN:-45}") || exit 0
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | $(date) ==="
+  echo "=== model $MODEL (ternary readout, bit-width 1.58) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+for CFG in clean other; do
+  [ -f "$CKPT" ] || { echo "missing checkpoint $CKPT" | tee -a "$LOG"; exit 1; }
+  echo "=== 1.7B aligned retry (final), config $CFG ===" | tee -a "$LOG"
+  "$PY" scripts/eval_streaming.py \
+    --model "$MODEL" \
+    --checkpoint "$CKPT" \
+    --policy decoder_attn_ffn \
+    --bit-width 1.58 \
+    --chunk-ms 320 \
+    --n 50 \
+    --max-new-tokens 32 \
+    --unfixed-token-num 5 \
+    --lsp-margin-words 3 \
+    --lsp-truncate-loops 1 \
+    --conditions quantized \
+    --config "$CFG" \
+    --out "artifacts/stage1/streaming_17b4_${CFG}.json" \
+    2>&1 | tee -a "$LOG"
+done
