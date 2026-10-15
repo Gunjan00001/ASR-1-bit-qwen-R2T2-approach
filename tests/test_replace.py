@@ -123,3 +123,30 @@ class TestOptions:
         layer = model.model.layers[0].self_attn.q_proj
         assert layer.bit_width == 1.58
         assert layer.group_size == 4
+
+
+class TestStochasticPlumbing:
+    """The `stochastic` flag has to survive the layer-policy plumbing."""
+
+    def test_flag_reaches_the_layers(self):
+        from torch import nn
+
+        from asr1bit.bitlinear import BitLinear
+        from asr1bit.replace import apply_layer_policy
+
+        model = nn.Sequential(nn.Linear(8, 8), nn.Linear(8, 8))
+        apply_layer_policy(model, lambda name: True, bit_width=1.58, stochastic=True)
+        layers = [m for m in model.modules() if isinstance(m, BitLinear)]
+        assert layers, "no layers replaced"
+        assert all(layer.stochastic for layer in layers)
+
+    def test_default_is_deterministic(self):
+        from torch import nn
+
+        from asr1bit.bitlinear import BitLinear
+        from asr1bit.replace import apply_layer_policy
+
+        model = nn.Sequential(nn.Linear(8, 8))
+        apply_layer_policy(model, lambda name: True, bit_width=1.58)
+        layers = [m for m in model.modules() if isinstance(m, BitLinear)]
+        assert layers and all(not layer.stochastic for layer in layers)

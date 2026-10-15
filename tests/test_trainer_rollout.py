@@ -276,3 +276,59 @@ class TestRolloutOnPolicyExamples:
             module.rollout_onpolicy_examples(
                 _args(op_distill=1), wrapper, [_utterance("HE NODS", 2.5)]
             )
+
+
+class TestCliContract:
+    """The committed PBS launchers pass these flags verbatim.
+
+    A renamed flag would break every launcher silently (the job would die at
+    argparse in the small hours of the night), so the flags that appear in
+    scripts/*.pbs are parsed together here and asserted.
+    """
+
+    def test_launcher_flags_parse(self, monkeypatch):
+        import sys
+
+        module = _load_trainer()
+        argv = [
+            "run_stage1_qat.py",
+            "--model", "Qwen/Qwen3-ASR-1.7B",
+            "--policy", "decoder_attn_ffn",
+            "--bit-width", "1.58",
+            "--group-size", "128",
+            "--steps", "2500",
+            "--train-n", "8000",
+            "--lr", "5e-6",
+            "--warmup-steps", "200",
+            "--batch-size", "1",
+            "--optimizer", "adamw",
+            "--alpha-warmup-frac", "0.02",
+            "--distill-weight", "0.05",
+            "--frozen-teacher", "1",
+            "--quant-stochastic", "1",
+            "--keep-step-checkpoints", "400",
+            "--save-dir", "data/checkpoints/x",
+            "--save-every", "250",
+            "--aligned-targets", "1",
+            "--aligned-n", "1200",
+            "--aligned-stop-stride", "2",
+            "--op-mix-frac", "0.5",
+            "--stream-eval-every", "250",
+            "--stream-eval-n", "20",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+        args = module.parse_args()
+        assert args.model.endswith("1.7B")
+        assert args.quant_stochastic == 1
+        assert args.keep_step_checkpoints == 400
+        assert args.aligned_targets == 1 and args.aligned_stop_stride == 2
+        assert args.frozen_teacher == 1 and args.distill_weight == 0.05
+        assert args.stream_eval_every == 250
+
+    def test_stochastic_flag_defaults_off(self, monkeypatch):
+        import sys
+
+        module = _load_trainer()
+        monkeypatch.setattr(sys, "argv", ["run_stage1_qat.py", "--steps", "1"])
+        args = module.parse_args()
+        assert args.quant_stochastic == 0  # old launchers must behave unchanged
