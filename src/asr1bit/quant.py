@@ -31,8 +31,18 @@ def _group_view(weight: torch.Tensor, group_size: int | None) -> tuple[torch.Ten
     return weight.reshape(-1, group_size), group_size
 
 
-def quantize_binary(weight: torch.Tensor, group_size: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+def quantize_binary(
+    weight: torch.Tensor, group_size: int | None = None, stochastic: bool = False
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Quantize ``weight`` to ``{-1, +1}`` with a centered-sign rule.
+
+    Args:
+        weight: Weight matrix, any shape.
+        group_size: Optional block size along the last dimension.
+        stochastic: When true, round *unbiasedly* instead of by the sign: draw
+            ``+1`` with probability ``clamp(0.5 + centered/(2*scale), 0, 1)``,
+            so ``E[q] = centered/scale`` for ``|centered| <= scale``. Intended
+            for QAT training only (see :class:`~asr1bit.bitlinear.BitLinear`).
 
     Returns the quantized weights (same shape as ``weight``) and the scale
     (scalar for per-tensor, ``(num_groups, 1)`` for group-wise).
@@ -41,8 +51,16 @@ def quantize_binary(weight: torch.Tensor, group_size: int | None = None) -> tupl
     grouped, _ = _group_view(weight, group_size)
     mean = grouped.mean(dim=1, keepdim=True)
     centered = grouped - mean
-    q = torch.where(centered >= 0, 1.0, -1.0).to(weight.dtype)
     scale = grouped.abs().mean(dim=1, keepdim=True).to(weight.dtype)
+    if stochastic:
+        probability = torch.where(
+            scale > 0,
+            0.5 + centered / (2 * scale.clamp(min=torch.finfo(weight.dtype).tiny)),
+            torch.full_like(centered, 0.5),
+        ).clamp(0.0, 1.0)
+        q = torch.where(torch.rand_like(centered) < probability, 1.0, -1.0).to(weight.dtype)
+    else:
+        q = torch.where(centered >= 0, 1.0, -1.0).to(weight.dtype)
     if group_size is None:
         return q.reshape(original_shape), scale.reshape(())
     return q.reshape(original_shape), scale
@@ -52,6 +70,7 @@ def quantize_ternary(
     weight: torch.Tensor,
     group_size: int | None = None,
     gamma: torch.Tensor | None = None,
+    stochastic: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Quantize ``weight`` to ``{-1, 0, +1}`` via RoundClip.
 
@@ -62,6 +81,10 @@ def quantize_ternary(
             omitted the observed ``mean|W|`` per tensor/group is used. A
             learnable scale passes ``gamma.detach()`` here for the rounding
             grid while keeping the parameter as the dequantization gain.
+        stochastic: When true, replace ``round`` with unbiased stochastic
+            rounding (floor + Bernoulli on the fractional part, then clip), so
+            ``E[q] = W/gamma`` for ``|W/gamma| <= 1``. Intended for QAT
+            training only (see :class:`~asr1bit.bitlinear.BitLinear`).
 
     Returns:
         ``(q, scale)`` where ``q`` holds the ``{-1, 0, +1}`` values and
@@ -77,9 +100,14 @@ def quantize_ternary(
             raise ValueError(
                 f"gamma has {gamma_eff.shape[0]} scales but weight has {grouped.shape[0]} groups"
             )
-    q = torch.clamp(
-        torch.round(grouped / gamma_eff.clamp(min=torch.finfo(weight.dtype).tiny)), -1.0, 1.0
-    )
+    scaled = grouped / gamma_eff.clamp(min=torch.finfo(weight.dtype).tiny)
+    if stochastic:
+        floor = torch.floor(scaled)
+        fraction = scaled - floor
+        q = floor + (torch.rand_like(scaled) < fraction).to(weight.dtype)
+        q = torch.clamp(q, -1.0, 1.0)
+    else:
+        q = torch.clamp(torch.round(scaled), -1.0, 1.0)
     q = torch.where(gamma_eff == 0, torch.zeros_like(q), q).to(weight.dtype)
     if group_size is None:
         return q.reshape(original_shape), gamma_eff.reshape(())

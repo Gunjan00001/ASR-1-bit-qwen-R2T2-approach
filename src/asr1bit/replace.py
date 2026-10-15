@@ -68,6 +68,7 @@ def apply_layer_policy(
     quantize_activations: bool = True,
     group_size: int | None = None,
     learnable_scale: bool = False,
+    stochastic: bool = False,
 ) -> nn.Module:
     """Replace selected ``nn.Linear`` layers with :class:`BitLinear` in place."""
     predicate = _resolve_policy(policy)
@@ -83,7 +84,7 @@ def apply_layer_policy(
                     bit_width=bit_width,
                     quantize_activations=quantize_activations,
                     group_size=group_size,
-                    learnable_scale=learnable_scale,
+                    learnable_scale=learnable_scale, stochastic=stochastic,
                 ),
             )
             replaced += 1

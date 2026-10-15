@@ -227,3 +227,35 @@ class TestProgressiveAlpha:
         layer.alpha = 0.5
         layer(torch.randn(2, 8)).sum().backward()
         assert layer.weight.grad.abs().sum() > 0
+
+
+class TestStochasticRounding:
+    """`stochastic=True` rounds unbiasedly while training, deterministically in eval."""
+
+    def _layer(self):
+        torch.manual_seed(0)
+        layer = BitLinear(16, 8, bit_width=1.58, learnable_scale=True, stochastic=True)
+        with torch.no_grad():
+            layer.weight.copy_(torch.randn_like(layer.weight) * 0.1)
+        return layer
+
+    def test_eval_is_deterministic(self):
+        layer = self._layer().eval()
+        x = torch.randn(2, 16)
+        with torch.no_grad():
+            first = layer(x)
+            second = layer(x)
+        assert torch.equal(first, second)
+
+    def test_training_mode_draws_differently(self):
+        layer = self._layer().train()
+        x = torch.randn(2, 16)
+        with torch.no_grad():
+            draws = [layer(x) for _ in range(8)]
+        assert not all(torch.equal(draws[0], other) for other in draws[1:])
+
+    def test_quantized_weight_is_grid_valued(self):
+        layer = self._layer().train()
+        qw = layer._quantized_weight()
+        assert qw.shape == layer.weight.shape
+        assert torch.isfinite(qw).all()

@@ -44,6 +44,7 @@ class BitLinear(nn.Module):
         group_size: int | None = None,
         bias: bool = False,
         learnable_scale: bool = False,
+        stochastic: bool = False,
     ):
         super().__init__()
         self.in_features = in_features
@@ -52,6 +53,7 @@ class BitLinear(nn.Module):
         self.quantize_activations = quantize_activations
         self.group_size = group_size
         self.learnable_scale = learnable_scale
+        self.stochastic = stochastic
         # Progressive QAT ramp: 0 = full precision, 1 = fully quantized.
         self.alpha = 1.0
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
@@ -98,16 +100,20 @@ class BitLinear(nn.Module):
     def _quantized_weight(self) -> torch.Tensor:
         if self.learnable_scale:
             gamma = self.gamma()
+            round_stochastic = self.stochastic and self.training
             if self.bit_width in _TERNARY_WIDTHS:
-                qw, _ = quantize_ternary(self.weight, self.group_size, gamma=gamma.detach())
+                qw, _ = quantize_ternary(
+                    self.weight, self.group_size, gamma=gamma.detach(), stochastic=round_stochastic
+                )
             else:
-                qw, _ = quantize_binary(self.weight, self.group_size)
+                qw, _ = quantize_binary(self.weight, self.group_size, stochastic=round_stochastic)
             dequantized = dequantize_weights(qw, gamma, self.group_size)
         else:
+            round_stochastic = self.stochastic and self.training
             if self.bit_width in _TERNARY_WIDTHS:
-                qw, scale = quantize_ternary(self.weight, self.group_size)
+                qw, scale = quantize_ternary(self.weight, self.group_size, stochastic=round_stochastic)
             else:
-                qw, scale = quantize_binary(self.weight, self.group_size)
+                qw, scale = quantize_binary(self.weight, self.group_size, stochastic=round_stochastic)
             dequantized = dequantize_weights(qw, scale, self.group_size)
         # Progressive ramp: alpha=0 is full precision, alpha=1 fully quantized.
         blended = (1.0 - self.alpha) * self.weight + self.alpha * dequantized

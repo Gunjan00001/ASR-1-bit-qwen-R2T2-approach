@@ -485,6 +485,9 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--save-dir", default=None, help="Directory for shadow checkpoints.")
     p.add_argument("--save-every", type=int, default=0, help="Checkpoint interval in steps (0=only at end).")
+    p.add_argument("--quant-stochastic", type=int, default=0,
+                   help="1 = unbiased stochastic rounding of the quantized weights during training "
+                        "(the 'stochastic precision' lever); evals always round deterministically.")
     p.add_argument("--keep-step-checkpoints", type=int, default=0,
                    help="Also write step-numbered checkpoints every N steps (0=off) so the best "
                         "state stays selectable (a last.pt-only run loses earlier states).")
@@ -610,6 +613,7 @@ def main() -> int:
         bit_width=args.bit_width,
         group_size=group_size,
         learnable_scale=bool(args.learnable_scale),
+        stochastic=bool(args.quant_stochastic),
     )
     model.to("cuda:0")
     results["bitlinear_replaced"] = getattr(model, "bitlinear_replaced", 0)

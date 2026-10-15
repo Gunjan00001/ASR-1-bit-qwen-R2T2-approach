@@ -1533,3 +1533,23 @@ environmental, not model bugs):
   recipe to the 1.7B — full-cache QAT with the frozen anchor, then anneal
   cycles — *before* the aligned streaming SFT, and measure the offline target
   first (sub-10 would be a working base; the 0.6B analogue is 7.52).
+
+## 2026-10-15 (19:45) — Stochastic rounding implemented (the T2.2 lever, ready for the next QAT run)
+
+- **Did:** implemented unbiased stochastic rounding end-to-end while the GPU
+  jobs ran: `quantize_ternary` (floor + Bernoulli on the fractional part, then
+  clip; E[q] = W/gamma for |W/gamma| ≤ 1) and `quantize_binary` (soft-sign draw,
+  E[q] = centered/scale for |centered| ≤ scale; out-of-range entries stay
+  certain, which the tests assert explicitly). `BitLinear(stochastic=True)`
+  applies it **in training mode only** — evals stay deterministic — and the
+  layer policy plus `run_stage1_qat.py --quant-stochastic 1` thread it through.
+- **Why it matters:** the recorded bottleneck is *quantization damage*
+  (offline +5.4 on the 0.6B, +22.4 on the 1.7B), and stochastic rounding is the
+  one quantizer-side lever never tried — it removes the rounding bias without
+  changing the deployed model (the grid is identical at eval time).
+- **Tests:** 9 new (336 total, ruff clean): unbiasedness in range, integral
+  targets never flip, clipping, group-wise zero groups, deterministic paths
+  repeat exactly, and the train/eval gating at the layer level.
+- **Next use:** the 1.7B offline recovery run (full-cache QAT + anneals) should
+  carry `--quant-stochastic 1` — that is the highest-value place to test it,
+  since its damage is the project's dominant remaining error.

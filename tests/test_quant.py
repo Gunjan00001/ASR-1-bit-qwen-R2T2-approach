@@ -115,3 +115,81 @@ class TestDequantize:
         scale = torch.tensor([[2.0], [10.0]])
         out = dequantize_weights(q, scale, group_size=2)
         assert torch.allclose(out, torch.tensor([[2.0, -2.0, 10.0, -10.0]]))
+
+
+class TestStochasticRounding:
+    """Unbiased stochastic rounding (`stochastic=True`), the T2.2 lever.
+
+    Only meaningful during QAT training: the draw is unbiased in expectation,
+    the deterministic path is untouched, and integral targets never flip.
+    """
+
+    def test_ternary_mean_is_unbiased(self):
+        torch.manual_seed(0)
+        # target scale t in (-1, 1): 0.25 / 0.5 / 0.75 and their negatives
+        targets = torch.tensor([[0.25, 0.5, 0.75, -0.25, -0.5, -0.75]])
+        gamma = torch.tensor([1.0])
+        weight = targets * gamma.reshape(-1, 1)
+        draws = torch.stack(
+            [quantize_ternary(weight, gamma=gamma, stochastic=True)[0] for _ in range(400)]
+        )
+        mean = draws.mean(dim=0)
+        assert torch.allclose(mean, targets, atol=0.06), (mean, targets)
+
+    def test_ternary_integral_targets_never_flip(self):
+        torch.manual_seed(1)
+        targets = torch.tensor([[1.0, 0.0, -1.0, 2.0, -3.0]])
+        gamma = torch.tensor([1.0])
+        weight = targets.clone()
+        for _ in range(5):
+            q, _ = quantize_ternary(weight, gamma=gamma, stochastic=True)
+            assert torch.equal(q, targets.clamp(-1.0, 1.0))  # integral t: fraction is 0
+
+    def test_ternary_stochastic_clips_to_grid(self):
+        torch.manual_seed(2)
+        weight = torch.tensor([[7.5, -7.5, 0.0]])
+        for _ in range(20):
+            q, _ = quantize_ternary(weight, stochastic=True)
+            assert set(q.flatten().tolist()) <= {-1.0, 0.0, 1.0}
+
+    def test_binary_mean_is_unbiased(self):
+        """E[q] = centered/scale exactly while |centered| <= scale.
+
+        Out-of-range entries are *certain* (the probability clamps), which is
+        the documented behaviour - unbiasedness is only claimed in range.
+        """
+        torch.manual_seed(3)
+        weight = torch.tensor([[0.4, 0.1, -0.3, -0.2]])  # zero-mean row, scale 0.25
+        scale = weight.abs().mean()
+        centered = weight - weight.mean()
+        expected = centered / scale
+        in_range = expected.abs() <= 1.0
+        assert in_range.sum() == 2, "test premise: exactly two entries in range"
+        draws = torch.stack(
+            [quantize_binary(weight, stochastic=True)[0] for _ in range(1000)]
+        )
+        mean = draws.mean(dim=0)
+        assert torch.allclose(mean[in_range], expected[in_range], atol=0.06), (
+            mean[in_range], expected[in_range])
+        # out-of-range entries are deterministic: their sign never flips
+        assert torch.equal(draws[:, ~in_range].abs(), torch.ones_like(draws[:, ~in_range]))
+        assert torch.equal(torch.sign(mean[~in_range]), torch.sign(expected[~in_range]))
+
+    def test_deterministic_paths_repeat_exactly(self):
+        torch.manual_seed(4)
+        weight = torch.tensor([[0.3, -1.4, 2.2, 0.0]])
+        first = quantize_ternary(weight)
+        second = quantize_ternary(weight)
+        assert torch.equal(first[0], second[0])
+        first_b = quantize_binary(weight)
+        second_b = quantize_binary(weight)
+        assert torch.equal(first_b[0], second_b[0])
+
+    def test_group_wise_stochastic_stays_in_group_scale(self):
+        torch.manual_seed(5)
+        weight = torch.tensor([[0.2, -0.4, 1.5, -2.0], [0.0, 0.0, 0.0, 0.0]])
+        q, scale = quantize_ternary(weight, group_size=4, stochastic=True)
+        assert q.shape == weight.shape
+        assert scale.shape == (2, 1)
+        # the all-zero group must stay zero (no NaN from 0/0)
+        assert torch.all(q[1] == 0)

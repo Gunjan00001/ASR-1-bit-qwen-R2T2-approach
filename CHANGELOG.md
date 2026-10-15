@@ -149,7 +149,12 @@ chunk targets), `qwen/stream.py` LSP state (`LSPState`, `update_lsp`,
 (batched on-policy rollout, gold alignment, distillation targets, degenerate
 filter), `run_stage1_qat.py` flags `--op-rollout*`, `--op-distill`,
 `--aligned-targets*`, `--stream-eval-every` (in-training `STREAM` guardrails),
-`eval_streaming.py` `--lsp-margin-words`, `--lsp-truncate-loops`, `--config`.
+`eval_streaming.py` `--lsp-margin-words`, `--lsp-truncate-loops`, `--config`;
+**unbiased stochastic rounding** (`--quant-stochastic 1`): ``quantize_binary`` /
+``quantize_ternary`` take ``stochastic=True``, ``BitLinear`` applies it in
+training mode only (evals stay deterministic), the layer policy and trainer
+thread it through, and the property is tested (E[q] = W/scale in range,
+integral targets never flip, the all-zero group stays zero).
 Launchers: `qat_stream_{opd,distill,anneal,aligned*}.pbs`, `eval_streaming_opd.pbs`
 (`TRUNC`, `CHUNK`, `CFG` overrides). Tests: 325 passed.
 
