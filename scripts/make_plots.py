@@ -345,11 +345,16 @@ def fig_streaming_results() -> dict:
         for bar in bars:
             ax2.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.4,
                      f"{bar.get_height():.2f}", ha="center", fontsize=8)
-    for y, label in ((2.24, "fp16 1.7B clean 2.24"), (4.61, "fp16 1.7B other 4.61"),
-                     (3.74, "gate clean = 2.24 + 1.5"), (6.11, "gate other = 4.61 + 1.5")):
+    for y, label, side in ((2.24, "fp16 1.7B clean 2.24", "right"),
+                           (4.61, "fp16 1.7B other 4.61", "right"),
+                           (3.74, "gate clean = 2.24 + 1.5", "left"),
+                           (6.11, "gate other = 4.61 + 1.5", "left")):
         ax2.axhline(y, color="black", linestyle=":" if "fp16" in label else "--",
                     linewidth=1.3, alpha=0.8)
-        ax2.text(len(groups) - 0.4, y + 0.25, label, fontsize=7, ha="right")
+        if side == "right":
+            ax2.text(len(groups) - 0.45, y + 0.35, label, fontsize=7, ha="right")
+        else:
+            ax2.text(-0.45, y + 0.35, label, fontsize=7, ha="left")
     ax2.set_xticks(list(x))
     ax2.set_xticklabels(groups, fontsize=9)
     ax2.set_ylabel("WER %")
