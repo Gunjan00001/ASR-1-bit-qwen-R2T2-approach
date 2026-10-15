@@ -57,6 +57,14 @@ binary states.
 | fp16 pretrained (same path) | — | 2.33 | — |
 
 Committed to `docs/PROJECT_STATUS.md` + `docs/stage1_results.md`; tag `0.2.43`.
+[CORRECTION 2026-10-16] The note above ("the remaining gap is 0.6B capacity,
+not the recipe") was wrong and is superseded by the measured decomposition in
+docs/LAB_NOTES.md (2026-10-15): the fp16 **0.6B** streams at 2.54/6.27 — close to
+the 1.7B's 2.24/4.61 — so size is not what limits the fp16 side; the gap is
+**quantization damage**.
+
+---
+
 The `+1.5` gate (~3.7/6.1) is not met — the remaining gap is 0.6B capacity, not
 the recipe (zero loops everywhere; binary only +5.5 behind ternary in streaming
 vs +32 offline).

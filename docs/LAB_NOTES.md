@@ -1628,6 +1628,12 @@ environmental, not model bugs):
      teacher pulls toward a full-precision optimum that a heavily damaged
      quantized student cannot occupy (the 0.6B tolerated it; the 1.7B's damage
      is +22.4 vs the 0.6B's +5.4, so the same pull may dominate).
+  4. **The optimizer itself** *(added 2026-10-16 after the audit caught the
+     dossier's claim)* — the arms shipped **adam8bit**, while the 0.6B recovery
+     recipes and the aligned v4 use **fp32 AdamW**; `recover4` (identical to
+     `recover2` except the optimizer) now tests it. The first A/B (SR) also
+     measured: **no-SR starts flat (20.76 vs recover1's 24.15)** — see
+     2026-10-16 02:50 entry.
 - **Launched the control:** `11543` = `qat_17b_recover2.pbs` — **byte-identical
   recipe minus `--quant-stochastic`** (asserted absent in the launcher), so its
   evals isolate cause (1). Launcher discipline applied this time: every intended

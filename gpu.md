@@ -1,3 +1,5 @@
+**[SUPERSEDED 2026-10-16 — see `docs/GPU_ACCESS.md` for the current cluster practices]**
+
 # GPU Access on This Cluster
 
 Everything here was discovered and **verified live** on this machine (login node

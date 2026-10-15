@@ -15,7 +15,7 @@
   T4 (1.7B full clean 1.96 vs published 1.95); `X = +1.5` locked.
 - **Stage 1 (BitLinear + QAT) machinery works**: ternary QAT can memorize a
   single utterance exactly (loss 0.000); all quantizer/training code is tested
-  (325 tests).
+  (340 tests).
 - **Naive QAT collapses** (~100 WER) — this is expected, not a bug (quantizer
   audit: per-tensor binary error 0.648 ≈ the Gaussian closed form 0.60).
 - **A working recovery recipe was found (Stage 2a/2b) and scaled up:**

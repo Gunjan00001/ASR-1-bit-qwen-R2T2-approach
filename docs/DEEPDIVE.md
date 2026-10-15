@@ -360,14 +360,30 @@ answered is it worth spending more GPU-days on the 1.7B — and the viva answer 
 "what did the negative result teach you?" is: *it taught us to run one variable
 at a time, which the project now does by construction.*
 
+**One correction recorded here for the record.** While writing the arms up, an
+audit caught a real doc-vs-launcher mismatch: the prose kept describing the
+recovery recipe as *anchored fp32-AdamW*, but `recover1-3` were built from
+`qat_17b_attn5`'s template and actually shipped **adam8bit** (the aligned v4
+*does* run fp32 AdamW — that claim is true; the recovery arms inherited a
+template and nobody changed the flag). A fourth arm, `recover4`, was launched
+the same hour: identical to `recover2` but with **fp32 AdamW**, so the docs'
+claim about the optimizer is now an actual measurement rather than a
+restatement. The doc these words live in was itself one of the offenders; the
+lesson (in CODE_GUIDE.md §4) is "grep-verify every patch" — applied to docs,
+not just launchers.
+
 ### 3.6 What is running right now, and how we know
 
-- `qat_stream_aligned5b` — a resume of the longer cycle (to step 5,000).
-- `qat_stream_bin_long` — a 3,000-step binary run from the best ternary state
-  (the 1,500-step budget was too short; its curve was still descending).
-- Evaluators scoring the resume's states and the 1.7B's final state.
+- **the 1.7B's three-arm experiment** (see §3.5b): `recover2` (no SR, lr
+   1.5e-6), `recover3` (no SR, lr 5e-6), `recover4` (fp32 AdamW) — one variable
+   each; recover1's verdict (no gain from the cycle as shipped) is final.
+- `eval_bin_long`-style evaluators score each selectable checkpoint on full
+  samples after a run ends.
 - A 2-hourly automated progress check whose instructions require it to record
-  every new full-sample number and to keep the development moving.
+  every new full-sample number, promote only on that evidence, and keep the
+  development moving; earlier rounds also produced `aligned5b` (the longer
+  cycle's states, all 11.76 — a stable plateau, no promotion) and `bin_long`
+  (26.80/35.23, no promotion).
 
 ---
 
@@ -676,8 +692,10 @@ src/asr1bit/bitlinear.py    the QAT layer (shadow weights, STE, alpha, scales)
 src/asr1bit/replace.py      layer-policy swapping
 src/asr1bit/data/           LibriSpeech loading, caching, aligner, chunk targets
 src/asr1bit/qwen/stream.py  LSP streaming policy (append-only emission)
-src/asr1bit/train/sft.py    streaming-SFT example builders (gold/distill/aligned)
-src/asr1bit/train/trainer.py  the QAT loop (rollouts, in-training evals, saves)
+src/asr1bit/train/samples.py  the streaming-sample record + rollout primitives
+src/asr1bit/train/examples.py on-policy + distilled example builders
+src/asr1bit/train/rollout.py  batched replay of the official algorithm
+scripts/run_stage1_qat.py     the QAT CLI (rollouts, in-training evals, saves)
 scripts/run_stage1_qat.py   the trainer CLI (all flags: bit_width, alpha, anchor,
                             aligned targets, keep-step-checkpoints, stochastic…)
 scripts/eval_streaming*.py  the streaming evaluators (official algorithm, LSP)

@@ -35,7 +35,7 @@ previous state at the extremes (160 ms 13.77 vs 13.24; 1000 ms 10.70 vs 10.59).
 The Stage-4 success criterion is defined at 320 ms, which is why the promotion
 is on that cell; both tables stay side by side here.
 
-Zero repetition loops at every promoted **ternary** cell: 0 truncations, and
+Zero repetition loops at the promoted **ternary** cells (0–1 truncations — the step-1 000 state records exactly 1), and
 `WER raw ≈ WER` in the table below — the loop filter had almost nothing to cut,
 so the remaining error is content, not collapse.  (The `revisions` column counts
 pre-commit text corrections, i.e. the append-only policy stabilizing what it has

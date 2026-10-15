@@ -12,7 +12,8 @@
    files. Practical size guide: *a file over ~400 lines is almost always two
    modules wearing one name*. (History: the trainer script 897 → 571, and
    `train/sft.py` 476 → `samples/gold/filters/rollout/examples` — the largest
-   file today is `train/qat.py` at 319, which is one concern.)
+   src file today is `qwen/stream.py` (427), which holds three closely-related
+   concerns — a known, recorded exception pending its own split.)
 2. **The CLI stays thin.** `scripts/*.py` parse arguments and orchestrate; the
    *logic* lives in `src/asr1bit/**` where it can be imported and unit-tested.
    `scripts/run_stage1_qat.py` is the model for this: its docstring is the run's
@@ -33,7 +34,7 @@
    (`train/opd.py`, removed 2026-10-15) is worse than nothing: it implies work
    that does not exist. Unused imports, flags and helpers go the same way.
 5. **Every new behaviour gets a test, and the suite stays green.** `pytest -q`
-   (340 tests) plus `ruff check .` are the contract; a refactor that has not run
+   (340 tests as of 2026-10-16) plus `ruff check .` are the contract; a refactor that has not run
    both is not finished. Tests import from `src/asr1bit/**`, not from the CLI
    scripts.
 

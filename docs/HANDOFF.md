@@ -93,7 +93,7 @@ indexes every failed/successful attempt with its number.
 | LSP emission (append-only) | policy implemented + tested | Stage 4 / T4.4; WER-neutral, reports commit latency |
 
 - Stage 0 gate passed (`0.2.0`); Stage 1/2 machinery is implemented, tested
-  (327 tests, ruff clean), documented, and pushed.
+  (340 tests, ruff clean), documented, and pushed.
 - The quantization pipeline works: ternary/binary weights across the whole
   decoder recover to single-digit/low-teens WER via the recipe in §2.
 - **The open problem is streaming robustness of the official algorithm** — a
