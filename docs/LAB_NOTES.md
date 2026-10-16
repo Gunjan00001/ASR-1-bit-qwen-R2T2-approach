@@ -1855,3 +1855,36 @@ project):
   committed state (340 tests green afterwards), and the recipe for re-running
   the split safely is `docs/CODE_GUIDE.md` §4 plus this entry's job list. The
   split is *deferred*, not dropped.
+
+## 2026-10-17 (01:35) — Stage 3's two-stage sequencing WORKS: the recovered 1.7B streams at 19.39/24.09
+
+The **first** 1.7B streaming attempt (aligned17b4: *unrecovered* base, lr 1.5e-6)
+ended at **29.24 / 33.75** with a collapsed base and the recipe's drift. The
+**two-stage pipeline** — recover the offline base at lr 5e-6 (recover3: 20.55 →
+**16.53**), then replay the aligned streaming recipe on that base (aligned17b5:
+lr 5e-6, 2 000 steps) — streams at:
+
+| split | WER | CER | loop truncations | raw WER |
+|---|---:|---:|---:|---:|
+| **clean** | **19.39** | 6.90 | **0** | 19.60 |
+| **other** | **24.09** | 9.41 | **0** | 23.86 |
+
+That is a ~**10-point** improvement on clean, ~**10-point** on other, with
+**zero loop truncations** across both splits and the offline base **preserved**
+(16.74 at the aligned run's step-2 000 vs the recovered base's 16.53). The
+two-stage pipeline is now the Stage-3 recipe: recover offline, then re-align.
+
+**Comparisons that frame it.** The 0.6B's promoted state remains better in
+absolute terms (11.55 / 18.98). The 1.7B's numbers are the *model-scale*
+question the project's Stage-3 gate was defined against, and 19.39 is the
+first 1.7B number inside single digits of the 0.6B's own performance rather
+than ~3× away. The recipe is a real path; the remaining gate needs more
+recovery cycles and a wider aligned training set (2 400 aligned utterances is
+still the streaming mix's cap).
+
+**Next steps queued** (when GPUs allow): (1) multi-cycle offline recovery on
+the 1.7B at lr 5e-6 (recover3-style, 5–10 k steps, warm restarts) to bring the
+offline base below ~10; (2) re-run the aligned recipe from that stronger base;
+(3) if the streaming number follows the offline's drop, the 1.7B line enters
+the gate's argument. All three runs' artifacts (JSONs, checkpoints, launchers)
+are on disk and recorded.
