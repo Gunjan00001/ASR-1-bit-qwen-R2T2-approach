@@ -1811,3 +1811,24 @@ project):
   about what 1.7B recipes *expect*; `eval_bin_long` scored the binary arm's
   plateau at 26.80/35.23; the `streaming` line for `recover3`'s final
   checkpoint is being launched next.
+
+## 2026-10-16 (08:50) — The offline-recovered 1.7B's streaming COLLAPSES; the two-stage doctrine is now the test
+
+- **`eval_streaming_17b` on `qat_17b_recover3/last.pt`: trig WER 285 with 354
+  loop truncations** (raw 629). The model's *offline* base improved (recover3:
+  20.55 → 16.53) precisely because the recovery recipe trains plain-offline
+  samples only — and with no streaming pressure the official algorithm's
+  prefix→emit head lost its discipline. The recovered base's *streaming*
+  collapsed while its base strengthened.
+- **The doctrine to test:** recover the offline base with a real schedule
+  (done, recover3) and *then* replay the aligned streaming recipe on that base
+  ([`qat_stream_aligned17b5.pbs`](scripts/qat_stream_aligned17b5.pbs): the
+  aligned recipe, init from `recover3/last.pt`, lr **5e-6**, 2 000 steps,
+  `--keep-step-checkpoints 400`, one variable vs the aligned17b4 attempt
+  which used the *unrecovered* base at lr 1.5e-6). If 2 000 re-aligned steps
+  bring streaming back without re-collapsing the base, Stage 3's sequencing is
+  a *two-stage* pipeline — and that becomes the recipe.
+- **Also recorded:** `recover4` (fp32 AdamW) finished its 2 500 steps at
+  21.40/19.28 trajectories (its own 19.28 @2 000 step was its best), consistent
+  with a small optimizer effect — the definitive ordering still prefers the LR
+  arm's schedule, and the definitive ordering would need an fp32+5e-6 arm later.
