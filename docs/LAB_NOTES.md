@@ -1832,3 +1832,26 @@ project):
   21.40/19.28 trajectories (its own 19.28 @2 000 step was its best), consistent
   with a small optimizer effect — the definitive ordering still prefers the LR
   arm's schedule, and the definitive ordering would need an fp32+5e-6 arm later.
+
+## 2026-10-17 (00:46) — The two-stage doctrine holds offline; A full-sample streaming eval is now running
+
+- **Job list check (00:43, after a day's pause):** every submitted run has
+  completed; no duplicates, no leftovers. The four 1.7B recovery arms are all
+  final (recover1..4 conclusions recorded on 2026-10-16); recover3's streaming
+  `other` split finished at **278.3 WER** (with 387 loop truncations) — the
+  recovered base's *streaming collapse* is consistent across both splits.
+- **`aligned17b5` completed** (2 000 steps, aligned mix on the *recovered*
+  base, lr 5e-6): its offline twin readout is
+  **16.63 (1 500) → 16.74 (2 000)** — essentially unchanged from the recovered
+  base's **16.53** (recover3). *The base survived the streaming re-alignment* —
+  the two-stage sequencing is holding at the offline level. Guardrail-trend
+  (20-utt) recorded 19.3–21.9 through the run — a *guardrail reading only*.
+- **The decisive number is now running:** `11666`
+  (`scripts/eval_streaming_17b.pbs`, mem=64 GB, full 50-utt clean + other)
+  against `qat_stream_aligned17b5/last.pt`. Its checkpoint is snapshotted first
+  (`last_aligned17b5_end.pt`) per the "snapshot before any overwrite" rule.
+- **Process note:** the `stream.py` split attempted mid-round was left
+  half-applied after a declined write, the tree was reverted to the last
+  committed state (340 tests green afterwards), and the recipe for re-running
+  the split safely is `docs/CODE_GUIDE.md` §4 plus this entry's job list. The
+  split is *deferred*, not dropped.
