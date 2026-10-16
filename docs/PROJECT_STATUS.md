@@ -177,7 +177,7 @@ conversion collapses; recovery must come from training, not from the quantizer.
 | 0 — baselines & harness | **gate passed** (`0.2.0`) | fp16 numbers reproduced on T4 |
 | 1 — BitLinear + QAT | **written gate MET; accuracy outcome poor** | the gate was "loss controllable; WER table emitted" — both true (audited quantizer, exact-memorization test, `stage1_results.md`) — but the naive run collapsed (≈100 WER), which is why Stage 2 exists |
 | 2 — accuracy recovery | **delivered in practice** | full-cache recipe + anneal → ternary **7.52** / binary **10.70** offline (mid-way it was 14.4/16.2 etc.); the `+1.5` *offline* bar remains open |
-| 3 — scale to 1.7B | **in progress** | anchored fp32-AdamW retry ran clean; first streaming number 29.24 clean from an offline 24.05 — the **offline base** is the bottleneck (full recovery recipe next) |
+| 3 — scale to 1.7B | **two-stage pipeline works** | recover offline at lr 5e-6 (20.55 → **16.53**) → replay the aligned streaming recipe → **19.39 clean / 24.09 other, zero loops**; the remaining mountain is ~5 more recovery-side points (≈10.7 streaming = the 0.6B-scale parity line), then the multi-cycle campaign |
 | 4 — streaming parity (LSP) | **recipe delivered; gate open** | official algorithm 203.5 → **11.55 clean / 18.98 other**, zero loops (tag 0.2.47); gate (320 ms ≤ 3.74/6.11) unmet — gap is quantization damage |
 | 5 — edge deployment | not started | packing/GGUF/CPU kernels |
 | 6 — evaluation & writeup | **begun** | docs + figures regenerated from artifacts; `stage4_results.md` holds the streaming record |
@@ -274,7 +274,7 @@ python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_f
    The full 28.5 k cache is the next scale-up for the offline recipe.
 
 **Stage 3 — scale to 1.7B**
-6. ✅ The anchored fp32-AdamW aligned retry ran clean (1 200 steps, no dip).
+6. ✅ The two-stage pipeline works: recover at lr 5e-6 (16.53 offline) → aligned replay streaming at 19.39 clean / 24.09 other, zero loops.
 7. First streaming measurement: **29.24 clean / 33.75 other** (CER 16.99/19.93) from
    an offline 24.05 — the streaming recipe transfers (gap +5.2), but the 1.7B's
    quantization damage (+22.4 against its fp16 1.63) is far above the 0.6B's
