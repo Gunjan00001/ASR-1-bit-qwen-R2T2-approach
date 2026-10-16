@@ -1888,3 +1888,23 @@ offline base below ~10; (2) re-run the aligned recipe from that stronger base;
 (3) if the streaming number follows the offline's drop, the 1.7B line enters
 the gate's argument. All three runs' artifacts (JSONs, checkpoints, launchers)
 are on disk and recorded.
+
+## 2026-10-17 (01:50) — Stage 3's multi-cycle recovery phase 2 launched (recover5)
+
+- **`115xx` = `qat_17b_recover5.pbs`**: the multi-cycle campaign's second phase.
+  Init from `recover3/last.pt` (offline 16.53), fresh 4 000-step cosine at
+  **lr 5e-6** (the schedule that works), **fp32 AdamW** (the optimizer recover4
+  validated at the 1.7B scale), batch 1, `--train-n 8000`, the frozen-teacher
+  anchor (w = 0.05, fp16 teacher), `--keep-step-checkpoints 400`, no SR ( measured
+  harmful), no streaming mix (the *offline* phase — the aligned streaming replay
+  runs as Stage B *after* this). mem=64gb, the self-waiting picker at ≥45 GB.
+- **Target:** the offline readout below ~12 (0.6B parity line is ~10.7); the
+  in-loop evaluations at each 500-step mark are the trajectory markers, and the
+  step-checkpoints are the selectable states.
+- **Why now:** recover3's phase-1 proved the recipe; recover4 proved the
+  optimizer footprint runs; recover5 extends the depth. If 4 000 more steps
+  drop the offline to <~12, the aligned streaming replay from *that* base is
+  the next Stage B, and the 1.7B enters the 0.6B-parity argument. If ~19 stays
+  the floor, the *inner loop of recovery scales* differently at the 1.7B and
+  the campaign's next step is a *schedule revision* (e.g. a longer cosine or a
+  higher anchor weight), not more steps.
