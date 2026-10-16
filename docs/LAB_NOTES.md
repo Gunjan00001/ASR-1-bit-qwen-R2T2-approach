@@ -1908,3 +1908,14 @@ are on disk and recorded.
   the floor, the *inner loop of recovery scales* differently at the 1.7B and
   the campaign's next step is a *schedule revision* (e.g. a longer cosine or a
   higher anchor weight), not more steps.
+
+## 2026-10-17 (02:25) — recover5's warm-restart bump and recovery
+
+Phase-2's first two in-loop offline readings: **20.23 (step 500)** then
+**17.90 (step 1 000)**. The 500-step bump above the 16.53 init is the expected
+warm-restart shape (a fresh cosine at 5e-6 moves the weights before the
+schedule's decay pulls them back). The *fp16 readout* (α=0) *improved* across
+the same steps (51.3 → 28.2) — the weights are moving toward the fp16-optimum
+even while the ternary readout recovers, which is the opposite of what the
+original QAT runs showed and the clearest sign yet that the recovery recipe is
+operating in a different regime than the first-round damage did.
