@@ -1770,3 +1770,44 @@ seed-sensitive state that no re-run has reproduced.
   `freeze_non_bitlinear` — one source of truth for "which parameters a QAT run
   updates", which is exactly the kind of thing both copies had to agree on for
   the optimizer to be trusted at all.
+
+## 2026-10-16 (06:50) — The three-arm 1.7B experiment has its answer: the schedule was the bottleneck
+
+Full-collection readout for the recovery arms (in-loop **offline** ternary WER,
+50-utt protocol — this readout has matched full-sample offline numbers all
+project):
+
+| recipe | step 500 | 1000 | 1500 | 2000 | 2500 |
+|---|---:|---:|---:|---:|---:|
+| `recover1` — SR + lr 1.5e-6 | 24.15 | 23.09 | 24.79 | 22.78 | 24.36 |
+| `recover2` — lr 1.5e-6 | 20.76 | 20.55 | 19.17 | 19.92 | 19.17→19.92 |
+| `recover3` — **lr 5e-6** | **19.92** | — | — | **16.74** | **16.53** |
+| `recover4` — **fp32-AdamW** + lr 1.5e-6 | — | — | **19.49** | **19.28** | (2 501 steps at 06:50) |
+
+- **Result 1 (the LR question, answered):** `recover3` (lr 5e-6) reaches
+  **16.53**, which is **4.0 points below** its 20.55 init and ~3.2 below the
+  best of the arms running at 1.5e-6. The sixteen-fold difference in schedule
+  warmth was *the* difference: no recovery recipe at 1.5e-6 ever beat its own
+  init. Which also means the earlier "gentle-but-stable" reading from v4 (the
+  aligned run at 1.5e-6) was *not* a recovery recipe at all, it just drifted
+  less. The 1.7B needs a schedule in the range the 0.6B's proven recipe used.
+- **Result 2 (SR, confirmed):** the un-sr comparison — `recover3` at the *same*
+  LR without SR produces 19.92 at step 500 vs recover1's 24.15 with SR. The
+  lever is definitively harmful *here*, as the interactive step-500 read showed
+  last round (see 2026-10-16 02:50 entry).
+- **Result 3 (the optimizer, trending):** `recover4` (fp32 AdamW) reads
+  **19.49/19.28** at steps 1500/2000 vs `recover2`'s 19.17/19.92 — a consistent
+  small improvement (~0.6), but *both* are behind `recover3`, so the recipe
+  question the LR arm settles first remains the bigger lever. The definitive
+  ordering would need one more arm (fp32 + 5e-6) later.
+- **What this means for Stage 3:** single-cycle recovery at a *real* schedule
+  works; the next unlock is the *0.6B-style multi-cycle campaign* (10k+ steps,
+  warm restarts, anneals) on top of the recover3 recipe, not the gentle pass.
+- **`recover4` is still training** (step ~2 101 at 06:50, no OOMs *despite* the
+  1.41 B trainable fp32-AdamW footprint the earlier attempt could not fit —
+  this machine's cluster has quiet 45 GB slots again now). Its final eval and
+  streaming readout will follow once its 2 500 steps complete.
+- In parallel, night-round artifacts: `recover1-3` produce three JSON choices
+  about what 1.7B recipes *expect*; `eval_bin_long` scored the binary arm's
+  plateau at 26.80/35.23; the `streaming` line for `recover3`'s final
+  checkpoint is being launched next.
