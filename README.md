@@ -83,7 +83,7 @@ open 1.7B question.
 **Is progress being made? Yes, and it is measurable:**
 
 1. **The quantization machinery is proven** — BitLinear QAT is implemented,
-   audited and unit-tested (327 tests, ruff clean); loss controllability is
+   audited and unit-tested (337 tests, ruff clean); loss controllability is
    demonstrated (ternary QAT memorizes a batch exactly); the quantizer's error
    on the real decoder weights matches the closed-form expectation.
 2. **The offline recovery recipe scales** — from total collapse (WER ≈ 100 for

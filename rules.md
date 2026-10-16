@@ -47,7 +47,7 @@ agreed; keep the numbering stable.
 - Tag checkpoints `MAJOR.MINOR.BUGS` (no leading `v`); push branch + tags
   directly after each commit batch (`git push origin <branch> --tags`).
 - Run `pytest -q` and `ruff check .` before committing; keep the suite green
-  (203 passed, 1 skipped as of 2026-10-10).
+  (pytest -q green; see docs/ACTIVITY_LOG.md).
 
 ## R5 — Cluster resource etiquette (JIIT PBS)
 
