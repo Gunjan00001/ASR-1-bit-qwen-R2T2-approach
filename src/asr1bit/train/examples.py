@@ -12,7 +12,6 @@ The two builders differ only in *what the target is*:
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
 
 from asr1bit.train.filters import clean_stream_text, is_degenerate
 from asr1bit.train.gold import alignment_key, gold_coverage
@@ -113,14 +112,5 @@ def build_distill_examples(
     return examples
 
 
-@dataclass
-class OnPolicyPool:
-    """Container for a rollout's on-policy examples plus bookkeeping."""
-
-    examples: list[dict] = field(default_factory=list)
-    utterances: int = 0
-    chunks: int = 0
-    kept: int = 0
-
-    def __len__(self) -> int:
+def __len__(self) -> int:
         return len(self.examples)

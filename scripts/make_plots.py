@@ -127,11 +127,31 @@ def fig_final_wer() -> dict:
         "Binary long\n(8k, 6000 steps)": {"ternary": 21.29, "binary": 12.92},
         "Ternary long2\n(8k, 4000 steps)": {"ternary": 9.22, "binary": 100.42},
         "Binary long3\n(8k, 3000 steps)": {"ternary": 22.35, "binary": 10.70},
-        # recovery recipe era: the full 28 539-utt cache (best checkpoints)
-        "Ternary full cache\n(28.5k, recovery recipe)": {"ternary": 7.52, "binary": 100.0},
-        "Ternary full cache\n(28.5k, 2nd cycle anneal)": {"ternary": 7.63, "binary": 100.0},
-        "Binary full cache\n(28.5k, recovery recipe)": {"ternary": 100.0, "binary": 10.70},
     }
+
+    # the recovery-era finals are read from their run JSONs (the audits showed
+    # hardcoded values drifting from the artifacts); the ~100.0 sentinel means
+    # "this run does not have that precision's checkpoint".
+    def _read_final(stem: str) -> dict:
+        """Final WERs for a finished run, straight from its results JSON.
+
+        Both readouts are real numbers: for a ternary-trained run the binary
+        value is the *same weights* decoded at binary — i.e. how the model
+        behaves when deployed at the wrong precision. Values around 100 mean
+        the model cannot transcribe at that precision, not that a checkpoint is
+        missing.
+
+        Which JSON stem each chart row belongs to is what has to be updated
+        when a new run in this family lands (see the stems in the calls below).
+        """
+        payload = json.loads((ART / f"{stem}.json").read_text())
+        return {"ternary": round(payload["ternary"]["wer"], 2),
+                "binary": round(payload["binary"]["wer"], 2)}
+
+    finals["Ternary full cache\n(28.5k, recovery recipe)"] = _read_final(
+        "stage1_decoder_attn_ffn_bw1.58_gNone_lr1e-05_adamw_delay_ls1_n28539")
+    finals["Binary full cache\n(28.5k, recovery recipe)"] = _read_final(
+        "stage1_decoder_attn_ffn_bw1.0_gNone_lr1e-05_adamw_delay_ls1_n28539")
     labels = list(finals)
     ternary = [finals[k].get("ternary", 0) for k in labels]
     binary = [finals[k].get("binary", 0) for k in labels]
