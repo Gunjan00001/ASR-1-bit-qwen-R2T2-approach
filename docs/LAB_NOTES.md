@@ -1949,3 +1949,26 @@ best 19.39 and the first failed attempt's 29.24).
 **Also recorded:** the aligned17b5 (phase-2 base's streaming) result stands at
 19.39/24.09; the two-stage pipeline's numbers above are the *new* base's
 starting line.
+
+## 2026-10-18 (08:10) — Stage B's first guardrail: the deeper base transfers to streaming
+
+`aligned17b6`'s first in-loop streaming guardrail (step 250) reads **16.00**
+(CER 8.85, 20-utt). The *same* recipe on the *shallower* (16.53) recovered base
+(`aligned17b5`) read **26.59** at step 250. Same recipe, same seed-domain, same
+guardrail — the only systematic difference is the recovered base's *depth*
+(11.76 vs 16.53): **10.6 points of streaming headroom at the first mark**.
+
+This is the two-stage doctrine's direction confirmed at its most sensitive
+point, and it is a *guardrail* reading: the full-sample evaluation (the metric
+that decides anything) will run over `aligned17b6`'s states when the run ends —
+the numbers to beat are the line's own 19.39/24.09 and, ultimately, the 0.6B's
+11.55/18.98.
+
+**Cycle 3 is running in parallel** (`recover6`, init from recover5's 11.76):
+another 4 000 steps of the same recipe, so the pipeline has a feeding edge —
+by the time this Stage-B run's evals land, a deeper base (target ~9-10) should
+be ready for the *next* Stage-B, tightening the loop again.
+
+**Also this round:** two contract tests added for the last untested helpers
+(`build_lr_lambda`, `patch_outer_forward`) — 343 tests, ruff clean — and
+`fig_roadmap`'s stale status strings replaced with the current reality.
