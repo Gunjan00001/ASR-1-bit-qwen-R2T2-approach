@@ -2359,3 +2359,28 @@ still evaluating.
 on recover7's **9.85** base) is training, and **cycle 5 (`recover8`, 11786) is
 launched** — the recovery curve is still descending ~0.95/cycle
 (11.76 → 10.81 → 9.85), so one more 4 000-step cycle is justified.
+
+## 2026-10-19 (02:10) — NEW BEST: aligned8's step-1 000 state reads 9.96 clean (deliverable 11.55)
+
+The last candidate states of the scaled-aligned run landed, and one of them
+breaks the project's streaming record:
+
+| state | clean | CER | loops | raw |
+|---|---:|---:|---:|---:|
+| **`aligned8/step1000`** | **9.96** | 4.72 | **0** | 10.06 |
+| `aligned8/step5000` | 11.55 | 4.72 | 1 | 11.55 |
+| `aligned8/step1500` | 12.39 | — | 0 | 12.39 |
+| the promoted deliverable (`aligned5/step1000`) | 11.55 | — | 0 | — |
+
+**9.96 clean is −1.59 below the deliverable**, with zero loop truncations and
+the LSP policy *improving* the raw text slightly (10.06 → 9.96). The early-peak
+pattern holds again: step 1 000 wins, step 1 500 and step 5 000 are worse —
+the third run in this lineage whose *selected early state* beats its final.
+
+This is the first promotion candidate in days and it also **refines the
+saturation story**: the 0.6B line is not capped at ~11.5 after all — the
+*6 000-aligned* recipe's step-1 000 state reaches **9.96**, so the earlier
+conclusion ("supervision size doesn't matter") was drawn from the *final*
+states of a recipe whose *early* state does matter. The measurement to wait for
+is the `other` split (running), after which the promotion can be recorded with
+both numbers as every previous one was.
