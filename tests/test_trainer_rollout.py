@@ -332,3 +332,65 @@ class TestCliContract:
         monkeypatch.setattr(sys, "argv", ["run_stage1_qat.py", "--steps", "1"])
         args = module.parse_args()
         assert args.quant_stochastic == 0  # old launchers must behave unchanged
+
+
+class TestSmallHelpers:
+    """The two helpers the audit flagged as untested (schedules, model_prep)."""
+
+    def test_lr_lambda_warmup_then_cosine(self):
+        import argparse
+
+        module = _load_trainer()
+        args = argparse.Namespace(lr=5e-6, warmup_steps=100, steps=1000, lr_schedule="cosine")
+        fn = module.build_lr_lambda(args)
+        assert fn(0) > 0 and fn(0) < fn(99)          # warmup rises
+        assert abs(fn(100) - 1.0) < 1e-9            # peak at warmup end
+        assert fn(1000) < 0.05                      # cosine decayed by the end
+        assert fn(2000) == fn(1000)                 # clamped past `steps`
+
+    def test_patch_outer_forward_routes_to_thinker(self):
+        """`patch_outer_forward` is a *class-level* patch: it must route the
+        outer `forward` to `.thinker` exactly once, refuse models without a
+        thinker, and mark the class so a second call is a no-op."""
+        import torch
+        from torch import nn
+
+        module = _load_trainer()
+
+        class Thinker(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.calls = 0
+
+            def forward(self, input_ids=None, **kwargs):
+                self.calls += 1
+                return torch.ones(1)
+
+        class FakeASR(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.thinker = Thinker()
+
+            def forward(self, *a, **kw):          # what gets replaced
+                raise AssertionError("outer forward was not patched")
+
+        model = FakeASR()
+        module.patch_outer_forward(model)
+        first_cls_forward = FakeASR.forward
+        module.patch_outer_forward(model)          # must be a no-op
+        assert FakeASR.forward is first_cls_forward, "patch stacked twice"
+        out = model(input_ids=torch.zeros(1, dtype=torch.long))
+        assert out.shape == (1,)
+        assert model.thinker.calls == 1
+
+    def test_patch_outer_forward_requires_a_thinker(self):
+        import pytest
+        from torch import nn
+
+        module = _load_trainer()
+
+        class NoThinker(nn.Module):
+            pass
+
+        with pytest.raises(RuntimeError, match="thinker"):
+            module.patch_outer_forward(NoThinker())
