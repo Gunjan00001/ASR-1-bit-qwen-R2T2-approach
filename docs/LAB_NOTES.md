@@ -2323,3 +2323,39 @@ rule: the guardrail's best state *and* the final state both get measured);
 **`11781` = `aligned17b8`** launched — the Stage-B on the 9.85 base with the
 isolation-validated recipe (1 200 aligned, 2 000 steps, lr 5e-6, fp32 AdamW),
 one variable against `aligned17b7` (base 10.81 → 9.85).
+
+## 2026-10-19 (00:50) — The 0.6B's streaming line is SATURATED at ~11.5; two candidates measured, no promotion
+
+Both candidate evaluations landed on full samples (320 ms, official algorithm):
+
+| state | clean | other | loops |
+|---|---:|---:|---:|
+| **the promoted deliverable** (`aligned5/step1000`, tag 0.2.47) | **11.55** | **18.98** | 0 |
+| `aligned8/step5000` (6 000 aligned + 6 000 standard) | **11.55** | — | 1 |
+| `aligned6/step1000` (mix ratio 2.5:1) | 13.67 | — | 30 |
+
+**No promotion** — the scaled aligned set *ties* the deliverable exactly on
+clean (a tie is not a beat; the rule requires both splits better), and the
+mix-ratio arm is worse *and* reintroduced 30 loop truncations (the ratio
+hypothesis is falsified on the metric, despite a 9.41 guardrail — the **eighth**
+guardrail divergence).
+
+**The finding is a ceiling:** three quite different recipes now converge on
+~11.5 clean —
+- the 2 500-step cycle with 1 200-aligned supervision (aligned5's *step-1000*): **11.55**
+- the same recipe at 5 000 steps (aligned5's final): 11.76
+- a 2.5× larger aligned set (6 000): **11.55**
+- a 2.5:1 standard-heavy mix: 13.67
+
+with the *offline* base far better (7.63) in every case. So at 0.6B the
+streaming error is *not* limited by aligned supervision, schedule length, set
+size or mix ratio — it is the model's own capacity against the quantization
+damage, which is exactly why Stage 3 exists. Recorded as the 0.6B line's
+measured saturation, with the remaining 0.6B candidate states (aligned8's
+step-1 000 and step-1 500, the early-peak window the promoted state came from)
+still evaluating.
+
+**Meanwhile the pipeline's other half keeps climbing:** `aligned17b8` (Stage-B
+on recover7's **9.85** base) is training, and **cycle 5 (`recover8`, 11786) is
+launched** — the recovery curve is still descending ~0.95/cycle
+(11.76 → 10.81 → 9.85), so one more 4 000-step cycle is justified.
