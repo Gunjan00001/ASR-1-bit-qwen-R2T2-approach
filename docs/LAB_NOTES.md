@@ -2044,3 +2044,27 @@ evaluations at the end decide everything.
 
 **Both pipeline halves are visibly working:** Stage B recovering toward its
 base; cycle 3 at step ~800 heading for the ~7–8 offline projection.
+
+## 2026-10-18 (10:30) — Launched the aligned-set-size experiment (0.6B, aligned-n 6000)
+
+Stage 4's recipes have varied the schedule, the mix, the stop stride, the
+precision and the chunk size — but **never the size of the aligned training
+set**: every 0.6B aligned run used 2 400 aligned utterances (`--aligned-n 2400`),
+and the 1.7B's Stage-B runs have used 1 200 and 2 400. `11768`
+(`qat_stream_aligned6.pbs`) holds the *promoted recipe* exactly as it stands —
+a single 5 000-step cycle at lr 5e-6 from the 7.5 offline base, aligned targets,
+the same 50/50 mix and stop stride — and raises the aligned pool to **6 000**
+utts (the aligner pays ~80 min at launch time). `--keep-step-checkpoints 500`
+is set, so the trajectory's states are selectable the way the current best
+(11.55) was selected.
+
+**What it tests:** whether streaming supervision is data-limited at the 0.6B —
+i.e. whether "more aligned utterances" buys anything beyond the 2 400 the
+existing recipes use. The deliverable's line to beat: **11.55 clean / 18.98
+other** (tag 0.2.47); the comparison is like-for-like (same base, same
+schedule, same eval protocol, full samples only).
+
+**Launcher note:** the `--keep-step-checkpoints 500` flag had been added to the
+*relaunch* launcher (aligned5r), not to aligned5 itself, so the new launcher
+needed it added explicitly — a reminder that launchers diverge in ways their
+names do not show.
