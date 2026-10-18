@@ -2484,3 +2484,25 @@ until `eval_streaming_17b.pbs` has run on its checkpoint.
 
 Also: `aligned17b8`'s own job is still alive (its end-of-run guardrail generation
 in progress, ~35 min in) — slow but progressing, no OOMs.
+
+## 2026-10-19 (06:50) — A stuck end-of-run guardrail (5 h) and its cost
+
+`aligned17b8`'s job sat **five hours** in its end-of-run guardrail generation
+after finishing its 2 000 steps (no OOMs, no errors — the log showed the same
+`pad_token_id` generation lines indefinitely). Nothing was being learned and the
+card was held. Killed (`qdel 11781`) after confirming its artifacts are on disk:
+`last.pt` (the 2 000 state), `step2000.pt` and the pre-eval snapshot
+`last_aligned17b8_end.pt` — hmm, and `step2000.pt` existing despite the cadence
+bug is itself the confirmation of that bug's mechanism: 2 000 is the *lowest*
+step that is a multiple of both `--save-every 250` and
+`--keep-step-checkpoints 400`.
+
+**Why the eval matters more than the run:** the run's own end-of-run work is the
+20-utt guardrail (which was stuck); the *full-sample* evaluation (`11796`, queued)
+is the protocol that decides anything, and it reads the saved checkpoint. Killing
+the stuck job freed the card the evaluation was waiting for.
+
+**Standing practice to add:** a finished 1.7B run whose end-of-run evaluation
+runs longer than ~1 h is pathological (the guardrail takes minutes on a healthy
+card); check the log for progress, confirm the checkpoint, and kill it — the
+full-sample evaluator is the measurement that matters.
