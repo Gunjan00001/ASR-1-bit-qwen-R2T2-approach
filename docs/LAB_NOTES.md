@@ -1972,3 +1972,21 @@ be ready for the *next* Stage-B, tightening the loop again.
 **Also this round:** two contract tests added for the last untested helpers
 (`build_lr_lambda`, `patch_outer_forward`) — 343 tests, ruff clean — and
 `fig_roadmap`'s stale status strings replaced with the current reality.
+
+## 2026-10-18 (08:20) — Stage B's guardrail jumps back up (16.0 → 22.1): the sixth reminder
+
+`aligned17b6`'s second guardrail (step 500) reads **22.12**, up from 16.00 at
+step 250, while the same recipe's run on the shallower base fell monotonically
+over its guardrails (26.6 → 21.9 → 20.9 → 19.3). Two readings, opposite
+directions, one run — which is precisely why the standing rule exists: **the
+20-utterance guardrail decides nothing**. It has now diverged from the
+full-sample metric six times in this project, and this round is a clean
+example: the same instrument gave 16.0 then 22.1 within 250 steps.
+
+The plan of record for judging `aligned17b6`: its full-sample clean/other
+evaluations over the step-checkpoints when the run ends (the 19.39/24.09 line
+to beat; the 0.6B's 11.55/18.98 as the target neighbourhood). Nothing is
+promoted or concluded from the guardrail.
+
+**Cycle 3 (`recover6`) is training** (step ~150 @08:20) — on schedule to feed a
+deeper base for the next Stage-B regardless of how this guardrail wobbles.
