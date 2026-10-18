@@ -61,7 +61,7 @@ a JSON under `artifacts/stage1/` (regenerate the summary with
 |---|---:|---:|---|
 | fp16 Qwen3-ASR-**1.7B** streaming (Stage-0 gate anchor) | **2.24** | **4.61** | `docs/stage0_results.md` |
 | fp16 Qwen3-ASR-**0.6B** streaming (our portable path) | 2.33–2.54 | 6.27 | Stage 0 / `streaming_pretrained*` |
-| **Ternary, all 196 decoder projections — offline** (28 539-utt cache) | **7.52** | — | `qat_ternary_full` |
+| **Ternary, all 196 decoder projections — offline** (28 539-utt cache) | **7.52** | — | `qat_ternary_full` (the run's best in-loop reading; its final checkpoint evaluates 7.63) |
 | Binary, all 196 decoder projections — offline | 10.70 | — | `qat_binary_full` |
 | Streaming, *naive chunked re-feed* variant (not the official algorithm) | 9.43 | — | `streaming_ternary_noprefix128` |
 | **STREAMING, official prefix algorithm — aligned targets + LSP (NEW BEST)** | **11.55** | **18.98** | `streaming_al5_step1000` |
@@ -235,14 +235,18 @@ always better. "50-utt" means a fixed 50-utterance `test-clean` slice (seed 0),
 
 - **Axes:** x = configuration (chronological, with the recovery-era ones on the
   right); y = final WER % (50-utt test-clean, best checkpoint).
-- **Bars:** **blue = ternary readout**, **green = binary readout** of the same
-  trained weights. A bar at ≈100 means that readout was *not* evaluated for
-  that run (the other precision was the trained one) — it is a sentinel, not a
-  measurement. Each bar is labelled with its value.
+- **Bars:** **blue = ternary readout**, **green = binary readout** — both
+  *real measurements of the same trained weights* at the two deployment
+  precisions (**the recovery-era rows are read straight from each run's results
+  JSON**, not hand-copied). A bar near 100 means the model cannot transcribe at
+  that precision at all — the true "wrong-precision deployment" number
+  (e.g. the ternary-trained run decoded at binary reads 98.4), not a missing
+  checkpoint. Each bar is labelled with its value.
 - **Reference line:** the black dotted **2.44** fp16 pretrained baseline.
 - **Read it for:** the three-era progression left→right — naive ≈100 % → FFN
-  ≈33 % → rollout ≈16 % → 8k ≈9–13 % → full cache **7.52 ternary / 10.70
-  binary**.
+  ≈33 % → rollout ≈16 % → 8k ≈9–13 % → full cache **7.63 ternary / 10.70
+  binary** (and the binary run's *ternary* readout 9.75 — precision-mixing is
+  a real measurement, not a runner).
 
 ### 4. `quantizer_error.png` — what quantization costs in weights
 
