@@ -24,6 +24,9 @@ export TOKENIZERS_PARALLELISM=false
 export HF_HOME=/tmp/asr1bit/hf
 LOG="artifacts/stage1/eval_streaming_17b.log"
 CKPT="${CKPT:-data/checkpoints/qat_stream_aligned17b4/last.pt}"
+# TAG defaults to the checkpoint's directory name, so two different
+# 1.7B checkpoints can never overwrite each other's result JSONs.
+TAG="${TAG:-$(basename "$(dirname "$CKPT")")}"
 
 if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
   PY=/tmp/asr1bit/miniconda3/bin/python
@@ -40,7 +43,7 @@ PICK=$(bash scripts/pick_gpu_wait.sh 20000 "${PICK_WAIT_MIN:-45}") || exit 0
 export CUDA_VISIBLE_DEVICES="$PICK"
 
 {
-  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | $(date) ==="
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | tag $TAG | $(date) ==="
   echo "=== model $MODEL (ternary readout, bit-width 1.58) ==="
   nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
 } | tee "$LOG"
@@ -61,6 +64,6 @@ for CFG in clean other; do
     --lsp-truncate-loops 1 \
     --conditions quantized \
     --config "$CFG" \
-    --out "artifacts/stage1/streaming_17b4_${CFG}.json" \
+    --out "artifacts/stage1/streaming_${TAG}_${CFG}.json" \
     2>&1 | tee -a "$LOG"
 done

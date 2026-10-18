@@ -252,6 +252,25 @@ always better. "50-utt" means a fixed 50-utterance `test-clean` slice (seed 0),
   binary** (and the binary run's *ternary* readout 9.75 — precision-mixing is
   a real measurement, not a runner).
 
+### 3.bis `stage3_offline.png` — the 1.7B's offline recovery (Stage 3)
+
+![Stage 3 offline recovery](docs/figures/stage3_offline.png)
+
+- **Axes:** x = training step; y = the **offline ternary readout** (50-utt
+  test-clean, log scale) — the metric the recovery campaign is judged by.
+- **Series:** one line per 1.7B run, read from `artifacts/stage3/*.log`'s EVAL
+  records: the FFN warm start and attention rollout (grey) plateau around
+  20–22; the four 1.5e-6 arms (red/orange/olive, including the SR arm's
+  dotted line) *hold station*; the lr-5e-6 cycles (green `recover3`, blue
+  `recover5`, purple `recover6`) descend 20.55 → 16.53 → 11.76 and continue;
+  the dashed cyan/black lines are the **aligned replays** (their offline dips
+  and recoveries show the streaming mix's cost and the base's resilience).
+- **Reference line:** the black dotted **7.63** — the 0.6B's own best offline,
+  i.e. the line the bigger model is chasing.
+- **Read it for:** the single clearest picture in the project of the finding
+  that unlocked Stage 3 — *the schedule, not the optimizer or the rounding, is
+  what moves a damaged model.*
+
 ### 4. `quantizer_error.png` — what quantization costs in weights
 
 ![Quantizer error](docs/figures/quantizer_error.png)

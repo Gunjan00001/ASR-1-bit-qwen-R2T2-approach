@@ -427,6 +427,61 @@ def fig_streaming_results() -> dict:
                          "best_clean": best_clean, "best_other": best_other}}
 
 
+def fig_stage3_offline() -> dict:
+    """The 1.7B's offline recovery trajectories (Stage 3).
+
+    One line per run, read from ``artifacts/stage3/*.log``'s EVAL records — the
+    only reliable source (several runs overwrote each other's JSONs before the
+    evaluator learned to tag its outputs, see LAB_NOTES 2026-10-18).
+    The reference bar is the 0.6B's best offline (7.63): the line Stage 3's
+    recovery campaign is chasing with a bigger, harder model.
+    """
+    runs = [
+        ("qat_17b_ffn.log", "FFN warm start", "#c7c7c7", "-"),
+        ("qat_17b_attn5.log", "attention rollout", "#7f7f7f", "-"),
+        ("qat_17b_recover1.log", "recover1 (1.5e-6 + SR)", "#d62728", ":"),
+        ("qat_17b_recover2.log", "recover2 (1.5e-6)", "#ff7f0e", "-"),
+        ("qat_17b_recover4.log", "recover4 (1.5e-6, fp32)", "#bcbd22", "-"),
+        ("qat_17b_recover3.log", "recover3 (5e-6)", "#2ca02c", "-"),
+        ("qat_17b_recover5.log", "recover5 (5e-6, cycle 2)", "#1f77b4", "-"),
+        ("qat_17b_recover6.log", "recover6 (5e-6, cycle 3)", "#9467bd", "-"),
+        ("qat_stream_aligned17b5.log", "aligned replay on 16.53 base", "#17becf", "--"),
+        ("qat_stream_aligned17b6.log", "aligned replay on 11.76 base", "#000000", "--"),
+    ]
+    stage3 = ROOT / "artifacts" / "stage3"
+    data = {}
+    plt.figure(figsize=(11, 6))
+    for fname, label, color, style in runs:
+        path = stage3 / fname
+        if not path.exists():
+            continue
+        steps, values = [], []
+        with path.open(errors="ignore") as handle:
+            for line in handle:
+                if line.startswith("EVAL "):
+                    record = json.loads(line[5:])
+                    if record.get("ternary_wer") is not None:
+                        steps.append(int(record["step"]))
+                        values.append(float(record["ternary_wer"]))
+        if steps:
+            data[label] = {"steps": steps, "wer": values}
+            plt.plot(steps, values, marker="o", color=color, linestyle=style,
+                     label=label, linewidth=2)
+    plt.axhline(7.63, color="black", linestyle=":", linewidth=1.5,
+                label="0.6B's best offline (7.63) — the bar being chased")
+    plt.yscale("log")
+    plt.xlabel("training step")
+    plt.ylabel("offline ternary WER % (log scale, 50-utt test-clean)")
+    plt.title("Stage 3 — the 1.7B's offline recovery: one gentle schedule holds (~19-21); "
+              "lr 5e-6 descends (20.55 → 16.53 → 11.76)")
+    plt.grid(True, which="both", alpha=0.25)
+    plt.legend(fontsize=8)
+    plt.tight_layout()
+    plt.savefig(FIG / "stage3_offline.png", dpi=150)
+    plt.close()
+    return data
+
+
 def main() -> int:
     FIG.mkdir(parents=True, exist_ok=True)
     summary = {
@@ -437,6 +492,7 @@ def main() -> int:
         "fp16_drift": fig_fp16_drift(),
         "roadmap": fig_roadmap(),
         "streaming": fig_streaming_results(),
+        "stage3_offline": fig_stage3_offline(),
     }
     out = ART / "wer_summary.json"
     out.write_text(json.dumps(summary, indent=2), encoding="utf-8")
