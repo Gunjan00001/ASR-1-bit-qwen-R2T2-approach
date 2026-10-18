@@ -49,8 +49,9 @@ ternary WER):
 | fp16 1.7B baseline (the gate's anchor, Stage 0) | **2.24** | **4.61** | n/a |
 | first aligned attempt (`aligned17b4`, unrecovered base, lr 1.5e-6) | 29.24 | 33.75 | 5 / 6 |
 | recovered base, *no* re-alignment (`recover3/last.pt`) | **285.06** | **278.30** | 354 / 387 |
-| **two-stage: recovered (16.53) → aligned replay (`aligned17b5`)** | **19.39** | **24.09** | **0 / 0** |
-| two-stage with the deeper base (11.76) → `aligned17b6` | *running* | *running* | — |
+| two-stage: recovered (16.53) → aligned replay, 1 200 aligned (`aligned17b5`) | 19.39 | 24.09 | 0 / 0 |
+| two-stage with a deeper base (11.76) **and** 2 400 aligned (`aligned17b6`) | 21.08 | 28.30 | 0 / 1 |
+| **two-stage, deeper base (10.81), 1 200 aligned — the clean isolation (`aligned17b7`)** | **16.63** | **23.41** | **0 / 0** |
 
 **What the streaming table says:**
 - Recovering the offline base *breaks* the streaming head if you stop there
@@ -59,11 +60,16 @@ ternary WER):
 - Re-aligning after the recovery restores it and *keeps the base*: 19.39/24.09
   with **zero loops**, the line's best, and the offline twin readout was
   preserved (16.74 vs the recovered 16.53).
-- The base's depth *transfers* to the streaming head: same recipe, first
-  in-training streaming reading 16.00 on the 11.76 base versus 26.59 on the
-  16.53 base. (That reading is the 20-utt in-training guardrail, which by
-  project rule decides nothing — the full-sample evaluations are the metric;
-  it is quoted only as the transfer's *direction*.)
+- **The base's depth transfers — proved on full samples by a single-variable
+  test.** `aligned17b7` changed only the base (16.53 → 10.81) against the line's
+  best recipe and improved streaming from 19.39/24.09 to **16.63/23.41**
+  (−2.76 clean, −0.68 other, zero loops). The companion run with the *same*
+  recipe but a larger aligned set (2 400) scored 21.08 clean — read jointly,
+  the two runs isolate both variables: **deeper base helps, larger aligned set
+  hurts** at the 1.7B.
+- The 1.7B recipe is therefore settled as: recover at lr 5e-6 (multi-cycle),
+  then re-align with the 1 200-utterance aligned set; remaining levers are more
+  recovery depth and whatever the 0.6B-side mix-ratio/scale runs show.
 
 ## 3. The recipes that got here (and the failures, with numbers)
 

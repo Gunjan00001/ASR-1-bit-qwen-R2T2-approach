@@ -2262,3 +2262,38 @@ To beat: the line's best **19.39 clean / 24.09 other** (`aligned17b5`, same
 recipe, shallower base). Its offline-preservation advantage is already measured
 (+0.84 versus +2.0 on the two-variable run); the streaming number is what the
 whole isolation was for.
+
+## 2026-10-18 (20:50) — THE CLEAN ANSWER: the base's depth transfers to streaming
+
+**`aligned17b7`** (identical recipe to the line's best run; the ONLY change is
+the recovered base) finished and was evaluated on full samples:
+
+| run | base (offline) | aligned set | clean | other | loops |
+|---|---:|---:|---:|---:|---:|
+| `aligned17b5` | 16.53 | 1 200 | 19.39 | 24.09 | 0 / 0 |
+| **`aligned17b7`** | **10.81** | 1 200 | **16.63** | **23.41** | **0 / 0** |
+
+**−2.76 clean, −0.68 other, zero loops on both splits.** The single-variable
+test says what the two-variable run could not: **a deeper recovered base
+improves the streaming**, and the pipeline's premise is sound.
+
+**And the pair of 1.7B runs now reads jointly** (each isolates one variable
+against the common reference, `aligned17b7`):
+
+| run | base | aligned set | clean | what it isolates |
+|---|---:|---:|---:|---|
+| `aligned17b7` | 10.81 | 1 200 | 16.63 | the *base* (deeper helps) |
+| `aligned17b6` | 11.76 | **2 400** | 21.08 | the *aligned set* (2 400 **hurts** by ~4.5 at comparable bases) |
+
+So the 1.7B's recipe is settled for now: **recover at lr 5e-6 → re-align with
+the 1 200-utterance aligned set** — and the levers that remain are (a) more
+recovery depth and (b) the 0.6B-side mix-ratio/scale findings once those runs
+land.
+
+**The line's best is now 16.63 / 23.41** (was 19.39 / 24.09). No *headline*
+promotion: the 0.6B deliverable (11.55 / 18.98) still leads, and the gate
+(3.74 / 6.11) is unmet — recorded as a *line* advance in
+`docs/stage3_results.md`, not a tag.
+
+**Cycle 4 launched** (`recover7`, 11778 — from recover6's 10.81, same recipe):
+the pipeline's next feed-forward step.
