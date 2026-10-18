@@ -2297,3 +2297,29 @@ promotion: the 0.6B deliverable (11.55 / 18.98) still leads, and the gate
 
 **Cycle 4 launched** (`recover7`, 11778 — from recover6's 10.81, same recipe):
 the pipeline's next feed-forward step.
+
+## 2026-10-18 (22:55) — Cycle 4 reaches 9.85; three completions; the candidate evals are running
+
+**The campaign's deepest base yet:** `recover7` (cycle 4) finished its 4 000
+steps at **offline 9.85**. The whole arc: **20.55 → 16.53 → 11.76 → 10.81 →
+9.85** — inside 2.2 points of the 0.6B's own 7.63, and every cycle has been a
+real step (no plateau).
+
+**Two 0.6B runs completed overnight-ish:**
+- **`aligned8`** (6 000 aligned + 6 000 standard — the *properly scaled* aligned
+  set): step 5 000 reached with **offline 10.49** and a **guardrail of 9.18 at
+  its final step** — the best 0.6B guardrail in the whole project (aligned5's
+  final was 9.41). All eleven step-checkpoints are on disk.
+- **`aligned6`** (the accidental mix-ratio arm, 6 000 standard / 2 400 aligned):
+  **ended unexpectedly at step 2 500 of 5 000** — no OOMs in its log, the log
+  simply stops mid-streaming-eval (its checkpoints 500–2000 plus `last.pt` at
+  2 500 survive). Recorded as an unexplained early exit; its guardrail at
+  2 500 was 9.65 (its best was 9.41 at step 1 000).
+
+**Actions taken:** snapshots for `aligned8`/`aligned6`/`recover7`; **two
+full-sample evaluations running** on the strongest candidates (`11779` =
+aligned8's step 5 000, `11780` = aligned6's step 1 000 — the state-selection
+rule: the guardrail's best state *and* the final state both get measured);
+**`11781` = `aligned17b8`** launched — the Stage-B on the 9.85 base with the
+isolation-validated recipe (1 200 aligned, 2 000 steps, lr 5e-6, fp32 AdamW),
+one variable against `aligned17b7` (base 10.81 → 9.85).
