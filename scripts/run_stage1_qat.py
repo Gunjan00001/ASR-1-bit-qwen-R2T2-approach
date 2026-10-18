@@ -170,7 +170,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--op-chunk-stride", type=int, default=3, help="Keep every Nth mid-stream chunk state.")
     p.add_argument("--op-max-rounds", type=int, default=16,
                    help="Cap rollout rounds per utterance (bounds the O(n^2) re-feed; 0 = no cap).")
-    p.add_argument("--op-max-samples", type=int, default=2400, help="Cap on the on-policy example pool.")
+    p.add_argument("--op-max-samples", type=int, default=2400,
+                   help="Cap on the on-policy example pool. NOTE: this also caps the "
+                        "*aligned* example pool (the aligned builder shares the pool), so "
+                        "raising --aligned-n alone cannot exceed this default - set both "
+                        "(2026-10-18: an intended 6000-aligned run pooled exactly 2400 "
+                        "until this flag was raised too).")
     p.add_argument("--op-mix-frac", type=float, default=0.5,
                    help="Target share of on-policy samples in the training mix.")
     p.add_argument("--op-refresh-every", type=int, default=0,

@@ -2125,3 +2125,34 @@ under 19.39 clean?).
 **Also running:** `aligned6` (the 0.6B aligned-set-size experiment) is at
 1 100/6 000 aligned utterances — the alignment self-verified at 6 000, so the
 `--train-n` cap fix is working in production.
+
+## 2026-10-18 (12:55) — Two 1.7B completions and the THIRD flag cap
+
+**Results first:**
+- **`recover6` (cycle 3) finished: offline 10.81** — 15.89 / 13.45 / **12.39** /
+  14.83 (the in-family bounce) / … / **10.81**. The multi-cycle campaign is now
+  20.55 → 16.53 → 11.76 → **10.81**, inside 3.2 points of the 0.6B's own 7.63
+  and still improving per cycle.
+- **`aligned17b6` (Stage B) finished: offline 13.77** (19.49 → 17.90 → 15.57 →
+  16.31 → **13.77**) — it recovered almost all of the perturbation *and* ended
+  below its own base's neighbourhood. Its checkpoint is snapshotted
+  (`last_aligned17b6_end.pt`) and **its full-sample streaming evaluation is
+  running** (`11773`) — the number the whole pipeline exists to produce.
+
+**The third flag cap (a repeat of this morning's class):** the intended 6 000-
+aligned run (`11769`) pooled exactly **2 400** aligned examples, because a
+*third* flag caps it: `--op-max-samples` (default 2 400, shared with the
+on-policy pool). So the run in flight is *not* a waste but a *different*
+experiment (a 6 000-standard / 2 400-aligned mix — a mix-ratio test, which was
+also untested), and the *real* 6 000-aligned run is now launched as
+`qat_stream_aligned7.pbs` with all three caps set explicitly and documented at
+their definitions:
+
+| cap | what it limits | set to |
+|---|---|---|
+| `--train-n` | how many utterances are loaded (the aligner only sees these) | 2 400 (held, so the aligned size is the variable) |
+| `--aligned-n` | how many are aligned | **6 000** |
+| `--op-max-samples` | the example pool's size (shared by aligned + on-policy) | **6 000** |
+
+Three caps, three separate silent failures in one day — all found by reading the
+artifacts (the log's own "pooled 2400") rather than the flags.
