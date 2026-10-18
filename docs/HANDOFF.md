@@ -1,6 +1,7 @@
 # Handoff — ASR-1-bit-Qwen (for the next agent/developer)
 
 **Date:** 2026-10-11 · **Branch:** `stage-1` · **Owner:** Gunjan00001
+**Stage-3 results file:** [`docs/stage3_results.md`](stage3_results.md).
 **Read this first**, then `docs/PROJECT_STATUS.md` (status + graphs),
 `docs/ACTIVITY_LOG.md` (every step, failure, fix), `rules.md` (operating rules),
 `docs/GPU_ACCESS.md` (cluster access), `docs/CODE_GUIDE.md`

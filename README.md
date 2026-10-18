@@ -78,7 +78,11 @@ capacity and not the recipe**: the fp16 *0.6B* streams at 2.54 / 6.27 — close
 to the 1.7B's 2.24 / 4.61, so model size is not what limits the fp16 side —
 while quantization alone costs **+5.4** on the offline path (2.11 → 7.52),
 above the entire +1.5 budget. Whether that damage shrinks with scale is the
-open 1.7B question.
+1.7B question — and it now has a *working pipeline*: a multi-cycle offline
+recovery at lr 5e-6 (20.55 → 16.53 → **11.76**) followed by the aligned
+streaming replay (**19.39 clean / 24.09 other**, zero loops, base preserved).
+The deeper base transferred 10.6 points into the streaming head at the first
+in-training reading. Full record: [`docs/stage3_results.md`](docs/stage3_results.md).
 
 **Is progress being made? Yes, and it is measurable:**
 

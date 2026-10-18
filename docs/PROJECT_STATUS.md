@@ -41,7 +41,9 @@
   capacity**: the fp16 *0.6B* streams at 2.54 / 6.27 (near the 1.7B's
   2.24 / 4.61), while quantization alone costs +5.4 on the offline path
   (2.11 → 7.5), more than the entire +1.5 budget. Whether that damage shrinks
-  with scale is the open 1.7B question (paused on cluster capacity). The full
+  with scale is the 1.7B question, and it now has a working pipeline (multi-cycle
+  recovery at lr 5e-6 → 11.76 offline → aligned replay → 19.39/24.09 streaming,
+  zero loops; see `docs/stage3_results.md`). The full
   matrix is in the streaming section below and `docs/stage1_results.md` (offline) and `docs/stage4_results.md` (streaming); every
   failed recipe (with numbers) is kept in `docs/LAB_NOTES.md`.
 
