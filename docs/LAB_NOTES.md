@@ -2384,3 +2384,33 @@ conclusion ("supervision size doesn't matter") was drawn from the *final*
 states of a recipe whose *early* state does matter. The measurement to wait for
 is the `other` split (running), after which the promotion can be recorded with
 both numbers as every previous one was.
+
+## 2026-10-19 (03:15) — The sweep: step 1 000 is a SHARP optimum, and selection is doing real work
+
+`aligned8`'s measured states (full-sample clean, 320 ms, official algorithm):
+
+| step | 500 | **1 000** | 1 500 | 2 000 | 5 000 |
+|---|---:|---:|---:|---:|---:|
+| clean clean | 14.30 | **9.96** | 12.39 | 15.25 | 11.55 |
+| loops | 0 | 0 | 0 | 0 | 1 |
+
+**9.96 sits in a single 500-step window** — its immediate neighbours read
+12.39 and 14.30, i.e. the useful state is ~2.4 WER wide. Two consequences:
+
+1. **The selection protocol is not a nicety, it is the method.** Any
+   "evaluate the final checkpoint" protocol would have shipped 11.55 (or the
+   worse 15.25 at step 2 000) and never seen 9.96. This is the strongest
+   argument yet for `--keep-step-checkpoints` + full-sample evaluation of
+   multiple states, and it generalises: the *aligned5* line's own best
+   (11.55) was likewise its step-1 000 state, not its final.
+2. **The promotion's pairing rule earns its keep.** The sharp state's `other`
+   split (20.11) is *worse* than the previous holder's 18.98, so the headline
+   carries both rows and tag `0.2.48` ships with the caveat attached. No
+   single measured state beats both splits at once — that remains the bar for
+   an unqualified promotion.
+
+**Caveat on the sharpness:** a 2.4-WER swing between adjacent 500-step states
+is large for 50-utt noise alone, but the two neighbouring evaluations (12.39,
+15.25) are single measurements. If a future run is expected to exploit this
+window, re-measuring step 1 000 (and its neighbours) on both splits is the
+first thing to do.
