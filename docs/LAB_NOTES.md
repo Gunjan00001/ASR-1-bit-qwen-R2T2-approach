@@ -2031,3 +2031,16 @@ number cycle 3's remaining evals decide.
 `aligned17b6` (Stage B) is at step 1 000 with its 1 000-step evaluation still
 running (the 1.7B's in-loop evals take ~25–35 minutes on contended cards); its
 500-step readings stand as recorded (offline 19.49, guardrail 22.1).
+
+## 2026-10-18 (09:20) — Stage B is recovering (19.49 → 17.90 offline); the precedent holds
+
+`aligned17b6`'s step-1 000 offline readout is **17.90**, down from 19.49 at
+step 500 — the aligned mix's perturbation is being recovered, exactly the shape
+`aligned17b5` showed on its shallower base (perturbation → recovery → hold).
+Its fp16 readout improved over the same window (23.9 → 20.2). With 1 400 steps
+left (to 2 500) and the base at 11.76, the question is how far the recovery
+goes while the streaming head absorbs the aligned supervision — the full-sample
+evaluations at the end decide everything.
+
+**Both pipeline halves are visibly working:** Stage B recovering toward its
+base; cycle 3 at step ~800 heading for the ~7–8 offline projection.
