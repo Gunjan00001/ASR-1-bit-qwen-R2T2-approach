@@ -2464,3 +2464,23 @@ remain the 2 000-multiples only.
 a *silent* interaction that only shows in the artifact (the empty-ish
 checkpoint directory), never in the launcher. It is also a lesson in *reading
 before blaming*: my first explanation named the wrong layer entirely.
+
+## 2026-10-19 (05:50) — A distinction worth recording: the trainer's end-of-run eval is NOT the full-sample protocol
+
+Two rounds of "its final streaming eval is running" were wrong for
+`aligned17b8`: what the *trainer* runs at the end of a job is its in-loop
+**guardrail** evaluation (`--stream-eval-n`, 20 utts). The *full-sample*
+protocol (50 utts, both splits, official algorithm, LSP policy) lives in
+`scripts/eval_streaming_17b.pbs` and must be **submitted separately** — the
+b7/b5 runs' numbers all came from such separate submissions, and b8's had never
+been launched. Submitted now as `11796` (with the checkpoint snapshotted first,
+`last_aligned17b8_end.pt`).
+
+Why it matters beyond this run: the two evaluations have *similar names* in the
+logs (`STREAM` lines versus the evaluator's `quantized ... WER` lines) and
+different protocols, and the project's entire promotion rule rests on which one
+is being read. The handoff should say: a finished 1.7B run is *not* evaluated
+until `eval_streaming_17b.pbs` has run on its checkpoint.
+
+Also: `aligned17b8`'s own job is still alive (its end-of-run guardrail generation
+in progress, ~35 min in) — slow but progressing, no OOMs.
