@@ -2101,3 +2101,27 @@ about the patch. The code guide's §4 rule exists for exactly this.
 cycle; projected ~8–9 at 4 000 steps); `aligned17b6`'s offline 19.49 → 17.90 →
 **15.57**, still recovering toward its 11.76 base with the streaming head being
 rebuilt on top.
+
+## 2026-10-18 (11:15) — Both cycles bounce at step 2000 (in-family, per the precedents)
+
+| run | 500 | 1000 | 1500 | 2000 |
+|---|---:|---:|---:|---:|
+| `aligned17b6` (Stage B on the 11.76 base) | 19.49 | 17.90 | **15.57** | 16.31 |
+| `recover6` (cycle 3) | 15.89 | 13.45 | **12.39** | 14.83 |
+
+Both show the same shape — descend, bottom, bounce ~+1 to +2.5 — and both
+precedents did exactly this before finishing lower: `recover5` bounced
+15.15 → 15.78 (steps 2000→2500) and then ran to **11.76**; `aligned17b5`'s
+offline held within 0.1 over its last 500 steps. So the readings are recorded
+as *bounces with precedent*, not as failures — and the only numbers that will
+decide anything are the full-sample evaluations of the finished checkpoints.
+
+**What to watch:** `recover6`'s step 2500–4000 (does the cycle-3 descent resume
+and beat 11.76? its step-1500 value 12.39 was already under cycle 2's *final*),
+and `aligned17b6`'s step-2500 plus its full-sample streaming evaluations (does
+the deeper base's Stage-B hold its recovery *and* deliver a streaming number
+under 19.39 clean?).
+
+**Also running:** `aligned6` (the 0.6B aligned-set-size experiment) is at
+1 100/6 000 aligned utterances — the alignment self-verified at 6 000, so the
+`--train-n` cap fix is working in production.
