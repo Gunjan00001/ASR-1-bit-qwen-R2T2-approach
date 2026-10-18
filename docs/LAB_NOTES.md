@@ -2068,3 +2068,36 @@ schedule, same eval protocol, full samples only).
 *relaunch* launcher (aligned5r), not to aligned5 itself, so the new launcher
 needed it added explicitly — a reminder that launchers diverge in ways their
 names do not show.
+
+## 2026-10-18 (11:00) — A silent flag cap: `--aligned-n` cannot exceed `--train-n`
+
+The aligned-set-size experiment's first launch was **wasted**: the launcher set
+`--aligned-n 6000` but the template's `--train-n` stayed 2400, and the trainer
+does
+
+```python
+strip = min(args.aligned_n, len(train_utts))   # run_stage1_qat.py
+```
+
+so the aligner was given exactly 2 400 utterances — visible in the log as
+"aligned N/2400 utts" while the flag said 6 000. The job would have been an
+*exact duplicate* of `aligned5` (same 2 400-aligned pool, same 5 000-step cycle,
+same base). Caught 10 minutes in by reading the log's own counter, killed, and
+relaunched.
+
+**Fixes:** (1) the interaction is now a comment at the code that causes it,
+where the next reader will meet it; (2) the launcher raises `--train-n` to
+6 000 alongside `--aligned-n`; (3) the relaunch verified itself in the log —
+`train=6000` and "aligning **6 000** train utterances" — before being trusted.
+
+**The pattern, again:** this is the fourth instance of the same failure class in
+this project (launcher `str.replace` no-ops, the `#PBS -N` miss, the silent
+`assert` abort, and now a `min()` that eats a flag). Every one was caught by
+*grepping the artifact for the thing the patch claimed*, never by reasoning
+about the patch. The code guide's §4 rule exists for exactly this.
+
+**Meanwhile, both pipeline halves are healthy:** `recover6`'s offline 15.89 →
+13.45 → **12.39** (steps 500/1000/1500 — descending faster than either previous
+cycle; projected ~8–9 at 4 000 steps); `aligned17b6`'s offline 19.49 → 17.90 →
+**15.57**, still recovering toward its 11.76 base with the streaming head being
+rebuilt on top.

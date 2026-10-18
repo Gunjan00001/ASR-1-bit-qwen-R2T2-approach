@@ -73,7 +73,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --op-chunk-ms 320 \
   --steps 5000 \
   --train-cache "$CACHE" \
-  --train-n 2400 \
+  --train-n 6000 \
   --eval-n 50 \
   --eval-every 500 \
   --eval-both 0 \

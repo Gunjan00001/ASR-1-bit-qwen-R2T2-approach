@@ -342,6 +342,11 @@ def main() -> int:
 # examples from forced-aligner timestamps and interleaves them with ordinary
 # transcription samples so content quality does not regress.
     if args.aligned_targets:
+        # NOTE the silent interaction: the aligner only ever sees the training
+        # utterances that were *loaded* (`--train-n`), so `--aligned-n` larger
+        # than `--train-n` quietly does nothing. Raising the aligned pool means
+        # raising *both* (2026-10-18: a run with --aligned-n 6000 and
+        # --train-n 2400 aligned exactly 2400 — a wasted launch).
         strip = min(args.aligned_n, len(train_utts))
         print(f"=== forced-aligner targets: aligning {strip} train utterances (T4.1) ===", flush=True)
         from qwen_asr import Qwen3ForcedAligner
