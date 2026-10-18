@@ -2250,3 +2250,15 @@ deeper recovered base improve streaming?".
 even the promoted recipe's 10.7 floor-neighbourhood — and `aligned6`'s mix-ratio
 arm sits at guardrail 11.29 @1500. Both are guardrail/offline readings; the full
 samples decide.
+
+## 2026-10-18 (19:00) — `aligned17b7` finished its steps; its full-sample eval is running
+
+The clean isolation run reached step 2 000. Its checkpoint is snapshotted
+(`last_aligned17b7_end.pt`) and the full-sample streaming evaluation is **`11777`**
+(the evaluator's TAG logic will file the results as
+`streaming_qat_stream_aligned17b7_*.json`, distinct from every other run's).
+
+To beat: the line's best **19.39 clean / 24.09 other** (`aligned17b5`, same
+recipe, shallower base). Its offline-preservation advantage is already measured
+(+0.84 versus +2.0 on the two-variable run); the streaming number is what the
+whole isolation was for.
