@@ -2223,3 +2223,30 @@ metric.)*
 **Nothing finished this round**, so no evaluations were launched (the standing
 rule: a run's checkpoints are evaluated when it ends, and promotions require
 those full-sample numbers).
+
+## 2026-10-18 (18:50) — The clean base isolation is holding its base (offline 11.65 vs 10.81)
+
+`aligned17b7` — the single-variable test (identical recipe to the line's best
+run, only the base deeper) — is near its end and looks like the *opposite* of
+`aligned17b6`:
+
+| run | baseline (offline) | offline during the aligned replay |
+|---|---:|---|
+| `aligned17b6` (2 variables moved) | 11.76 | 19.49 → 17.90 → 15.57 → **13.77** (+2.0 net) |
+| **`aligned17b7` (one variable)** | 10.81 | **11.65 @1500** (+0.84 so far) |
+
+Its streaming guardrail at step 1 750 is **16.00**, better than `aligned17b5`'s
+~19.3 at the matched window. Guardrails decide nothing (the eighth reminder is
+already on file), but the *base preservation* is a real measured difference:
+with only the base moved, the aligned replay costs ~0.8 instead of ~2.0.
+
+**The full-sample streaming evaluation of `aligned17b7` is the next action**
+(its run ends within the hour): snapshot `last.pt`, then
+`eval_streaming_17b.pbs` with that checkpoint — the clean answer to "does a
+deeper recovered base improve streaming?".
+
+**Meanwhile the 0.6B is having its own good day:** `aligned8` (6 000 aligned +
+6 000 standard) reads **offline 9.53 @1000** — the lowest 0.6B offline yet, below
+even the promoted recipe's 10.7 floor-neighbourhood — and `aligned6`'s mix-ratio
+arm sits at guardrail 11.29 @1500. Both are guardrail/offline readings; the full
+samples decide.
