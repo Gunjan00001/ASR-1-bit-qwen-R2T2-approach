@@ -2414,3 +2414,23 @@ is large for 50-utt noise alone, but the two neighbouring evaluations (12.39,
 15.25) are single measurements. If a future run is expected to exploit this
 window, re-measuring step 1 000 (and its neighbours) on both splits is the
 first thing to do.
+
+## 2026-10-19 (04:55) — Stage-B on the 9.85 base is in final eval; and a checkpoints gap found
+
+**Readings:**
+- `aligned17b8` (Stage B on recover7's **9.85**) reached its final step: offline
+  **12.92 @1500** (a +3.1 perturbation over its base — larger than
+  `aligned17b7`'s +0.84 over *its* base) and guardrail 19.53 @1750 (vs b7's
+  16.00 matched). Its run is in its final streaming evaluation; the full-sample
+  number will say whether the deeper base pays a second time.
+- `recover8` (cycle 5) is training: step-500 offline **13.77** — a +3.9 bump
+  over its 9.85 base, consistent with the previous cycles' bumps (+3.7, +4.1),
+  which have always been followed by a descent past the previous base.
+
+**A gap found while checking:** the b7/b8 launchers were copied from
+`aligned17b5`, which does **not** carry `--keep-step-checkpoints` — so those
+two runs saved only `last.pt` and their *early* states (the window the
+`aligned8` sweep just proved can hold the sharp optimum, and where the 0.6B
+line's best states have lived three times) cannot be measured at all. The
+next Stage-B launcher must include the flag; the standing grep-verify list for
+launchers now includes `keep-step-checkpoints`.
