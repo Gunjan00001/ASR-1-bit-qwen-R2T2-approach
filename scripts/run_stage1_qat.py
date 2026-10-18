@@ -534,9 +534,15 @@ def main() -> int:
             set_precision(model, args.bit_width, alpha)  # restore training precision
         if args.save_dir and args.save_every and (step + 1) % args.save_every == 0:
             save_checkpoint(Path(args.save_dir) / "last.pt", model, step + 1, args)
-            step_path = step_checkpoint_path(args.save_dir, step + 1, args.keep_step_checkpoints)
-            if step_path is not None:
-                save_checkpoint(step_path, model, step + 1, args)
+        # Step-numbered checkpoints run on their OWN cadence, deliberately not
+        # nested inside `--save-every`: nesting them meant the two periods had to
+        # coincide, so a run with --save-every 250 and --keep-step-checkpoints 400
+        # only ever wrote at multiples of 2000 (2026-10-19: two 1.7B runs were
+        # thought to lack the flag entirely; they had it, and the cadences simply
+        # never met).
+        step_path = step_checkpoint_path(args.save_dir, step + 1, args.keep_step_checkpoints)
+        if step_path is not None and not step_path.exists():
+            save_checkpoint(step_path, model, step + 1, args)
 # Wrap up: persist the history, the timings, the final checkpoint, and run
 # the end-of-run evaluation. The run's JSON is the artifact of record.
     results["history"] = history

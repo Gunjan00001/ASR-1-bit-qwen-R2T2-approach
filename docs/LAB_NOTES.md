@@ -2434,3 +2434,33 @@ two runs saved only `last.pt` and their *early* states (the window the
 line's best states have lived three times) cannot be measured at all. The
 next Stage-B launcher must include the flag; the standing grep-verify list for
 launchers now includes `keep-step-checkpoints`.
+
+## 2026-10-19 (05:10) — CORRECTION: the launchers had the flag; the CADENCES were the bug
+
+My previous entry blamed the `aligned17b*` launchers for lacking
+`--keep-step-checkpoints`. **That was wrong** — grep shows `b4`–`b8` all carry
+it. The real cause was in the trainer:
+
+```python
+if args.save_dir and args.save_every and (step + 1) % args.save_every == 0:
+    save_checkpoint(.../last.pt)
+    step_path = step_checkpoint_path(..., args.keep_step_checkpoints)   # nested!
+```
+
+The step-checkpoint call was nested inside the `--save-every` branch, so a
+number could only be kept when **both** periods coincided: with
+`--save-every 250` and `--keep-step-checkpoints 400` the save events are
+multiples of 250 and the keep test needs multiples of 400 — they meet only at
+**2 000**. That is exactly why `qat_stream_aligned17b8/` holds just `last.pt`
+and why the recovery runs' directories show a lone `step2000.pt`.
+
+**Fixed in code:** the keep cadence is now independent of `--save-every` (a
+small unconditional check per step, with an existence guard). Verified: CLI
+`--help` runs, 343 tests pass, ruff clean. Runs already in flight
+(`recover8`, `aligned17b8`) keep the old behaviour — their selectable states
+remain the 2 000-multiples only.
+
+**The pattern this belongs to** (fifth instance): a *correct-looking* flag with
+a *silent* interaction that only shows in the artifact (the empty-ish
+checkpoint directory), never in the launcher. It is also a lesson in *reading
+before blaming*: my first explanation named the wrong layer entirely.

@@ -94,6 +94,7 @@ export CUDA_VISIBLE_DEVICES="$PICK"
   --frozen-teacher 1 \
   --lazy-collate 1 \
   --save-dir data/checkpoints/qat_stream_aligned17b3 \
+  --keep-step-checkpoints 400 \
   --save-every 250 \
   --out artifacts/stage1 \
   2>&1 | tee -a "$LOG"
