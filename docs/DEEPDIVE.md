@@ -372,11 +372,51 @@ restatement. The doc these words live in was itself one of the offenders; the
 lesson (in CODE_GUIDE.md §4) is "grep-verify every patch" — applied to docs,
 not just launchers.
 
+### 3.5c The answer: a two-stage pipeline, and the number that proves it
+
+The controlled arms answered the recovery question, and the answer was
+**schedule**:
+
+| arm | lr | optimizer | offline at step 2500 |
+|---|---|---:|---:|
+| `recover1` | 1.5e-6 | adam8bit | 24.36 (with SR) |
+| `recover2` | 1.5e-6 | adam8bit | ~19.2 |
+| `recover4` | 1.5e-6 | **fp32 AdamW** | 19.3 (step 2000) |
+| `recover3` | **5e-6** | adam8bit | **16.53** |
+
+Sixteen-fold more learning rate, run for the same 2 500 steps, improved the base
+by ~4 points where everything else merely held station. That produced the
+recipe, and the recipe then produced a *pipeline*:
+
+1. **Recover offline at lr 5e-6** — `recover3` showed the direction (20.55 →
+   16.53); `recover5`, a second 4 000-step cycle at the same scale with
+   fp32 AdamW, continued it to **11.76** — below the ~12 target, first 1.7B
+   state in the 0.6B's neighbourhood, and still descending at its final step.
+2. **Re-align streaming on the recovered base** — the aligned target recipe
+   replayed at lr 5e-6. Two measurements at the same recipe, same aligned data,
+   same guardrail, differing only in the base the recovery produced:
+
+   | base (offline) | first streaming guardrail @250 |
+   |---|---:|
+   | 16.53 (`aligned17b5`) | 26.59 |
+   | **11.76 (`aligned17b6`)** | **16.00** |
+
+   **10.6 points of streaming headroom, transferred directly from offline
+   depth.** That is the two-stage doctrine demonstrated at its most sensitive
+   point: the streaming head can only be as good as the base it is re-aligned
+   onto, and the recovery recipe is what makes the base deep.
+
+**The viva lesson in one line:** the 1.7B's failure was never the streaming
+algorithm (that had been fixed at the 0.6B) nor the quantization machinery — it
+was a *recovery schedule too gentle to move a model that damaged*. One variable
+at a time found it in under a day, and the pipeline that came out has now
+produced the project's first 1.7B numbers in the 0.6B's range.
+
 ### 3.6 What is running right now, and how we know
 
-- **the 1.7B's three-arm experiment** (see §3.5b): `recover2` (no SR, lr
-   1.5e-6), `recover3` (no SR, lr 5e-6), `recover4` (fp32 AdamW) — one variable
-   each; recover1's verdict (no gain from the cycle as shipped) is final.
+- **the two-stage pipeline live** (see §3.5c): `aligned17b6` (Stage B, the
+   aligned replay on the 11.76 base) and `recover6` (cycle 3 of the recovery,
+   init from recover5's 11.76) — the pipeline running its own feed-forward loop.
 - `eval_bin_long`-style evaluators score each selectable checkpoint on full
   samples after a run ends.
 - A 2-hourly automated progress check whose instructions require it to record
