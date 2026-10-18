@@ -2194,3 +2194,32 @@ launch made (two variables in one arm), and it cost a 6-hour run to repeat.
 
 **Still running:** `aligned6` (11769) — by construction a *mix-ratio* experiment
 (6 000 standard / 2 400 aligned) which is itself a never-varied variable.
+
+## 2026-10-18 (16:50) — Three runs in flight; the mix-ratio arm shows the best guardrails yet
+
+*(All of the below are 20-utt in-training guardrail readings. By project rule
+they decide nothing — seven divergences so far — and are quoted only as
+directions. The full-sample evaluations of the finished checkpoints are the
+metric.)*
+
+| run | what it tests | guardrail trajectory |
+|---|---|---|
+| `aligned6` | **mix ratio** 6 000 standard : 2 400 aligned (2.5:1) vs the promoted 1:1 | 15.29 @750 → **9.41 @1000** |
+| `aligned17b7` | the *clean* base isolation (aligned17b5's recipe verbatim; base 16.53 → **10.81**) | 19.06 @750 → **16.94 @1000** |
+| `aligned8` | the real scaled-aligned set (6 000 aligned + 6 000 standard, pool 6 000) | alignment 6 000/6 000 in 6 660 s (the cap fix verified live), training @76 |
+
+**Why these matter:**
+- `aligned6`'s 9.41 is *below* the promoted 0.6B recipe's own guardrail at the
+  same step (11.53 on aligned5). If that holds on full samples, the
+  **mix ratio** — never varied before today, and accidentally produced by the
+  flag caps — may be a real lever for the deliverable.
+- `aligned17b7`'s 16.94 at step 1 000 compares with `aligned17b5`'s ~21 at its
+  matched window: the deeper base is *not* hurting the early streaming head.
+  Whether the *final* full-sample number improves on 19.39/24.09 is the
+  cleanly-isolated question this run exists to answer.
+- `aligned8` is the first run whose aligned pool is genuinely 6 000; its
+  launch-time log self-verified the count.
+
+**Nothing finished this round**, so no evaluations were launched (the standing
+rule: a run's checkpoints are evaluated when it ends, and promotions require
+those full-sample numbers).
