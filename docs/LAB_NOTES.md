@@ -2156,3 +2156,41 @@ their definitions:
 
 Three caps, three separate silent failures in one day — all found by reading the
 artifacts (the log's own "pooled 2400") rather than the flags.
+
+## 2026-10-18 (14:50) — Stage B's headline is a NEGATIVE result; two variables, no attribution; clean and scaled runs launched
+
+**`aligned17b6`'s full-sample streaming evaluation (the pipeline's first
+complete product):**
+
+| arm | base (offline) | aligned set | clean | other |
+|---|---:|---:|---:|---:|
+| `aligned17b5` | 16.53 | 1 200 | **19.39** | **24.09** |
+| `aligned17b6` | **11.76** | 2 400 | **21.08** | **28.30** |
+
+Both splits got *worse* despite the deeper base, and the in-training guardrail's
+16.00 (vs 26.59 on the shallower base) proved — for the **seventh** time — not
+to transfer. **No promotion:** the 1.7B line's best remains aligned17b5's
+19.39/24.09, and the 0.6B's deliverable (11.55/18.98) still leads everything.
+
+**The honest diagnosis is about experimental design, not about the base:**
+`aligned17b6` changed **two** things relative to the line's best run — the base
+(16.53 → 11.76) *and* the aligned set (1 200 → 2 400). With both moved, the
+result cannot say whether depth helps, whether more aligned data hurts at this
+scale, or whether it was the seed. That is the identical mistake the recover1
+launch made (two variables in one arm), and it cost a 6-hour run to repeat.
+
+**Two clean runs launched to fix it:**
+- **`11775` (`aligned17b7`)** — *every* flag identical to `aligned17b5` (the
+  line's best) except **one**: the base, now `recover6`'s **10.81**. This is the
+  project's first single-variable test of "does a deeper recovered base improve
+  streaming?".
+- **`11776` (`aligned8`)** — the 0.6B's *scaled aligned* experiment done
+  properly: `--aligned-n 6000` **and** `--train-n 6000` **and**
+  `--op-max-samples 6000`. Two earlier attempts at this experiment were silently
+  neutered by the caps (an exact duplicate of the existing recipe was killed at
+  11:00, and the 12:55 relaunch pooled 2 400 again because `--train-n` caps the
+  aligner too — so the *standard* side must grow with the aligned side under a
+  50/50 mix). The duplicate flag line left in that launcher was also removed.
+
+**Still running:** `aligned6` (11769) — by construction a *mix-ratio* experiment
+(6 000 standard / 2 400 aligned) which is itself a never-varied variable.
