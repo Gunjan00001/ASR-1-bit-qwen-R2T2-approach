@@ -1990,3 +1990,30 @@ promoted or concluded from the guardrail.
 
 **Cycle 3 (`recover6`) is training** (step ~150 @08:20) — on schedule to feed a
 deeper base for the next Stage-B regardless of how this guardrail wobbles.
+
+## 2026-10-18 (08:40) — Stage B's early readings: an 8-point offline perturbation at step 500
+
+`aligned17b6`'s step-500 in-loop numbers: **offline 19.49** (from the base's
+11.76) and guardrail 22.12. The aligned/streaming mix *costs the recovered base
+about 8 points in the first 500 steps* — a bigger absolute perturbation than
+`aligned17b5` showed on its shallower base (its offline was already recovered to
+16.63/16.74 by steps 1500/2000, i.e. it *held*). Two readings define what to
+watch:
+
+- **Does the offline recover** toward the 11.76 base by steps 1000–2500 (the
+  aligned mix is only 50 % of the batch, so the base's content is still in the
+  loop)? If it recovers while the streaming head improves, the pipeline is
+  sound at this depth too.
+- **Does the streaming follow** — the guardrail went 16.0 → 22.1, which under
+  the standing rule means *nothing*; the full-sample evaluations of the
+  step-checkpoints when the run ends are the only numbers that will be used to
+  compare against 19.39/24.09 and 11.55/18.98.
+
+Recorded as-is: an *interim* reading, deliberately not a conclusion. The
+precedent (aligned17b5: perturbation → recovery) is encouraging; the opposite
+(precedent absent) would mean the aligned recipe needs its own warmup schedule
+at this base depth — a *variable we would then test*, one at a time, as with
+everything else in the 1.7B's campaign.
+
+**Cycle 3 (`recover6`) is at step ~480 and its 500-step offline readout lands
+next**; the two runs together are the pipeline's feed-forward loop.
