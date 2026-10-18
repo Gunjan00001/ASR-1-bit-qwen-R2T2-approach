@@ -20,7 +20,8 @@ filter — the honest "what the model actually emitted" figure).
 
 | state | chunk | clean | other |
 |---|---|---|---|
-| **ternary, aligned targets + LSP — NEW BEST (5 000-step cycle, step 1 000)** | 160 ms | **13.77** | — |
+| **ternary, 6 000-aligned recipe, step 1 000 — NEW BEST clean (2026-10-19)** | 320 ms | **9.96** | 20.11 |
+| ternary, aligned targets + LSP (5 000-step cycle, step 1 000) | 160 ms | **13.77** | — |
 | **ternary, aligned targets + LSP — NEW BEST (step 1 000)** | 320 ms | **11.55** | **18.98** |
 | **ternary, aligned targets + LSP — NEW BEST (step 1 000)** | 1000 ms | **10.70** | — |
 | ternary, aligned targets (T4.1/T4.2) + LSP (previous promoted state) | 160 ms | 13.24 | 20.80 |
@@ -81,6 +82,18 @@ problem.
 | `opd_aligned2bin_final_other` | other | 320 | **26.93** | 17.37 | 40 | 306 | 26.70 |
 | `opd_aligned2_other_c1000` | other | 1000 | **16.59** | 7.27 | 0 | 93 | 16.59 |
 | `al5_step1000` | clean | 320 | **11.55** | 6.41 | 1 | 171 | 11.55 |
+
+### 2026-10-19 — a split promotion
+
+`aligned8/step1000` (the 6 000-aligned-set recipe's selected early state) reads
+**9.96 clean** — 1.59 better than the previous clean best — but **20.11 other**,
+1.13 worse than the 18.98 recorded by `aligned5/step1000`. The two splits now
+have different holders, which is stated rather than hidden: both rows stay in
+the headline tables, and the tag `0.2.48` marks the checkpoint with its caveat.
+The trade-off is not understood yet (candidate explanations: the *other* set's
+harder utterances being more sensitive to this recipe's supervision shift, or
+50-utt noise at ±1); the sweep of the run's other selected states is what will
+tell.
 
 ## What moved the number
 

@@ -64,9 +64,10 @@ a JSON under `artifacts/stage1/` (regenerate the summary with
 | **Ternary, all 196 decoder projections — offline** (28 539-utt cache) | **7.52** | — | `qat_ternary_full` (the run's best in-loop reading; its final checkpoint evaluates 7.63) |
 | Binary, all 196 decoder projections — offline | 10.70 | — | `qat_binary_full` |
 | Streaming, *naive chunked re-feed* variant (not the official algorithm) | 9.43 | — | `streaming_ternary_noprefix128` |
-| **STREAMING, official prefix algorithm — aligned targets + LSP (NEW BEST)** | **11.55** | **18.98** | `streaming_al5_step1000` |
-| ↳ its 160 ms / 1000 ms sweep | 13.77 / **10.70** | — | `streaming_opd_al5best_*` |
-| ↳ previous promoted state — `aligned2`, 2 500-step cycle | 12.92 | 20.00 | `streaming_opd_aligned2` |
+| **STREAMING, official prefix algorithm — aligned targets + LSP** | **9.96** | 20.11 | `streaming_opd_al8s1000` — **best clean** (6 000-aligned recipe, selected step-1 000 state, zero loops; `other` regressed +1.13) |
+| ↳ best `other` so far (same recipe family, smaller aligned set) | 11.55 | **18.98** | `streaming_al5_step1000` |
+| ↳ its 160 ms / 1000 ms sweep | 13.77 / 10.70 | — | `streaming_opd_al5best_*` |
+| ↳ the `aligned2` state (history) | 12.92 | 20.00 | `streaming_opd_aligned2` |
 | ↳ that state at 160 ms / 1000 ms | 13.24 / 10.59 | 20.80 / 16.59 | `*_c160`, `*_c1000` |
 | Streaming, binary arm, same recipe (best measured) | 18.43 | 25.45 | step-1 250 state (weights lost to a resume ✗; final weights give 27.54 / 26.93) |
 | Naive QAT, before the recovery recipe (history) | ≈100 | — | `docs/stage1_results.md` |
