@@ -2017,3 +2017,17 @@ everything else in the 1.7B's campaign.
 
 **Cycle 3 (`recover6`) is at step ~480 and its 500-step offline readout lands
 next**; the two runs together are the pipeline's feed-forward loop.
+
+## 2026-10-18 (09:10) — Cycle 3's warm-restart bump matches cycle 2's shape
+
+`recover6`'s step-500 offline readout: **15.89** (from its 11.76 init) — a +4.1
+bump, the same shape as cycle 2's (16.53 → 20.23, +3.7) and for the same
+reason (a fresh cosine moves the weights before the decay pulls them back).
+Cycle 2 then recovered *through* its init and finished 4.8 points below it
+(20.23 → … → 11.76); if cycle 3 repeats that arithmetic from 11.76, the offline
+lands in the **~7–8** range — the 0.6B's own neighbourhood (7.63). That is the
+number cycle 3's remaining evals decide.
+
+`aligned17b6` (Stage B) is at step 1 000 with its 1 000-step evaluation still
+running (the 1.7B's in-loop evals take ~25–35 minutes on contended cards); its
+500-step readings stand as recorded (offline 19.49, guardrail 22.1).
