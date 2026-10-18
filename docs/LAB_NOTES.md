@@ -1919,3 +1919,33 @@ the same steps (51.3 → 28.2) — the weights are moving toward the fp16-optimu
 even while the ternary readout recovers, which is the opposite of what the
 original QAT runs showed and the clearest sign yet that the recovery recipe is
 operating in a different regime than the first-round damage did.
+
+## 2026-10-18 (06:50) — The multi-cycle recovery hits the 0.6B-parity target: offline 11.76; STAGE B launched
+
+**recover5 completed its 4 000 steps.** Offline ternary trajectory (in-loop,
+50-utt protocol):
+
+| step | 500 | 1000 | 1500 | 2000 | 3000 | 3500 | 4000 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| WER | 20.23 | 17.90 | 17.90 | **15.15** | **13.14** | **11.97** | **11.76** |
+| fp16 readout | 31.3 | 28.2 | 29.1 | 36.1 | 27.0 | 21.9 | 22.9 |
+
+The phase-2 cycle took the 1.7B's offline from **16.53 → 11.76** — below the
+~12 target and, for the first time, in striking distance of the 0.6B's own
+7.63. The fp16 readout *improved* in the same window (the model moved toward
+the full-precision optimum while the ternary readout improved — the opposite of
+the original damage pattern). The trajectory was still descending at step
+4 000, so a third cycle (or a longer cosine) has room left.
+
+**STAGE B launched: `qat_stream_aligned17b6.pbs`** — the aligned streaming SFT
+on this recovered base, mirroring the 0.6B's proven aligned recipe as closely
+as the 1.7B allows (`--aligned-n 2400`, 50/50 mix, stop-stride 2, lr 5e-6,
+fp32 AdamW, 2 500 steps, keep-step-checkpoints 400, mem=64gb, SR off, 12 h).
+Its full-sample streaming evals will say whether the offline's −4.8 points
+carry into the streaming metric (the 0.6B's own offline→streaming gap is
++3.9; if the 1.7B's gap is similar, stage 3 lands ≈15–16, versus its previous
+best 19.39 and the first failed attempt's 29.24).
+
+**Also recorded:** the aligned17b5 (phase-2 base's streaming) result stands at
+19.39/24.09; the two-stage pipeline's numbers above are the *new* base's
+starting line.
