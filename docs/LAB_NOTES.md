@@ -2844,3 +2844,24 @@ best 1.7B streaming number yet (16.53/22.05, zero loops). The depth question is
 now an *interaction*: at 5e-6 the deep base regresses (18.43), at 2.5e-6 it
 wins. The early states' re-evaluations (step 800/1200, now uncollided) will map
 whether the final is the peak or another selection opportunity.
+
+## 2026-10-19 (21:15) — The warmup arm finished too; its sweep is running with the fixed TAG
+
+`aligned17b10` (the `--warmup-steps 500` arm on the 9.85 base) reached step
+2 000 and its job ended cleanly (zero OOMs; checkpoints 400–1600 plus the final
+state). Its guardrail series was 76.0 / 20.47 / 31.06 / 18.59 / 20.24 / 19.53 —
+noise, as established.
+
+Its checkpoint is snapshotted (`last_aligned17b10_end.pt`) and **three
+full-sample evaluations are submitted** (steps 800, 1200, final) through the
+fixed launcher, whose TAG now names the state — so this sweep (and all future
+ones) cannot collide. `aligned17b11`'s early-state re-evaluations are running
+alongside; together they will map the full state landscape of both depth-fix
+arms rather than trusting their final checkpoints.
+
+**What the pair will settle:** the warmup arm tests the *other* half of the
+depth question. The LR arm already showed that halving the LR at the deep base
+produces the line's best pair (16.53/22.05). If the warmup arm also lands near
+that, the depth ceiling is definitively a *recipe* effect and the deep base is
+usable; if it mirrors its 5e-6 twin's regression (18.43), the interaction is
+specifically LR-mediated.
