@@ -2716,3 +2716,21 @@ verdict will come from each arm's **full-sample evaluation** at its final
 checkpoint, exactly as the pipeline's other answers did.
 
 Recorded so the mid-run noise is indexed and not mistaken for a trend.
+
+## 2026-10-19 (13:20) — The warmup arm's 500 (20.47) is also behind the baseline; no guardrail-level separation
+
+| step | b8 baseline (warmup 100, lr 5e-6) | b10 (warmup 500) | b11 (lr 2.5e-6) |
+|---|---|---|---|
+| 250 | 13.65 | 76.0 | 12.94 |
+| 500 | **15.76** | **20.47** | 18.35 |
+
+Both depth-fix arms read *worse* than the baseline at the matched 500-step
+point — b10's 76 → 20.47 is the warmup ramp finishing, and its LR is only just
+at peak, so its early phase is *deliberately* slower. The LR arm's two readings
+are mixed (better at 250, worse at 500).
+
+**Conclusion available at the guardrail level: none.** The three arms are not
+separable on the 20-utt guardrail, which is exactly why the project's rule
+exists. Each arm's **full-sample evaluation at step 2 000** (around 15:00–16:00)
+is the depth-fix verdict — and until then the operating point remains
+`aligned17b7`'s 16.63/23.41 as recorded.
