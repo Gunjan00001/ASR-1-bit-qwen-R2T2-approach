@@ -2998,3 +2998,10 @@ a warning in a docstring is not a fix. Both wasted launches were caught by
 reading the run's own log line (`aligned N/N utts`), not by reasoning. The run
 that was capped (`11871`) is killed; the corrected run is resubmitted and will
 align the true 6 000 (≈100 min, cached for later scaled-aligned arms).
+
+## 2026-10-20 (06:50) — The corrected run is aligning the true 6 000 (fix proven in production)
+
+`aligned17b12` (job `11872`) started cleanly after a GPU pick and printed
+`=== forced-aligner targets: aligning 6000 train utterances (T4.1) ===` then
+`aligned 50/6000 utts (47s)` — the cap is gone. Aligner ETA ≈ 94 min at that
+rate, then 2 000 training steps (~5 h) and the end-of-run evaluation.

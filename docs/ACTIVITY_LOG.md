@@ -1046,7 +1046,7 @@ tags through `0.2.39`).
 
 | job | what | status | ETA |
 |---|---|---|---|
-| 11871 | `qat_stream_aligned17b12.pbs` — deep 9.85 base, lr 2.5e-6, **aligned-n 6 000** (one variable from b11) | queued | aligner ~2–3 h + 2 000 steps ~5 h + end eval ~1 h |
+| 11872 | `qat_stream_aligned17b12.pbs` — deep 9.85 base, lr 2.5e-6, **aligned-n 6 000** (one variable from b11); relaunched after fixing the silent cap | aligning (50/6000 in 47 s) | aligner ≈94 min + 2 000 steps ≈5 h + end eval ≈1 h |
 | 11864 | b10's final `other` split | running | ~1 h |
 
 Rationale: b11 set the line-best pair (16.53/22.05, zero loops) with 1 200
