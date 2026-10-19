@@ -2591,3 +2591,26 @@ could only have re-derived numbers already on disk.
 descending past cycle 4's 9.85. That is *consistent* with the dose-response's
 reversal: the campaign has reached the depth where more recovery does not help
 the pipeline, so cycle 5's value is diagnostic, not a new base to build on.
+
+## 2026-10-19 (10:40) — The warmup arm OOM'd at its first step (sixth churn casualty); relaunched
+
+`aligned17b10`'s alignment finished (1 200/1 200 in 1 301 s) and the job then
+OOM'd at its **first training step** — the same co-tenant-growth race that has
+now killed six runs across the project (the picker saw ≥45 GB, the card filled
+before the first optimizer step). Its twin `aligned17b8` survived on the same
+base and flags purely by timing. Relaunched with the picker's usual discipline.
+
+**Cost note (an engineering improvement worth having later):** each attempt
+re-pays the forced-aligner pass (~22 min here, ~40 min at 2 400 utts). Caching
+the aligned examples (keyed by aligner model, split, aligned-n and stop-stride,
+stored next to the first run that built them) would remove that tax from every
+retry. Not implemented now — recorded as a concrete future win, not a guess.
+
+**The experiment itself is unchanged and still worth running:** `aligned17b10`
+vs `aligned17b8` differ in exactly one flag (`--warmup-steps` 500 vs 100) on the
+same 9.85 base, and the guardrails will say almost immediately whether the
+longer warmup absorbs the early perturbation that the dose-response implicates.
+
+**For the record:** `recover8` is at step ~2 500 of 4 000, still cycling about
+~12–13; the campaign's useful depth (`recover6`, 10.81) remains the Stage-B
+sweet spot until the warmup arm says otherwise.
