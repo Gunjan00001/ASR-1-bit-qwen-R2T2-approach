@@ -1056,3 +1056,10 @@ fresh (the cache is keyed by the 1 200 set) but is itself cached for later
 6 000-aligned runs.
 
 
+
+## 2026-10-20 (05:10) — aligned17b12 relaunched after fixing the silent aligned-n cap
+
+`11871` was killed (it aligned 2 400, not 6 000 — the second occurrence of the
+`--train-n` cap). The loader now takes an explicit `limit`; the aligned path
+loads its own corpus at `--aligned-n`; three tests added. The corrected run is
+resubmitted (aligner ≈100 min, then 2 000 steps).

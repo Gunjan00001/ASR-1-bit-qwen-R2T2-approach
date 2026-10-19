@@ -2978,3 +2978,23 @@ arm skips the 2–3 hour aligner pass, exactly as designed.
 The run is on the deep base at lr 2.5e-6 with only `--aligned-n` changed from
 the line-best — the depth-fix's operating point carried forward to the scaled
 set.
+
+## 2026-10-20 (05:10) — The silent aligned-corpus cap recurred; properly fixed this time
+
+`aligned17b12`'s log read **`aligned 2400/2400` / `0/2400 from cache`** — the
+`--aligned-n 6000` was silently capped at `--train-n` (2 400) for the **second
+time** (the first, 2026-10-18, is written in the flag's own help text). The
+previous "fix" was documentation only; the behaviour never changed.
+
+**Root cause:** the aligned path sliced `train_utts`, which
+`load_train_utterances` had already capped at `--train-n`. **The fix:** the
+loader takes an explicit `limit` (`load_train_utterances(args, limit=...)`),
+and the aligned path now loads its own corpus with `--aligned-n` as the cap.
+Three tests cover it (`tests/test_train_dataset.py`): default = `--train-n`,
+override works, and the cache size is still the ceiling.
+
+**Process lesson, recorded because it is the project's most expensive class:**
+a warning in a docstring is not a fix. Both wasted launches were caught by
+reading the run's own log line (`aligned N/N utts`), not by reasoning. The run
+that was capped (`11871`) is killed; the corrected run is resubmitted and will
+align the true 6 000 (≈100 min, cached for later scaled-aligned arms).

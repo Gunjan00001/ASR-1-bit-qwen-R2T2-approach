@@ -78,11 +78,17 @@ def collate(examples: list[dict], processor) -> dict:
     return full_inputs
 
 
-def load_train_utterances(args: argparse.Namespace) -> list:
-    """Training utterances from a local cache when given, else Hub validation sample."""
+def load_train_utterances(args: argparse.Namespace, limit: int | None = None) -> list:
+    """Training utterances from a local cache when given, else Hub validation sample.
+
+    ``limit`` overrides ``--train-n``. The aligned-targets path passes its own
+    ``--aligned-n`` so that a large aligned pool is not silently capped by the
+    *training* sample count (2026-10-20: a 6 000-aligned run aligned 2 400).
+    """
+    cap = args.train_n if limit is None else limit
     if args.train_cache:
         utterances = load_utterance_cache(args.train_cache)
-        if args.train_n and args.train_n < len(utterances):
-            return utterances[: args.train_n]
+        if cap and cap < len(utterances):
+            return utterances[:cap]
         return utterances
-    return list(iter_librispeech("clean", "validation", sample_n=args.train_n, sample_seed=0))
+    return list(iter_librispeech("clean", "validation", sample_n=cap, sample_seed=0))

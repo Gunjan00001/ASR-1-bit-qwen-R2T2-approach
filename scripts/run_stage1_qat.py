@@ -347,12 +347,11 @@ def main() -> int:
 # examples from forced-aligner timestamps and interleaves them with ordinary
 # transcription samples so content quality does not regress.
     if args.aligned_targets:
-        # NOTE the silent interaction: the aligner only ever sees the training
-        # utterances that were *loaded* (`--train-n`), so `--aligned-n` larger
-        # than `--train-n` quietly does nothing. Raising the aligned pool means
-        # raising *both* (2026-10-18: a run with --aligned-n 6000 and
-        # --train-n 2400 aligned exactly 2400 — a wasted launch).
-        strip = min(args.aligned_n, len(train_utts))
+        # The aligned pool has its own size: load a separate corpus slice with
+        # `--aligned-n` as the cap. Using `train_utts` here silently capped a
+        # 6 000-aligned run at `--train-n` (2 400) twice (2026-10-18, 2026-10-20).
+        aligned_utts = load_train_utterances(args, limit=args.aligned_n)
+        strip = len(aligned_utts)
         print(f"=== forced-aligner targets: aligning {strip} train utterances (T4.1) ===", flush=True)
         from qwen_asr import Qwen3ForcedAligner
 
@@ -362,7 +361,7 @@ def main() -> int:
         # Cache the aligner's words (the expensive part) so retries and re-runs
         # with the same utterance set never pay it twice. Keyed by the exact
         # utterance set + aligner model, so a stale hit is impossible.
-        words_cache = WordsCache(utts_key(train_utts[:strip], DEFAULT_ALIGNER_MODEL))
+        words_cache = WordsCache(utts_key(aligned_utts, DEFAULT_ALIGNER_MODEL))
         aligner = Qwen3ForcedAligner.from_pretrained(DEFAULT_ALIGNER_MODEL)
         align_started = time.perf_counter()
 
@@ -370,7 +369,7 @@ def main() -> int:
             print(f"aligned {done}/{total} utts ({time.perf_counter() - align_started:.0f}s)", flush=True)
 
         aligned = build_aligned_examples(
-            train_utts[:strip],
+            aligned_utts,
             processor,
             aligner,
             chunk_ms=args.op_chunk_ms,
@@ -382,7 +381,7 @@ def main() -> int:
         words_cache.save()
         del aligner
         torch.cuda.empty_cache()
-        op_utterances = train_utts[:strip]
+        op_utterances = aligned_utts
         op_examples = select_evenly(aligned, args.op_max_samples)
         train_examples = interleave_with_ratio(standard_examples, op_examples, args.op_mix_frac)
         print(
