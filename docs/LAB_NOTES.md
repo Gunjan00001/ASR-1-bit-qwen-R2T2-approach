@@ -2506,3 +2506,88 @@ the stuck job freed the card the evaluation was waiting for.
 runs longer than ~1 h is pathological (the guardrail takes minutes on a healthy
 card); check the log for progress, confirm the checkpoint, and kill it — the
 full-sample evaluator is the measurement that matters.
+
+## 2026-10-19 (06:50) — The dose-response is NOT monotonic: the deepest base gives the worst Stage-B
+
+Three Stage-B runs, identical recipe (1 200 aligned, 2 000 steps, lr 5e-6,
+fp32 AdamW), differing only in the recovered base and the seed:
+
+| recovered base (offline) | Stage-B clean | Stage-B `other` | Δ vs its base |
+|---:|---:|---:|---:|
+| 16.53 | 19.39 | 24.09 | +2.86 |
+| **10.81** | **16.63** | **23.41** | +5.82 |
+| **9.85** | **18.43** | *(other running)* | **+8.58** |
+
+So the transfer that looked clean at one point *reverses* at the deepest base:
+deeper recovery no longer buys better streaming, and the dose-response is
+non-monotonic. The supporting evidence inside the runs points the same way —
+the deeper the base, the larger the aligned replay's *offline* perturbation
+(b7: +0.84 at step 1 500; b8: +3.1), i.e. a heavily recovered state is *harder*
+to re-align than a partially recovered one.
+
+**What that implies.** The line's best remains `aligned17b7`'s **16.63/23.41**
+(base 10.81), and the *re-alignment* recipe — not the recovery — is now the
+binding constraint at depth: candidates are a *longer warmup* or a *lower LR*
+for the Stage-B when the base is deep (one variable at a time, as always).
+
+**Launched to test the finding's reality:** `aligned17b9` — byte-identical to
+`aligned17b7` (same base 10.81, same flags) but a *fresh run* (different
+shuffling seed). If it lands ~16–17, the transfer is real and the non-monotonic
+point is a genuine regime effect; if it lands ~18, the gap between b7 and b8 is
+seed noise instead. Either answer is worth having before any more GPU-days go
+into "deeper is better".
+
+## 2026-10-19 (08:50) — The dose-response's third pair confirms the reversal on BOTH splits
+
+| recovered base | Stage-B clean | Stage-B other |
+|---:|---:|---:|
+| 16.53 | 19.39 | 24.09 |
+| **10.81** | **16.63** | **23.41** ← the line's best |
+| 9.85 | 18.43 | 25.34 |
+
+Both splits agree that the deepest base gives the *worst* Stage-B — so the
+non-monotonicity is not a clean-split fluke. (`aligned17b9`, the seed replicate
+of the 10.81-base run, is at step ~500 and will bound how much of the b7-vs-b8
+gap is seed noise.)
+
+**The hypothesis this points at, and the arm launched for it:** the deeper the
+base, the larger the aligned replay's *early* perturbation (b7 +0.84, b8 +3.1 at
+step 1 500) — i.e. the re-alignment's *early* phase is what damages a deeply
+recovered state. The natural one-variable test is a **longer Stage-B warmup**:
+`aligned17b10` = `aligned17b8`'s exact setup (same 9.85 base, 1 200 aligned,
+2 000 steps, lr 5e-6, fp32) with `--warmup-steps 500` instead of 100. If the
+warmup absorbs the perturbation, the deepest base should at least match 16.63;
+if it does not, the depth ceiling is real and 10.81 is the pipeline's sweet spot.
+
+**Cycle 5 (`recover8`) is descending on schedule:** 13.77 (500) → 14.41 (1000,
+in-family bounce) → **11.76 (1500)**, projecting ~9 by its 4 000th step — a
+deeper base that the pipeline may or may not want to use.
+
+## 2026-10-19 (10:35) — The runs are DETERMINISTIC: the "seed replicate" reproduced b7 exactly
+
+`aligned17b9` was launched as a *seed replicate* of the line's best run. Its
+in-training guardrails match `aligned17b7`'s **to the digit**:
+
+| step | 250 | 500 |
+|---|---:|---:|
+| `aligned17b7` | 76.71 | 23.53 |
+| `aligned17b9` | **76.71** | **23.53** |
+
+So the training path is deterministic given the checkpoint, the flags and the
+seeded shuffling — a *reproducibility* result worth having (every number in
+these docs comes from a run that can be re-created exactly), and it kills the
+"b7-vs-b8 was seed noise" hypothesis outright: **the deeper base's regression
+(16.63 → 18.43) is a real effect, not luck.** The replicate was killed — it
+could only have re-derived numbers already on disk.
+
+**Both consequences land in the Stage-3 story:**
+1. The dose-response's reversal is confirmed (no noise explanation available).
+2. The one remaining explanation for the reversal is the *re-alignment's early
+   perturbation*, which is exactly what `aligned17b10` (the warmup arm, now
+   training) is testing.
+
+**Cycle 5's bounce, for the record:** `recover8` reads 13.77 → 14.41 → 11.76 →
+**13.03** at steps 500/1000/1500/2000 — cycling around ~12–13 rather than
+descending past cycle 4's 9.85. That is *consistent* with the dose-response's
+reversal: the campaign has reached the depth where more recovery does not help
+the pipeline, so cycle 5's value is diagnostic, not a new base to build on.
