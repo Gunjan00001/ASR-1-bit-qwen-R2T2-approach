@@ -74,13 +74,15 @@ indexes every failed/successful attempt with its number.
   16.63): if either restores ≥16.63 the deep-base ceiling is a *recipe*
   problem; if neither does, **10.81 is the pipeline's operating point** and
   Stage-B's next lever is elsewhere. Decide on full-sample evals only.
-  (2) **The 1.7B operating point is fixed and measured:** recover to **10.81**
-  (`recover6`, two cycles at lr 5e-6, fp32 AdamW, anchor 0.05) → re-align with
-  the **1 200-utterance** aligned set (`aligned17b7`) → **16.63 clean / 23.41
-  other, zero loops**. Deeper recovery (9.85) *regresses* the Stage-B, and the
-  recovery campaign has plateaued (cycle 5 cycled ~12–13 and was cut at its
-  walltime). Aligned words are now cached (`data/aligned_cache/`), so re-runs
-  skip the 20-minute aligner pass. (3) **The 0.6B line** is saturated by
+  (2) **The 1.7B operating point is fixed and measured:** recover to the deep
+  **9.85** base (recover7 lineage), then re-align with the **1 200-utterance**
+  aligned set at **lr 2.5e-6** (`aligned17b11`) → **16.53 clean / 22.05 other,
+  zero loops** — the line's best pair on both splits. This came from a matched
+  two-arm test of the depth question: the halved LR is what rescues the deep
+  base (18.43/25.34 at 5e-6 → 16.53/22.05), while a 500-step warmup alone is
+  neutral (19.17/~22). The previous 10.81-base / 5e-6 point (16.63/23.41) is
+  retained in the record but is no longer the operating point. Aligned words
+  are cached (`data/aligned_cache/`), so re-runs skip the aligner pass. (3) **The 0.6B line** is saturated by
   measurement: best clean **9.96** (`aligned8/step1000`, tag 0.2.48) and best
   other **18.98** (`aligned5/step1000`) — two different holders, both recorded;
   the scaled aligned set (6 000) reached 11.55, the mix-ratio arm 13.67, the

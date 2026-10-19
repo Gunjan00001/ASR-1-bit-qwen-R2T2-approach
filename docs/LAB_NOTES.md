@@ -2910,3 +2910,32 @@ What remains is the decisive point: **b10's final state** (evaluating now). If
 its late phase keeps the same pattern it could approach or beat the LR arm's
 16.53/22.05 — which would say the *warmup* is the better knob for a deep base.
 If instead it settles in the 19–22 range, the LR halving wins.
+
+## 2026-10-20 (01:30) — Depth-fix verdict: the LR halving is the winner; the warmup is neutral
+
+Both arms' complete full-sample sweeps (1.7B, 320 ms, official algorithm):
+
+| state | b11 (lr 2.5e-6) | b10 (warmup 500) |
+|---|---|---|
+| step 800 | clean 35.91 (16 trunc) / other 25.00 | **clean 19.28 (1 trunc) / other 21.93** |
+| step 1 200 | 32.20 (14) / 35.68 | 22.25 (0) / 25.80 |
+| **final** | **clean 16.53 / other 22.05, 0 loops** | clean 19.17 / other ~22 |
+
+**Verdict.** The deep (9.85) base's Stage-B regression is a *recipe* effect,
+and the effective knob is the **learning rate**, not the warmup:
+- Halving the LR (5e-6 → 2.5e-6) turns 18.43/25.34 into **16.53/22.05** — the
+  best pair in the 1.7B line on both splits.
+- The 500-step warmup alone lands near the baseline (19.17 clean / ~22 other):
+  better `other`, worse `clean` — neutral overall, and it does not reach the
+  LR arm's clean number.
+- The two arms' *shapes* differ and explain each other: the warmup arm's early
+  states are stable (1 truncation) but never descend as far; the LR arm's early
+  states loop badly (16 truncations) and then drop sharply once the streaming
+  head is repaired late. A warmup without the halved LR buys stability, not
+  accuracy.
+
+**The 1.7B operating point is therefore: recover to the deep 9.85 base, then
+re-align at 2.5e-6** (`aligned17b11` = 16.53/22.05, zero loops). This replaces
+the previous 10.81-base / 5e-6 point (16.63/23.41), which was already the
+deep-base-vs-baseline story's better half. The stage-3 recommendation, the
+handoff and the live status carry the new point.
