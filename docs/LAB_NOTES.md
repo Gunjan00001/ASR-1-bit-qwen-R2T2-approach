@@ -2865,3 +2865,26 @@ produces the line's best pair (16.53/22.05). If the warmup arm also lands near
 that, the depth ceiling is definitively a *recipe* effect and the deep base is
 usable; if it mirrors its 5e-6 twin's regression (18.43), the interaction is
 specifically LR-mediated.
+
+## 2026-10-19 (22:55) — The LR arm's state sweep: the FINAL is the peak, and the early states loop
+
+Full-sample clean, `aligned17b11` (lr 2.5e-6, 9.85 base), uncollided names:
+
+| state | clean | loop truncations |
+|---|---:|---:|
+| step 800 | **35.91** | 16 |
+| step 1 200 | **32.20** | 14 |
+| **final (2 000)** | **16.53** (`other` 22.05) | **0** |
+
+Two things are now settled:
+1. **The earlier "35.91" was the step-800 state** — the correction was right, and
+   the final (16.53/22.05) is the arm's, and the line's, best pair.
+2. **For this arm the final state is the peak**, the opposite of the 0.6B's
+   early-peak pattern. The early states *loop* (14–16 truncations) because the
+   streaming head is not yet repaired by the halved-LR re-align; the late phase
+   is where the repair completes. So "evaluate the early states too" is not a
+   universal rule — it is a *per-lineage* fact worth measuring every time, which
+   is precisely what the state sweeps do.
+
+`aligned17b10`'s sweep (the warmup arm) is still running; its three states are
+the other half of the depth-fix question.
