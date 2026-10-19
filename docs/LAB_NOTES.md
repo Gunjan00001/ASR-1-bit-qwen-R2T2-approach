@@ -2939,3 +2939,14 @@ re-align at 2.5e-6** (`aligned17b11` = 16.53/22.05, zero loops). This replaces
 the previous 10.81-base / 5e-6 point (16.63/23.41), which was already the
 deep-base-vs-baseline story's better half. The stage-3 recommendation, the
 handoff and the live status carry the new point.
+
+## 2026-10-20 (01:40) — LAUNCHED: aligned17b12 (aligned-n 1 200 → 6 000), one variable from the line-best
+
+Job `11871` submitted after grep-verifying every decisive flag (policy/bit-width,
+`--init-from qat_17b_recover7/last.pt`, `--aligned-n 6000`, `--lr 2.5e-6`,
+`--steps 2000`, `--keep-step-checkpoints 400`, mem=64gb, 12 h walltime). This
+is the 0.6B's scaled-aligned lesson carried to the 1.7B line, applied to the new
+operating point (deep base + halved LR). One variable, per the rule.
+
+The b10 final `other` split (job `11864`) is the only outstanding number from
+the depth-fix pair; b11's sweep is complete.
