@@ -2734,3 +2734,30 @@ separable on the 20-utt guardrail, which is exactly why the project's rule
 exists. Each arm's **full-sample evaluation at step 2 000** (around 15:00–16:00)
 is the depth-fix verdict — and until then the operating point remains
 `aligned17b7`'s 16.63/23.41 as recorded.
+
+## 2026-10-19 (16:50) — The cadence fix is proven in production; the arms' guardrails are pure noise
+
+**The checkpoint-cadence fix works.** Both depth-fix arms (started after the
+fix) now write step-numbered states at their *own* cadence:
+`aligned17b10` has `step400`/`step800`, `aligned17b11` has
+`step400`/`step800`/`step1200` — where the pre-fix runs had only the 2 000
+multiples. Every 400-step state is now selectable, which is what the 0.6B's
+sharp-optimum result depends on.
+
+**The guardrail series are uninformative at this level of noise:**
+
+| step | 250 | 500 | 750 | 1000 |
+|---|---:|---:|---:|---:|
+| b8 baseline | 13.65 | 15.76 | 78.59 | 19.06 |
+| b10 warmup 500 | 76.0 | 20.47 | 31.06 | — |
+| b11 lr 2.5e-6 | 12.94 | 18.35 | 27.29 | 13.18 |
+
+Within a single run the number swings by 14 points between adjacent 250-step
+marks; across arms, ordering reverses between marks. Recording them as a
+*series* is the only honest use; no single reading supports a conclusion. The
+depth-fix verdict remains the **full-sample evaluations at step 2 000** (b11
+~2 h away, b10 ~4 h, both healthy with zero OOMs).
+
+**And the selectable states exist now:** when the arms end, the evaluator can
+score step 400/800/1200/1600 as well as the final state — the selection
+protocol will be applied to the answer, not just the run.
