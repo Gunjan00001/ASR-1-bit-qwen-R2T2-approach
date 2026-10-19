@@ -2967,3 +2967,14 @@ operating point is the deep base re-aligned at 2.5e-6 (`aligned17b11`).
 
 `aligned17b12` (the scaled aligned set, 6 000) is running its aligner pass — the
 next arm on the new operating point.
+
+## 2026-10-20 (05:00) — The 6 000-aligned arm's aligner pass finished and is cached
+
+`aligned17b12`'s aligner completed the 6 000-utterance pass (`data/aligned_cache/`
+now holds **two** files: the 1 200-set from b11 and the 6 000-set), and the run
+has moved into training. The 6 000-keyed cache means any future scaled-aligned
+arm skips the 2–3 hour aligner pass, exactly as designed.
+
+The run is on the deep base at lr 2.5e-6 with only `--aligned-n` changed from
+the line-best — the depth-fix's operating point carried forward to the scaled
+set.
