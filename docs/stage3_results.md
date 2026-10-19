@@ -71,6 +71,28 @@ ternary WER):
   then re-align with the 1 200-utterance aligned set; remaining levers are more
   recovery depth and whatever the 0.6B-side mix-ratio/scale runs show.
 
+### 3.bis The dose-response — and where it reverses
+
+Three Stage-B runs with an *identical* recipe (1 200 aligned utterances,
+2 000 steps, lr 5e-6, fp32 AdamW), differing only in the recovered base and the
+seed:
+
+| recovered base (offline) | Stage-B clean | Stage-B other | Δ vs its own base |
+|---:|---:|---:|---:|
+| 16.53 | 19.39 | 24.09 | +2.86 |
+| **10.81** | **16.63** | **23.41** | +5.82 |
+| 9.85 | 18.43 | 25.34 | +8.58 |
+
+**Deeper recovery stops paying — and then reverses.** The intermediate base is
+the pipeline's sweet spot so far, and the in-run evidence says why: the deeper
+the base, the larger the aligned replay's *early* perturbation (b7 +0.84, b8
++3.1 at step 1 500). A heavily recovered state is harder to re-align than a
+partially recovered one, so the *re-alignment* recipe — not the recovery — is
+the binding constraint at depth. Two arms are measuring that directly: a seed
+replicate of the 10.81-base run (`aligned17b9`) to bound the noise, and a
+warmup arm (`aligned17b10`, `--warmup-steps 500`) to test whether a gentler
+early phase absorbs the perturbation.
+
 ## 3. The recipes that got here (and the failures, with numbers)
 
 1. **FFN warm start, then attention rollout** (the 0.6B's recipe shape) →
