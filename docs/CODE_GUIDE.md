@@ -61,6 +61,7 @@ src/asr1bit/
     examples.py       on-policy + distilled example builders
     dataset.py        ordinary transcription examples, collation, batching
     aligned.py        aligned-target examples (the streaming fix)
+    aligned_cache.py  caches the aligner's words (retries skip the expensive pass)
     onpolicy.py       rollouts, distillation targets, degenerate filtering
     inloop_eval.py    cheap in-training evaluations (guardrails, not metrics)
     checkpoints.py    save / load / selectable step checkpoints

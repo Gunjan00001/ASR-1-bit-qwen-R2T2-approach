@@ -24,6 +24,7 @@ def build_aligned_examples(
     lookahead_ms: int = 0,
     stop_stride: int = 2,
     progress=None,
+    words_cache=None,
 ) -> list[dict]:
     """Chunk-aligned SFT samples from forced-aligner word timestamps (T4.3).
 
@@ -41,8 +42,15 @@ def build_aligned_examples(
 
     examples: list[dict] = []
     empty_seen = 0
+    hits = 0
     for index, utt in enumerate(utterances):
-        words = align_words(utt.audio, utt.text, aligner=aligner)
+        words = None if words_cache is None else words_cache.get(index)
+        if words is not None:
+            hits += 1
+        else:
+            words = align_words(utt.audio, utt.text, aligner=aligner)
+            if words_cache is not None and words:
+                words_cache.put(index, words)
         if not words:
             continue
         empty_seen = 0
@@ -77,4 +85,6 @@ def build_aligned_examples(
             )
         if progress is not None and (index + 1) % 50 == 0:
             progress(index + 1, len(utterances))
+    if words_cache is not None:
+        print(f"aligned words: {hits}/{len(utterances)} from cache", flush=True)
     return examples

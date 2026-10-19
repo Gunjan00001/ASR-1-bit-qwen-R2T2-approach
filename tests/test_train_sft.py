@@ -488,3 +488,51 @@ class TestSelectEvenly:
         picked = select_evenly(list(range(10)), 4)
         assert picked == [0, 2, 5, 7]
         assert select_evenly(list(range(10)), 4) == picked
+
+
+class TestWordsCache:
+    """The aligner-words cache: a hit must skip the aligner entirely."""
+
+    def test_roundtrip_and_alignment_skip(self, tmp_path):
+        from asr1bit.train.aligned import build_aligned_examples
+        from asr1bit.train.aligned_cache import WordsCache, utts_key
+
+        class U:
+            def __init__(self, text, duration):
+                self.text, self.duration = text, duration
+                self.audio = [0.0] * 16000  # sliceable, one second
+
+        utts = [U("HELLO THERE", 1.0), U("SECOND ONE", 1.0)]
+        calls = {"n": 0}
+
+        from types import SimpleNamespace
+
+        def fake_align(audio, text, aligner=None):
+            calls["n"] += 1
+            return [SimpleNamespace(text="HELLO", start=0.0, end=0.4),
+                    SimpleNamespace(text="THERE", start=0.4, end=0.9)]
+
+        # the builder imports align_words *inside* the function from its source
+        # module, so the patch must land there
+        import asr1bit.data.align as align_mod
+        orig = align_mod.align_words
+        align_mod.align_words = fake_align
+        try:
+            cache = WordsCache(utts_key(utts, "m"), directory=tmp_path)
+            first = build_aligned_examples(utts, processor=_FakeProcessor(), aligner=object(),
+                                           words_cache=cache)
+            assert calls["n"] == 2 and first
+            cache.save()
+
+            cache2 = WordsCache(utts_key(utts, "m"), directory=tmp_path)
+            second = build_aligned_examples(utts, processor=_FakeProcessor(), aligner=object(),
+                                            words_cache=cache2)
+            assert calls["n"] == 2, "a cache hit must not call the aligner again"
+            assert len(second) == len(first)
+        finally:
+            align_mod.align_words = orig
+
+
+class _FakeProcessor:
+    def apply_chat_template(self, messages, add_generation_prompt=True, tokenize=False):
+        return "<|prompt|>"

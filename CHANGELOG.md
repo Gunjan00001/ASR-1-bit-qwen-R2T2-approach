@@ -133,6 +133,20 @@ complete; the gate is **not met** and `0.3.0` is intentionally untagged.
   readouts stay clean. Full WER table and analysis in
   `docs/stage1_results.md` (updated 2026-10-10). `0.3.0` stays untagged.
 
+## 0.2.49 — aligned-words cache, checkpoint-cadence fix (2026-10-19)
+
+- **Aligned-words cache** (`train/aligned_cache.py`): the forced aligner's
+  output is persisted (JSON, keyed by the utterance set + aligner model) so a
+  retry or re-run never pays the 20–40 min alignment pass twice; a corrupt or
+  missing cache is a miss, never an error. Tested (a hit must not call the
+  aligner again).
+- **Step-checkpoint cadence fix**: `--keep-step-checkpoints` had been nested
+  inside the `--save-every` branch, so with 250/400 only multiples of 2 000 were
+  ever written. The cadences are now independent.
+- Stage-3 result of record: two-stage pipeline proven single-variable
+  (base 16.53 → 10.81 improved streaming 19.39 → **16.63/23.41**; a deeper
+  9.85 base regressed to 18.43/25.34, and the runs are bit-reproducible).
+
 ## 0.2.41 – 0.2.46 — Stage 4: the streaming algorithm is freed (2026-10-12..15)
 
 **Headline.** The official Qwen3-ASR prefix algorithm used to *collapse* for

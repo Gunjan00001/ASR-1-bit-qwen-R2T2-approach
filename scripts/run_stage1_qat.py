@@ -357,7 +357,12 @@ def main() -> int:
         from qwen_asr import Qwen3ForcedAligner
 
         from asr1bit.data.align import DEFAULT_ALIGNER_MODEL
+        from asr1bit.train.aligned_cache import WordsCache, utts_key
 
+        # Cache the aligner's words (the expensive part) so retries and re-runs
+        # with the same utterance set never pay it twice. Keyed by the exact
+        # utterance set + aligner model, so a stale hit is impossible.
+        words_cache = WordsCache(utts_key(train_utts[:strip], DEFAULT_ALIGNER_MODEL))
         aligner = Qwen3ForcedAligner.from_pretrained(DEFAULT_ALIGNER_MODEL)
         align_started = time.perf_counter()
 
@@ -372,7 +377,9 @@ def main() -> int:
             lookahead_ms=args.aligned_lookahead_ms,
             stop_stride=args.aligned_stop_stride,
             progress=align_progress,
+            words_cache=words_cache,
         )
+        words_cache.save()
         del aligner
         torch.cuda.empty_cache()
         op_utterances = train_utts[:strip]
