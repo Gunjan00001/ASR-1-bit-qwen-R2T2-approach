@@ -2639,3 +2639,29 @@ base it would extend, so there is no signal to continue from. The next 1.7B
 question is the *warmup arm* now training (`aligned17b10`, testing whether a
 gentler early phase rescues the deeper 9.85 base) — and after that, the line's
 remaining lever is the re-alignment recipe itself, not the recovery.
+
+## 2026-10-19 (11:50) — The depth-fix experiment's second arm launched; the cache's first live use (a miss, as expected)
+
+**Two one-variable tests now run against `aligned17b8`** (the deep-base
+regression, 18.43 clean vs the shallower base's 16.63), sharing the same 9.85
+base and recipe:
+
+| arm | what changes |
+|---|---|
+| `aligned17b10` | `--warmup-steps` 500 (vs 100) |
+| `aligned17b11` | `--lr` 2.5e-6 (vs 5e-6) |
+
+If either restores ≥ 16.63 on this base, the depth ceiling is a *recipe*
+problem, not a property of deep recovery — and the pipeline gains a working
+deep-base setting.
+
+**The aligned-words cache's first live run reports `0/1200 from cache`** — a
+miss, exactly as expected: the *first* run whose code contains the cache pays
+the aligner pass and then persists it, so every subsequent Stage-B run on the
+same utterance set (any lr, warmup or steps) reuses it. That is the intended
+behaviour and the reason the cache is keyed only by the utterance set and
+aligner model: all four depth-fix arms will share one alignment.
+
+**`aligned17b10` is in its step-250 evaluation** (steps logged to 246, no OOMs);
+its first guardrail will be the direct comparison against b8's 13.65 at the
+same step.
