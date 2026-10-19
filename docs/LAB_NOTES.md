@@ -2950,3 +2950,20 @@ operating point (deep base + halved LR). One variable, per the rule.
 
 The b10 final `other` split (job `11864`) is the only outstanding number from
 the depth-fix pair; b11's sweep is complete.
+
+## 2026-10-20 (02:50) — The depth-fix pair is complete: b11 16.53/22.05 vs b10 19.17/22.39
+
+`aligned17b10`'s final `other` split landed (22.39, zero loops), closing the
+matched pair on the deep 9.85 base:
+
+| arm | knob | clean | other |
+|---|---|---:|---:|
+| b11 | lr 5e-6 → **2.5e-6** | **16.53** | **22.05** |
+| b10 | **warmup 100 → 500** | 19.17 | 22.39 |
+
+Both splits favour the LR arm. The verdict is unchanged and now fully measured:
+the deep-base rescue is **LR-mediated**, the warmup is neutral. The 1.7B
+operating point is the deep base re-aligned at 2.5e-6 (`aligned17b11`).
+
+`aligned17b12` (the scaled aligned set, 6 000) is running its aligner pass — the
+next arm on the new operating point.
