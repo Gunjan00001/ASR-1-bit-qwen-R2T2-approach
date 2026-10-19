@@ -2665,3 +2665,25 @@ aligner model: all four depth-fix arms will share one alignment.
 **`aligned17b10` is in its step-250 evaluation** (steps logged to 246, no OOMs);
 its first guardrail will be the direct comparison against b8's 13.65 at the
 same step.
+
+## 2026-10-19 (12:10) — The cache works in production; the warmup arm's first guardrail needs the LR context
+
+**The aligned-words cache is live.** `aligned17b11`'s run reported `0/1200 from
+cache` (a miss, expected on the first run carrying the code), aligned the set,
+and **saved `data/aligned_cache/b378f925bbf9d098.json`** — 953 KB covering all
+1 200 utterances' word timestamps. Its key comes only from the utterance set and
+the aligner model, and b8/b10/b11 all align the same first 1 200 training
+utterances, so **every subsequent 1 200-aligned Stage-B run will hit this
+cache** and skip the pass entirely.
+
+**The warmup arm's step-250 guardrail is 76.0 versus b8's 13.65 — and that is
+the warmup doing its job, not a failure.** With `--warmup-steps 500` the
+learning rate at step 250 is still ~15–20 % of peak, so the model has barely
+moved; b8 (warmup 100) is at full LR by step 250 and has already adapted. The
+comparison only becomes meaningful where the *learning rates match* (from step
+500 on) — and even that is a guardrail; the run's **full-sample evaluation** is
+the measurement that matters, especially given that this arm's entire purpose is
+to change the *early* dynamics.
+
+Recorded so the next reader does not mistake the 76 for a regression: a warmup
+and a schedule change the guardrail's *timing*, not necessarily the outcome.
