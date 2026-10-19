@@ -2687,3 +2687,16 @@ to change the *early* dynamics.
 
 Recorded so the next reader does not mistake the 76 for a regression: a warmup
 and a schedule change the guardrail's *timing*, not necessarily the outcome.
+
+## 2026-10-19 (12:20) — The LR arm's first guardrail (12.94 @250) edges b8's 13.65; too early to call
+
+`aligned17b11` (the 2.5e-6 arm on the same 9.85 base) reads **12.94** at its
+step-250 guardrail versus `aligned17b8`'s **13.65** at the same step — a
+directionally encouraging but single-step difference. The warmup arm
+(`aligned17b10`) is at 326 steps with its first reading (76.0) explained by its
+LR still ramping; its comparable point (step 500, where its LR is at peak)
+arrives next.
+
+Both arms' *full-sample* evaluations are the measurement. Recorded here so the
+mid-run numbers are indexed, not over-read — this project has eight guardrail
+divergences on file.
