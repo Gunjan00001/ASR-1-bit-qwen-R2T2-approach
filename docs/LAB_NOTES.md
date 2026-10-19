@@ -2783,3 +2783,33 @@ have lived, so 800/1 200/2 000 are all scored rather than trusting the final.
 
 `aligned17b10` (the warmup arm) is at step ~1 250 and ends later tonight;
 its sweep follows the same pattern when it does.
+
+## 2026-10-19 (18:50) — The gentler-LR arm is much WORSE (35.91): the depth hypothesis is failing
+
+`aligned17b11` (lr **2.5e-6**, same 9.85 base as b8's 5e-6) finished and its
+final state's full-sample clean reads **35.91** (16 loop truncations, raw
+38.24) — roughly *double* the baseline it was meant to improve on:
+
+| arm | LR | base | final clean |
+|---|---:|---:|---:|
+| b7 (the operating point) | 5e-6 | **10.81** | **16.63** |
+| b8 (the regression) | 5e-6 | 9.85 | 18.43 |
+| **b11 (this arm)** | **2.5e-6** | 9.85 | **35.91** |
+
+The gentler LR does not rescue the deep base — it makes it dramatically worse,
+which inverts the hypothesis: the deep base does not need a *softer* re-align,
+it needs at least the full 5e-6 push (and even that cannot match the 10.81
+base). The in-run pattern supports that reading: the recovered base's
+streaming head is broken (a recovery-only state collapses at ~285), so a weak
+aligned SFT barely repairs it — hence 35.91 rather than ~18.
+
+**The two early states (800/1 200) are still evaluating** (the cards are heavily
+contended; the eval's RTF 19 explains the 1.9-hour wall). If an early state is
+dramatically better than the final, the sharp-optimum lesson would matter here
+too; otherwise the conclusion is clean: **the pipeline's operating point is the
+10.81 base with the full-strength re-align, and the deep-base question is
+closed** — deeper recovery both regresses the Stage-B *and* resists rescue by
+the obvious recipe knobs.
+
+`aligned17b10` (the warmup arm) is at step ~1 570; its sweep will confirm or
+contradict the "softer is worse" pattern with the other knob.
