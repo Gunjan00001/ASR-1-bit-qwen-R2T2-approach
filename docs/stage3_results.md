@@ -83,7 +83,13 @@ seed:
 | **10.81** | **16.63** | **23.41** | +5.82 |
 | 9.85 | 18.43 | 25.34 | +8.58 |
 
-**Deeper recovery stops paying — and then reverses.** The intermediate base is
+**Corrected 2026-10-19 (20:55):** a fourth point changes the shape — the same
+deep base (9.85) with the Stage-B **learning rate halved to 2.5e-6** reaches
+**16.53 / 22.05**, the best 1.7B pair yet. So depth and LR *interact*: at 5e-6
+the deep base regresses, at 2.5e-6 it wins. The original three points remain
+below for the record.
+
+**Deeper recovery stops paying at the original LR — and then reverses.** The intermediate base is
 the pipeline's sweet spot so far, and the in-run evidence says why: the deeper
 the base, the larger the aligned replay's *early* perturbation (b7 +0.84, b8
 +3.1 at step 1 500). A heavily recovered state is harder to re-align than a

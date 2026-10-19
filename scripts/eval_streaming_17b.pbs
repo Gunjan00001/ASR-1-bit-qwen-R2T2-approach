@@ -26,7 +26,7 @@ LOG="artifacts/stage1/eval_streaming_17b.log"
 CKPT="${CKPT:-data/checkpoints/qat_stream_aligned17b4/last.pt}"
 # TAG defaults to the checkpoint's directory name, so two different
 # 1.7B checkpoints can never overwrite each other's result JSONs.
-TAG="${TAG:-$(basename "$(dirname "$CKPT")")}"
+TAG="${TAG:-$(basename "$(dirname "$CKPT")")_$(basename "$CKPT" .pt)}"
 
 if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then
   PY=/tmp/asr1bit/miniconda3/bin/python

@@ -2813,3 +2813,34 @@ the obvious recipe knobs.
 
 `aligned17b10` (the warmup arm) is at step ~1 570; its sweep will confirm or
 contradict the "softer is worse" pattern with the other knob.
+
+## 2026-10-19 (20:55) — CORRECTION: the LR arm is a NEW LINE-BEST (16.53 / 22.05), not 35.91
+
+**The corrected record.** `aligned17b11`'s *final* state (lr 2.5e-6 on the 9.85
+base) measures **16.53 clean / 22.05 other, zero loops** — better than the
+previous line-best on **both splits**:
+
+| arm | base | LR | clean | other |
+|---|---:|---:|---:|---:|
+| b7 (previous best) | 10.81 | 5e-6 | 16.63 | 23.41 |
+| b8 | 9.85 | 5e-6 | 18.43 | 25.34 |
+| **b11 (NEW LINE-BEST)** | **9.85** | **2.5e-6** | **16.53** | **22.05** |
+
+**What went wrong in the previous entry, and why it matters.** My sweep submitted
+three evaluations (steps 800/1200/final) through the same launcher, whose TAG
+was only the checkpoint *directory* — so all three wrote the same
+`streaming_..._clean/other.json` and overwrote one another. The 35.91 I recorded
+was an *early* state's number, and I drew a "hypothesis falsified" conclusion
+from a file that had already been replaced. Two process rules come out of it:
+1. **The TAG now includes the checkpoint's own name**
+   (`...b11_step800`, `...b11_last`), so a state sweep can never collide.
+2. **A number is not "final" until its JSON's `checkpoint` field names the state
+   it belongs to.** Reading the JSON rather than the shared log would have
+   caught this immediately; the log is a stream, the JSON is a record.
+
+**The science, corrected:** the "gentler Stage-B for a deep base" hypothesis is
+**confirmed**, not falsified — halving the LR at the 9.85 base produces the
+best 1.7B streaming number yet (16.53/22.05, zero loops). The depth question is
+now an *interaction*: at 5e-6 the deep base regresses (18.43), at 2.5e-6 it
+wins. The early states' re-evaluations (step 800/1200, now uncollided) will map
+whether the final is the peak or another selection opportunity.
