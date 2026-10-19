@@ -2888,3 +2888,25 @@ Two things are now settled:
 
 `aligned17b10`'s sweep (the warmup arm) is still running; its three states are
 the other half of the depth-fix question.
+
+## 2026-10-20 (00:15) — The warmup arm's early states are much stronger than the LR arm's
+
+Full-sample clean, the two depth-fix arms at matched states:
+
+| state | b11 (lr 2.5e-6) | b10 (warmup 500) |
+|---|---:|---:|
+| step 800 | 35.91 (16 trunc) | **19.28 (1 trunc)** |
+| step 1 200 | 32.20 (14 trunc) | **22.25 (0 trunc)** |
+| final | 16.53 (`other` 22.05) | *pending* |
+
+The warmup arm's early states are **13–16 points better** and loop almost
+never. The mechanism is visible: the LR arm starts at full-rate adaptation
+(its first 800 steps are spent repairing, hence the truncations), while the
+warmup arm holds the model near the base for 500 steps and *then* adapts — a
+gentler entry. Its `other` splits also read far better early (b11's 800/1200
+`other` = 25.00/35.68).
+
+What remains is the decisive point: **b10's final state** (evaluating now). If
+its late phase keeps the same pattern it could approach or beat the LR arm's
+16.53/22.05 — which would say the *warmup* is the better knob for a deep base.
+If instead it settles in the 19–22 range, the LR halving wins.
