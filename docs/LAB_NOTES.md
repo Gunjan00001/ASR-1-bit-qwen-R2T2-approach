@@ -2614,3 +2614,28 @@ longer warmup absorbs the early perturbation that the dose-response implicates.
 **For the record:** `recover8` is at step ~2 500 of 4 000, still cycling about
 ~12–13; the campaign's useful depth (`recover6`, 10.81) remains the Stage-B
 sweet spot until the warmup arm says otherwise.
+
+## 2026-10-19 (11:20) — Cycle 5 was cut by its walltime at ~step 2500; the campaign has plateaued
+
+`recover8`'s job hit its 10-hour walltime at step ~2 500 of 4 000 (no OOMs — the
+log simply stops in the end-of-run generation). What it leaves on disk is the
+**step-2000 state** (`last.pt` and `step2000.pt` share the 09:13 timestamp), and
+its measured trajectory was 13.77 / 14.41 / 11.76 / **13.03** — cycling around
+~12–13, never approaching cycle 4's 9.85.
+
+**That is the campaign's plateau, and it agrees with the dose-response:** more
+recovery beyond the 10.81 base does not help, and now the *recovery itself*
+stops improving past cycle 4. The pipeline's operating point is therefore
+fixed and measured:
+
+- **recover to 10.81** (`recover6`) — two cycles at lr 5e-6, fp32 AdamW, anchor
+  0.05, 4 000 steps each;
+- **re-align with the 1 200-utterance set** (`aligned17b7`) — 2 000 steps, lr
+  5e-6, fp32;
+- result: **16.63 clean / 23.41 other, zero loops** — the 1.7B line's best.
+
+Nothing resumes cycle 5: its checkpoint's readout (13.03) is *worse* than the
+base it would extend, so there is no signal to continue from. The next 1.7B
+question is the *warmup arm* now training (`aligned17b10`, testing whether a
+gentler early phase rescues the deeper 9.85 base) — and after that, the line's
+remaining lever is the re-alignment recipe itself, not the recovery.
