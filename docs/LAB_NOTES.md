@@ -2761,3 +2761,25 @@ depth-fix verdict remains the **full-sample evaluations at step 2 000** (b11
 **And the selectable states exist now:** when the arms end, the evaluator can
 score step 400/800/1200/1600 as well as the final state — the selection
 protocol will be applied to the answer, not just the run.
+
+## 2026-10-19 (16:55) — The LR arm reached step 2 000; its state sweep is evaluating
+
+`aligned17b11` (lr 2.5e-6 on the 9.85 base) finished its 2 000 steps. Its
+guardrails are the clearest demonstration yet that the 20-utt in-training number
+is noise at this level:
+
+| step | 250 | 500 | 750 | 1000 | 1250 | 1500 | 1750 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| b11 | 12.94 | 18.35 | 27.29 | 13.18 | **46.59** | 12.94 | 16.24 |
+
+An 18-to-46 swing between adjacent 250-step marks inside one run — recorded as
+a series only, as the rule says.
+
+**The state sweep is running** (`11849` step 800, `11850` step 1 200, `11851`
+final; all full-sample, official algorithm, LTP policy, 1.7B model, mem=64gb).
+The step set follows the 0.6B's sharp-optimum lesson: the *early* part of the
+trajectory (≈40 % of the run, i.e. step 800) is where the record-winning states
+have lived, so 800/1 200/2 000 are all scored rather than trusting the final.
+
+`aligned17b10` (the warmup arm) is at step ~1 250 and ends later tonight;
+its sweep follows the same pattern when it does.
