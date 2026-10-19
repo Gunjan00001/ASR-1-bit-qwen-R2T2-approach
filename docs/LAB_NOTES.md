@@ -2700,3 +2700,19 @@ arrives next.
 Both arms' *full-sample* evaluations are the measurement. Recorded here so the
 mid-run numbers are indexed, not over-read — this project has eight guardrail
 divergences on file.
+
+## 2026-10-19 (12:45) — The matched step-500 guardrails are MIXED: no verdict from them
+
+| step | b8 baseline (warmup 100, lr 5e-6) | b10 (warmup 500) | b11 (lr 2.5e-6) |
+|---|---|---|---|
+| 250 | 13.65 | 76.0 *(LR ramping)* | **12.94** |
+| 500 | 15.76 | *(arriving)* | **18.35** |
+
+The LR arm is *better* at 250 and *worse* at 500; the warmup arm's first
+comparable point is still arriving. In other words the guardrails carry no
+usable signal for this question — which is consistent with everything this
+project has learned about them (eight divergences on file). The depth-fix
+verdict will come from each arm's **full-sample evaluation** at its final
+checkpoint, exactly as the pipeline's other answers did.
+
+Recorded so the mid-run noise is indexed and not mistaken for a trend.
