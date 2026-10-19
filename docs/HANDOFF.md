@@ -68,18 +68,29 @@ indexes every failed/successful attempt with its number.
   `--keep-step-checkpoints 500`) to recover a binary streaming state better than
   the 27.54/26.93 of the resumed weights (the 18.43/25.45 step-1 250 state was
   lost to that resume).
-- **Next:** (1) the two 0.6B runs in flight — `qat_stream_aligned5r.pbs` (one
-  longer aligned cycle: 5 000 steps at lr 5e-6 from the 7.5 base; decide on
-  *full-sample* evals only, tagged `_aligned5`, one per chunk) and
-  `qat_stream_bin_es.pbs` + `scripts/eval_bin_es.pbs` (the binary early-stopping
-  re-run; pick its best step-500/1 000/1 500 state, since the 18.43/25.45 one
-  was lost to a resume); (2) the **quantizer-side levers** for the
-  quantization-damage gap — stochastic rounding and co-training (precision
-  schedules / mixed ternary-binary) are the untried options, alongside scale;
-  (3) the **1.7B** when a quiet GPU appears (≥45 GB stable free; the anchored
-  fp32-AdamW recipe per §0) — its content (offline 1.17 vs the 0.6B's 2.44) is
-  the other path to the gate; (4) the write-up — `docs/stage4_results.md` is
-  generated from the artifacts, PROJECT_STATUS/stage1_results carry the matrix.
+- **Next:** (1) **the depth-fix pair in flight** (`aligned17b10` =
+  `--warmup-steps 500`, `aligned17b11` = `--lr 2.5e-6`, both on the same 9.85
+  base as `aligned17b8`, which regressed to 18.43 vs the shallower base's
+  16.63): if either restores ≥16.63 the deep-base ceiling is a *recipe*
+  problem; if neither does, **10.81 is the pipeline's operating point** and
+  Stage-B's next lever is elsewhere. Decide on full-sample evals only.
+  (2) **The 1.7B operating point is fixed and measured:** recover to **10.81**
+  (`recover6`, two cycles at lr 5e-6, fp32 AdamW, anchor 0.05) → re-align with
+  the **1 200-utterance** aligned set (`aligned17b7`) → **16.63 clean / 23.41
+  other, zero loops**. Deeper recovery (9.85) *regresses* the Stage-B, and the
+  recovery campaign has plateaued (cycle 5 cycled ~12–13 and was cut at its
+  walltime). Aligned words are now cached (`data/aligned_cache/`), so re-runs
+  skip the 20-minute aligner pass. (3) **The 0.6B line** is saturated by
+  measurement: best clean **9.96** (`aligned8/step1000`, tag 0.2.48) and best
+  other **18.98** (`aligned5/step1000`) — two different holders, both recorded;
+  the scaled aligned set (6 000) reached 11.55, the mix-ratio arm 13.67, the
+  binary arm 26.80. More 0.6B recipe search is *not* where value lies.
+  (4) **The quantizer-side levers** remain the untried half for the gate:
+  stochastic rounding was measured *harmful* (24.15 vs 20.76, tag-adjacent
+  experiment 2026-10-16); co-training (precision schedules / mixed
+  ternary-binary) is still untested. (5) The write-up is current:
+  `docs/stage3_results.md` (1.7B, incl. the dose-response), `stage4_results.md`
+  (0.6B streaming), this file and the live status.
 
 ---
 
