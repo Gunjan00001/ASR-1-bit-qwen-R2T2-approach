@@ -3005,3 +3005,15 @@ align the true 6 000 (≈100 min, cached for later scaled-aligned arms).
 `=== forced-aligner targets: aligning 6000 train utterances (T4.1) ===` then
 `aligned 50/6000 utts (47s)` — the cap is gone. Aligner ETA ≈ 94 min at that
 rate, then 2 000 training steps (~5 h) and the end-of-run evaluation.
+
+## 2026-10-20 (06:50) — The scaled arm has its true 6 000 aligned and cached; training now
+
+`aligned17b12` finished the 6 000-utterance aligner pass — `data/aligned_cache/`
+holds a **third** key now (the 1 200, the 2 400 from the capped attempt, and the
+6 000) — and the run has entered training. Any future 6 000-aligned arm skips
+the pass entirely.
+
+This is the first true scaled-aligned arm at the 1.7B: the deep 9.85 base at
+lr 2.5e-6 with `--aligned-n 6000`, one variable from the line-best b11
+(16.53/22.05). Its answer tests whether the 0.6B's scaled-set gain (best `other`
+at 6 000 aligned) carries to the 1.7B line.
