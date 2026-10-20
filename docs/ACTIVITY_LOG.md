@@ -1075,3 +1075,9 @@ resubmitted (aligner ≈100 min, then 2 000 steps).
 Recipe: deep 9.85 base → re-align at lr 2.5e-6 with the 6 000-aligned set, then
 select step 1 600 (the run's step 1 200 state is broken: 131.57, 121 loops).
 Tagged `0.2.50`. The sweep jobs `11891`–`11893` finished; no new runs launched.
+
+## 2026-10-20 (22:55) — LAUNCH: aligned17b13 (aligned-n 12 000, one variable from the line-best)
+
+| job | what | status | ETA |
+|---|---|---|---|
+| 11896 | `qat_stream_aligned17b13.pbs` — deep 9.85 base, lr 2.5e-6, **12 000 aligned** | aligning | ≈3 h aligner + 2 000 steps ≈5 h + end eval ≈1 h |

@@ -3093,3 +3093,13 @@ would have shipped 15.89/22.16; a *single*-state protocol at 1 200 would have
 shipped a disaster. The sweep is what makes the result trustworthy.
 
 **Promotion (1.7B line): `aligned17b12`/step1600 = 15.15 clean / 18.98 other.**
+
+## 2026-10-20 (22:55) — LAUNCHED: aligned17b13, the scaled set's second point (12 000)
+
+Job `11896` submitted after grep-verifying the decisive flags (deep 9.85 base
+`qat_17b_recover7/last.pt`, `--aligned-n 12000`, `--lr 2.5e-6`, `--steps 2000`,
+`--keep-step-checkpoints 400`, mem=64gb, 12 h walltime). One variable from the
+line-best b12: the aligned set doubles 6 000 → 12 000. Purpose: measure whether
+the scaled-aligned gain (1 200 → 6 000 was worth ~1.4 clean) is still rising or
+has flattened. Aligner pass ≈3 h at the measured rate, cached under the 12 000
+key for later arms; then 2 000 steps and the end-of-run evaluation.
