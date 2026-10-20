@@ -3052,3 +3052,22 @@ not a slow card — check the log, confirm the checkpoint, kill. Same class as
 `11781` (the b8 run, 5 h).
 
 The three full-sample evaluations are the measurement, as always.
+
+## 2026-10-20 (16:55) — The scaled arm beats the line-best on clean: 15.15 at step 1 600
+
+Full-sample, `aligned17b12` (deep 9.85 base, lr 2.5e-6, **6 000 aligned**):
+
+| state | clean | truncations |
+|---|---:|---:|
+| step 1 600 | **15.15** | 0 |
+| final (2 000) | 15.89 | 3 |
+
+Both beat b11's 16.53, so the 0.6B's scaled-aligned lesson **does** carry to the
+1.7B: at the same base and LR, quadrupling the aligned set (1 200 → 6 000)
+improves clean by 1.4 points. The peak is at 1 600 here — the third distinct
+selection pattern in the lineage (0.6B early-peak, b11 final-peak, b12
+late-but-not-final) — which is exactly why every run gets a state sweep.
+
+**Pending:** the `other` splits (both jobs are still in their second pass). If
+they hold at or below b11's 22.05, this is the full line-best pair. Promotion
+and the docs updates wait on that number, per the rule.
