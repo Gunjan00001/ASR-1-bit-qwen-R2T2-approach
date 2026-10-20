@@ -41,9 +41,10 @@
   capacity**: the fp16 *0.6B* streams at 2.54 / 6.27 (near the 1.7B's
   2.24 / 4.61), while quantization alone costs +5.4 on the offline path
   (2.11 → 7.5), more than the entire +1.5 budget. Whether that damage shrinks
-  with scale is the 1.7B question, and it now has a working pipeline (multi-cycle
-  recovery at lr 5e-6 → 11.76 offline → aligned replay → 19.39/24.09 streaming,
-  zero loops; see `docs/stage3_results.md`). The full
+  with scale is the 1.7B question, and it now has a working pipeline with a
+  measured answer: deep 9.85 base → re-align at lr 2.5e-6 with the 6 000-aligned
+  set → **15.15 clean / 18.98 other** (step 1 600; zero loops on clean; see
+  `docs/stage3_results.md`). The full
   matrix is in the streaming section below and `docs/stage1_results.md` (offline) and `docs/stage4_results.md` (streaming); every
   failed recipe (with numbers) is kept in `docs/LAB_NOTES.md`.
 
@@ -179,7 +180,7 @@ conversion collapses; recovery must come from training, not from the quantizer.
 | 0 — baselines & harness | **gate passed** (`0.2.0`) | fp16 numbers reproduced on T4 |
 | 1 — BitLinear + QAT | **written gate MET; accuracy outcome poor** | the gate was "loss controllable; WER table emitted" — both true (audited quantizer, exact-memorization test, `stage1_results.md`) — but the naive run collapsed (≈100 WER), which is why Stage 2 exists |
 | 2 — accuracy recovery | **delivered in practice** | full-cache recipe + anneal → ternary **7.52** / binary **10.70** offline (mid-way it was 14.4/16.2 etc.); the `+1.5` *offline* bar remains open |
-| 3 — scale to 1.7B | **two-stage pipeline works** | recover offline at lr 5e-6 (20.55 → **16.53**) → replay the aligned streaming recipe → **19.39 clean / 24.09 other, zero loops**; the remaining mountain is ~5 more recovery-side points (≈10.7 streaming = the 0.6B-scale parity line), then the multi-cycle campaign |
+| 3 — scale to 1.7B | **two-stage pipeline works; line-best measured** | recover offline (20.55 → 16.53 → 11.76), then a deep 9.85 base re-aligned at lr 2.5e-6 with 6 000 aligned → **15.15 clean / 18.98 other** (step 1 600, zero loops on clean); the LR/depth/warmup interactions and the state sweep are recorded |
 | 4 — streaming parity (LSP) | **recipe delivered; gate open** | official algorithm 203.5 → **11.55 clean / 18.98 other**, zero loops (tag 0.2.47); gate (320 ms ≤ 3.74/6.11) unmet — gap is quantization damage |
 | 5 — edge deployment | not started | packing/GGUF/CPU kernels |
 | 6 — evaluation & writeup | **begun** | docs + figures regenerated from artifacts; `stage4_results.md` holds the streaming record |
@@ -276,7 +277,7 @@ python scripts/inspect_checkpoint.py --checkpoint <ckpt> --policy decoder_attn_f
    The full 28.5 k cache is the next scale-up for the offline recipe.
 
 **Stage 3 — scale to 1.7B**
-6. ✅ The two-stage pipeline works: recover at lr 5e-6 (16.53 offline) → aligned replay streaming at 19.39 clean / 24.09 other, zero loops.
+6. ✅ The two-stage pipeline works: recover offline (16.53 → 11.76) → aligned replay streaming; the line-best is now **15.15 clean / 18.98 other** (deep 9.85 base, lr 2.5e-6, 6 000 aligned, step 1 600, zero loops on clean).
 7. First streaming measurement: **29.24 clean / 33.75 other** (CER 16.99/19.93) from
    an offline 24.05 — the streaming recipe transfers (gap +5.2), but the 1.7B's
    quantization damage (+22.4 against its fp16 1.63) is far above the 0.6B's
