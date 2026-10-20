@@ -3017,3 +3017,11 @@ This is the first true scaled-aligned arm at the 1.7B: the deep 9.85 base at
 lr 2.5e-6 with `--aligned-n 6000`, one variable from the line-best b11
 (16.53/22.05). Its answer tests whether the 0.6B's scaled-set gain (best `other`
 at 6 000 aligned) carries to the 1.7B line.
+
+## 2026-10-20 (08:45) — The scaled arm at step ~500: one good guardrail, one absurd one
+
+`aligned17b12` reads **13.18** at step 250 and **151.06** at step 500 — a 138-point
+swing inside one run, the most extreme drift recorded yet. This is exactly the
+in-training guardrail the promotion rule excludes, and it is written down so the
+spike cannot later be read as a trend: the run's number is its **full-sample
+evaluation**, not either of these. Training is healthy (zero OOMs, ~3h40m in).
