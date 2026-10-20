@@ -3025,3 +3025,17 @@ swing inside one run, the most extreme drift recorded yet. This is exactly the
 in-training guardrail the promotion rule excludes, and it is written down so the
 spike cannot later be read as a trend: the run's number is its **full-sample
 evaluation**, not either of these. Training is healthy (zero OOMs, ~3h40m in).
+
+## 2026-10-20 (13:45) — The scaled arm completed 2 000 steps; its sweep is evaluating
+
+`aligned17b12` reached step 2 000 (guardrails ended 12.71 / **12.47** at
+1 500/1 750 — the best of a noisy series, still not a decision number). Its
+final checkpoint is snapshotted (`last_aligned17b12_end.pt`) and **three
+full-sample evaluations are submitted** (steps 1 200, 1 600, final; jobs
+`11891`–`11893`) under the state-named TAG.
+
+The step set is the late half of the trajectory: this run's guardrails
+*improved* toward the end (unlike b11's early collapse), so the final and its
+neighbours are the plausible peaks. The full-sample pair will say whether the
+6 000-aligned set beats b11's 16.53/22.05 — the scaled-set question carried
+from the 0.6B.
