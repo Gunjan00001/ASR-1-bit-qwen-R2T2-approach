@@ -3103,3 +3103,20 @@ line-best b12: the aligned set doubles 6 000 → 12 000. Purpose: measure whethe
 the scaled-aligned gain (1 200 → 6 000 was worth ~1.4 clean) is still rising or
 has flattened. Aligner pass ≈3 h at the measured rate, cached under the 12 000
 key for later arms; then 2 000 steps and the end-of-run evaluation.
+
+## 2026-10-21 (00:50) — The 12 000 request is data-capped at 8 000, not code-capped
+
+`aligned17b13` printed `aligned 8000/8000 utts` (6651 s, cached under its own
+key — the fourth). Unlike the earlier silent cap, this ceiling is **the
+training cache itself**: `qat_clean_train.100_n8000.pt` holds 8 000 utterances,
+and the aligned path can only draw from it. The loader's `limit` is behaving
+correctly (limit 12 000 > available 8 000).
+
+**Decision: let it run.** The 8 000-aligned point is a genuine third measurement
+of the scaling curve (1 200 → 6 000 → 8 000), just a smaller step than planned
+(+33 % rather than +100 %). Building a larger cache would take another hour and
+churn a healthy run for a modest delta; the 8 000 result tells us whether the
+6 000 gain is flattening, which is the actual question.
+
+**Recorded so the run is not later mistaken for the 12 000 arm it was meant to
+be** — the launcher's `--aligned-n 12000` is correct; the data is the ceiling.

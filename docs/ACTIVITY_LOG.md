@@ -1080,4 +1080,4 @@ Tagged `0.2.50`. The sweep jobs `11891`–`11893` finished; no new runs launched
 
 | job | what | status | ETA |
 |---|---|---|---|
-| 11896 | `qat_stream_aligned17b13.pbs` — deep 9.85 base, lr 2.5e-6, **12 000 aligned** | aligning | ≈3 h aligner + 2 000 steps ≈5 h + end eval ≈1 h |
+| 11896 | `qat_stream_aligned17b13.pbs` — deep 9.85 base, lr 2.5e-6, **12 000 aligned requested, data-capped at 8 000** (training cache size) | aligned 8000/8000, training | 2 000 steps ≈5 h + end eval ≈1 h |
