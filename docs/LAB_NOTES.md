@@ -3039,3 +3039,16 @@ The step set is the late half of the trajectory: this run's guardrails
 neighbours are the plausible peaks. The full-sample pair will say whether the
 6 000-aligned set beats b11's 16.53/22.05 — the scaled-set question carried
 from the 0.6B.
+
+## 2026-10-20 (14:55) — aligned17b12's trainer hung in its end-of-run generation; killed per the rule
+
+The run reached step 2 000 at 13:41 and then sat in its end-of-run guardrail
+generation for 1 h 48 m (the log's last lines are all the generation banner).
+The checkpoint is confirmed (`last_aligned17b12_end.pt`, 5.6 GB, written 13:41;
+the trainer's own `last.pt` at 14:24 is the same weights) and the state sweep
+(`11891`–`11893`) is running independently, so **job `11872` is killed**. This
+is the established pathology rule: an end-of-run eval over ~1 h means a hang,
+not a slow card — check the log, confirm the checkpoint, kill. Same class as
+`11781` (the b8 run, 5 h).
+
+The three full-sample evaluations are the measurement, as always.
