@@ -1063,3 +1063,15 @@ fresh (the cache is keyed by the 1 200 set) but is itself cached for later
 `--train-n` cap). The loader now takes an explicit `limit`; the aligned path
 loads its own corpus at `--aligned-n`; three tests added. The corrected run is
 resubmitted (aligner ≈100 min, then 2 000 steps).
+
+## 2026-10-20 (18:55) — PROMOTION (1.7B line): aligned17b12/step1600 = 15.15 clean / 18.98 other
+
+| metric | previous line-best (b11) | **new line-best (b12/1600)** |
+|---|---:|---:|
+| clean | 16.53 | **15.15** |
+| other | 22.05 | **18.98** |
+| loops (clean/other) | 0 / 0 | 0 / 4 |
+
+Recipe: deep 9.85 base → re-align at lr 2.5e-6 with the 6 000-aligned set, then
+select step 1 600 (the run's step 1 200 state is broken: 131.57, 121 loops).
+Tagged `0.2.50`. The sweep jobs `11891`–`11893` finished; no new runs launched.

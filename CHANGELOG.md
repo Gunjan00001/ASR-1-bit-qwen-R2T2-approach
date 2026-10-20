@@ -133,6 +133,20 @@ complete; the gate is **not met** and `0.3.0` is intentionally untagged.
   readouts stay clean. Full WER table and analysis in
   `docs/stage1_results.md` (updated 2026-10-10). `0.3.0` stays untagged.
 
+## 0.2.50 — 2026-10-20
+
+**Fixed** — the aligned corpus was silently capped by `--train-n` for the second
+time (`aligned17b12`'s first launch aligned 2 400 instead of 6 000). The loader
+now takes an explicit `limit`; the aligned path loads its own corpus at
+`--aligned-n`; three tests cover it. The earlier "fix" was documentation only —
+the lesson is recorded in LAB_NOTES.
+
+**Result** — the 1.7B line's best pair moves to **15.15 clean / 18.98 other**
+(`aligned17b12` step 1600: deep 9.85 base, lr 2.5e-6, 6 000 aligned, 320 ms,
+official algorithm, zero loops on clean). The scaled aligned set beats the
+1 200-aligned arm on both splits (16.53/22.05), and the same run's step 1 200
+reads 131.57 with 121 loop truncations — the state sweep is load-bearing.
+
 ## 0.2.49 — aligned-words cache, checkpoint-cadence fix (2026-10-19)
 
 - **Aligned-words cache** (`train/aligned_cache.py`): the forced aligner's

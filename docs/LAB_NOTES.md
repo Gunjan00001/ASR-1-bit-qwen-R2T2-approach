@@ -3071,3 +3071,25 @@ late-but-not-final) — which is exactly why every run gets a state sweep.
 **Pending:** the `other` splits (both jobs are still in their second pass). If
 they hold at or below b11's 22.05, this is the full line-best pair. Promotion
 and the docs updates wait on that number, per the rule.
+
+## 2026-10-20 (18:50) — The scaled arm's sweep is complete: step 1 600 is a NEW LINE-BEST PAIR (15.15 / 18.98)
+
+| state | clean | other | truncations |
+|---|---:|---:|---:|
+| step 1 200 | **131.57** | — | 121 |
+| **step 1 600** | **15.15** | **18.98** | 0 / 4 |
+| final (2 000) | 15.89 | 22.16 | 3 / 1 |
+
+Step 1 600 beats the previous line-best (b11: 16.53/22.05) on **both splits**
+by 1.38 and 3.07, and its `other` 18.98 equals the *0.6B deliverable's* best
+`other`. Read with the depth-fix pair (`aligned17b10`/`b11`), the recipe now has
+three measured facts: LR halving rescues the deep base, the warmup does not,
+and the **scaled aligned set (6 000) is worth a further ~1.4 clean** at the same
+base/LR.
+
+Step 1 200 is the cautionary counterpart: **131.57 with 121 loop truncations** —
+a broken state 400 steps before the best one. A final-checkpoint-only protocol
+would have shipped 15.89/22.16; a *single*-state protocol at 1 200 would have
+shipped a disaster. The sweep is what makes the result trustworthy.
+
+**Promotion (1.7B line): `aligned17b12`/step1600 = 15.15 clean / 18.98 other.**

@@ -75,14 +75,17 @@ indexes every failed/successful attempt with its number.
   problem; if neither does, **10.81 is the pipeline's operating point** and
   Stage-B's next lever is elsewhere. Decide on full-sample evals only.
   (2) **The 1.7B operating point is fixed and measured:** recover to the deep
-  **9.85** base (recover7 lineage), then re-align with the **1 200-utterance**
-  aligned set at **lr 2.5e-6** (`aligned17b11`) → **16.53 clean / 22.05 other,
-  zero loops** — the line's best pair on both splits. This came from a matched
-  two-arm test of the depth question: the halved LR is what rescues the deep
-  base (18.43/25.34 at 5e-6 → 16.53/22.05), while a 500-step warmup alone is
-  neutral (19.17/~22). The previous 10.81-base / 5e-6 point (16.63/23.41) is
-  retained in the record but is no longer the operating point. Aligned words
-  are cached (`data/aligned_cache/`), so re-runs skip the aligner pass. (3) **The 0.6B line** is saturated by
+  **9.85** base (recover7 lineage), then re-align with the **6 000-utterance**
+  aligned set at **lr 2.5e-6** (`aligned17b12`), selecting the **step-1600**
+  state → **15.15 clean / 18.98 other** (0 / 4 loops at 320 ms) — the line's
+  best pair on both splits. Three measured facts sit under it: halving the LR
+  rescues the deep base (18.43/25.34 → 16.53/22.05 for the 1 200-aligned arm),
+  a 500-step warmup alone is neutral (19.17/22.39), and the scaled aligned set
+  is worth a further ~1.4 clean. **State selection is load-bearing**: step 1 200
+  of that same run reads 131.57 (121 loop truncations) while step 1 600 reads
+  15.15. Every arm gets a state sweep; aligned words are cached
+  (`data/aligned_cache/`, keys for 1 200/2 400/6 000), so re-runs skip the
+  aligner pass. (3) **The 0.6B line** is saturated by
   measurement: best clean **9.96** (`aligned8/step1000`, tag 0.2.48) and best
   other **18.98** (`aligned5/step1000`) — two different holders, both recorded;
   the scaled aligned set (6 000) reached 11.55, the mix-ratio arm 13.67, the
