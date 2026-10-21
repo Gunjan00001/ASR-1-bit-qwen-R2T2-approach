@@ -3184,3 +3184,15 @@ the direct control on the streaming/standard balance, so shifting one step
 toward standard samples tests whether fewer aligned examples per batch buys a
 loop-free clean state at some cost to `other`. The 6 000 cache makes this arm
 cheap to start: training begins immediately.
+
+## 2026-10-21 (22:55) — The mix arm completed 2 000 steps; sweep submitted
+
+`aligned17b14` (mix-frac 0.4 on the line-best recipe) finished all 2 000 steps
+and exited cleanly (the step grid includes `step2000.pt`). Guardrails ended
+21.88 / **17.18** (1 750/2 000) — the tightest series of any 1.7B arm, consistent
+with the mix change stabilizing the head, but still not a decision number.
+
+Snapshot taken (`last_aligned17b14_end.pt`) and the sweep is submitted
+(1 200 / 1 600 / 2 000). The question: does the standard-heavier mix buy a
+loop-free clean at or below the line-best's 15.15, and what does it cost
+`other` (18.98)?
