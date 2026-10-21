@@ -3216,3 +3216,23 @@ fewer aligned examples should hurt the hard split most).
 
 Recorded with the hypothesis stated and refuted the same way as the warmup arm:
 the mix axis at 0.5 is a local optimum, and the next lever must be elsewhere.
+
+## 2026-10-22 (02:50) — The mix arm is fully refuted (other 27.7–36.1); LAUNCHED: aligned17b15, 6 000 steps
+
+**Mix arm complete.** `aligned17b14` (mix 0.4) full-sample: clean 18.01, `other`
+27.73 (its best of three; 36.14/28.41 at other states), loops 11–12. Both splits
+worse than b12 (15.15/18.98) and the loop count *rose*. The 0.5 mix is a local
+optimum on this axis, and the arm is closed.
+
+**Launched (12072): `aligned17b15`, the long-run arm.** The line-best recipe
+exactly (deep 9.85 base, lr 2.5e-6, 6 000 aligned from cache, mix 0.5) with
+**`--steps 6000`** — one variable from b12. Rationale: the 2 000-step runs peak
+late (b12's best was step 1 600 of 2 000), so the cosine schedule never finishes
+its late phase.
+
+**Resume design (the 12 h walltime covers ~2 900 steps at ~4/min):** step
+checkpoints every 400, `last.pt` snapshotted before each resume, and the LR
+schedule advances to the resumed position. The run is intended as a 2–3 chunk
+chain (0→~2 900→~5 800→6 000); each chunk starts training immediately from the
+cached 6 000-aligned set. Disk headroom is ample (320 T free; each full
+checkpoint set ~40 GB).

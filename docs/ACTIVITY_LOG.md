@@ -1087,3 +1087,9 @@ Tagged `0.2.50`. The sweep jobs `11891`–`11893` finished; no new runs launched
 | job | what | status | ETA |
 |---|---|---|---|
 | 12037 | `qat_stream_aligned17b14.pbs` — deep 9.85 base, lr 2.5e-6, 6 000 aligned (cached), **mix 0.4** | queued | 2 000 steps ≈5 h + end eval ≈1 h |
+
+## 2026-10-22 (02:50) — LAUNCH: aligned17b15 (6 000 steps, line-best recipe; chained across walltime)
+
+| job | what | status | ETA |
+|---|---|---|---|
+| 12072 | `qat_stream_aligned17b15.pbs` — deep 9.85 base, lr 2.5e-6, 6 000 aligned (cached), mix 0.5, **steps 6 000** | running | chunk 1 → ~2 900 steps in 12 h; resumes follow |
