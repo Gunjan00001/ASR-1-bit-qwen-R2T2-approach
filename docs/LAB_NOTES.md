@@ -3131,3 +3131,20 @@ end-of-run phase with minutes of walltime left. Guardrails ended 20.0 / 31.76 /
 Snapshot taken (`last_aligned17b13_end.pt`) and the sweep is submitted
 (1 200 / 1 600 / final, `11967`–`11969`). This is the scaling curve's third
 point: 1 200 → 6 000 gave +1.4 clean; 8 000 asks whether it is flattening.
+
+## 2026-10-21 (12:50) — The 8 000-aligned arm's early states are broken; the final is still evaluating
+
+| state | clean | loop truncations |
+|---|---:|---:|
+| step 1 200 | 28.81 | 85 |
+| step 1 600 | 27.33 | 62 |
+| final (2 000) | *queued* | — |
+
+Same shape as b12: the deep-base scaled runs leave the streaming head unrepaired
+through the middle of training (b12's step 1 200 was 131.57), and the late phase
+is where repair completes. b12's final was 15.15; this run's final is the
+number that decides whether 8 000 beats 6 000, and it is queued (`11969`) behind
+its own 1 600 second pass.
+
+Recorded rather than extrapolated: the mid-run states cannot answer the scaling
+question in either direction.
