@@ -3120,3 +3120,14 @@ churn a healthy run for a modest delta; the 8 000 result tells us whether the
 
 **Recorded so the run is not later mistaken for the 12 000 arm it was meant to
 be** — the launcher's `--aligned-n 12000` is correct; the data is the ceiling.
+
+## 2026-10-21 (10:55) — The 8 000-aligned arm reached 2 000 steps just before its walltime; sweep launched
+
+`aligned17b13` completed all 2 000 steps at ~10:50 (the pace recovered to
+~4.2 steps/min), leaving the final checkpoint saved and the job to its
+end-of-run phase with minutes of walltime left. Guardrails ended 20.0 / 31.76 /
+42.12 — noise, as always.
+
+Snapshot taken (`last_aligned17b13_end.pt`) and the sweep is submitted
+(1 200 / 1 600 / final, `11899`–`11901`). This is the scaling curve's third
+point: 1 200 → 6 000 gave +1.4 clean; 8 000 asks whether it is flattening.
