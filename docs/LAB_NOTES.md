@@ -3196,3 +3196,23 @@ Snapshot taken (`last_aligned17b14_end.pt`) and the sweep is submitted
 (1 200 / 1 600 / 2 000). The question: does the standard-heavier mix buy a
 loop-free clean at or below the line-best's 15.15, and what does it cost
 `other` (18.98)?
+
+## 2026-10-22 (00:50) — The mix arm's clean sweep says the hypothesis was backwards
+
+`aligned17b14` (mix-frac 0.4) full-sample clean by state:
+
+| state | clean | loop truncations |
+|---|---:|---:|
+| step 1 200 | 38.14 | 12 |
+| step 1 600 | 28.18 | 19 |
+| final (2 000) | **18.01** | 12 |
+
+All three are worse than the line-best b12 (15.15 at step 1 600), and the loops
+did *not* drop — 12 at the final versus b12's 4. So shifting the mix toward
+standard samples **hurts both clean and loop repair**; the streaming/standard
+balance at 0.5 was already the better point on this axis. The `other` splits are
+still computing; they will complete the picture (expected to be worse, since
+fewer aligned examples should hurt the hard split most).
+
+Recorded with the hypothesis stated and refuted the same way as the warmup arm:
+the mix axis at 0.5 is a local optimum, and the next lever must be elsewhere.
