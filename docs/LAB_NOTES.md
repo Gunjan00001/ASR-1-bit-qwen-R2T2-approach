@@ -3148,3 +3148,25 @@ its own 1 600 second pass.
 
 Recorded rather than extrapolated: the mid-run states cannot answer the scaling
 question in either direction.
+
+## 2026-10-21 (14:55) — The 8 000-aligned arm: new BEST `other` (17.95), clean regresses (21.72)
+
+| arm | aligned | clean | other | loops (clean/other) |
+|---|---:|---:|---:|---|
+| b10 (1 200, warmup) | 1 200 | 19.17 | 22.39 | 0 / 0 |
+| b11 (1 200) | 1 200 | 16.53 | 22.05 | 0 / 0 |
+| **b12 (line-best pair)** | **6 000** | **15.15** | **18.98** | 0 / 4 |
+| **b13 (best other)** | **8 000** | 21.72 | **17.95** | 27 / 1 |
+
+Two separate facts:
+1. **`other` keeps improving with the aligned set** — 22.05 → 18.98 → **17.95**
+   is monotone across 1 200 → 6 000 → 8 000, and 17.95 is the best `other` in
+   the whole project (better than the 0.6B deliverable's 18.98).
+2. **`clean` does not** — 16.53 → 15.15 → 21.72. The 8 000 run's final carries
+   27 loop truncations, i.e. the head is less fully repaired at that state; the
+   scaling of the aligned *data* buys robustness on the hard split (`other`)
+   without buying clean.
+
+So the line-best **pair** remains b12 (15.15/18.98) — a state that wins both
+splits — while b13 holds the single-split record for `other`. Both are recorded
+as measured; no promotion changes hands, per the both-splits rule for the pair.

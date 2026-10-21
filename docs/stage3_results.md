@@ -139,3 +139,10 @@ qsub -v CKPT=data/checkpoints/<run>/last.pt scripts/eval_streaming_17b.pbs
 ```
 Launchers are committed with their runs; every number above traces to a log
 under `artifacts/stage3/` or a JSON under `artifacts/stage1/`.
+**Scaled aligned set, third point (2026-10-21):** 8 000 aligned reads **clean
+21.72 / other 17.95** at its final state (27 clean loops). So the aligned-set
+scaling moves the two splits differently: `other` is monotone in the set size
+(22.05 → 18.98 → 17.95 for 1 200 → 6 000 → 8 000), while `clean` peaks at
+6 000 (15.15). The line-best *pair* therefore stays at 6 000; the single-split
+`other` record now belongs to 8 000.
+
