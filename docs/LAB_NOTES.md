@@ -3170,3 +3170,17 @@ Two separate facts:
 So the line-best **pair** remains b12 (15.15/18.98) — a state that wins both
 splits — while b13 holds the single-split record for `other`. Both are recorded
 as measured; no promotion changes hands, per the both-splits rule for the pair.
+
+## 2026-10-21 (16:55) — LAUNCHED: aligned17b14, the mix-fraction arm (0.5 → 0.4)
+
+Job `12037` submitted after grep-verifying the decisive flags (deep 9.85 base,
+`--aligned-n 6000` — cache hit, no aligner pass — `--op-mix-frac 0.4`,
+`--lr 2.5e-6`, `--steps 2000`, `--keep-step-checkpoints 400`, mem=64gb, 12h
+walltime). One variable from the line-best b12.
+
+Rationale from the sweep: the scaled-set curve left `clean`'s late states with
+4–27 loop truncations while `other` improved monotonically. The mix fraction is
+the direct control on the streaming/standard balance, so shifting one step
+toward standard samples tests whether fewer aligned examples per batch buys a
+loop-free clean state at some cost to `other`. The 6 000 cache makes this arm
+cheap to start: training begins immediately.

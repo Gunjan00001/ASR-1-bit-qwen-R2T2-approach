@@ -1081,3 +1081,9 @@ Tagged `0.2.50`. The sweep jobs `11891`–`11893` finished; no new runs launched
 | job | what | status | ETA |
 |---|---|---|---|
 | 11967–11969 | b13's state sweep (1 200 / 1 600 / final; 8 000-aligned arm) | queued | full samples ≈1–2 h each |
+
+## 2026-10-21 (16:55) — LAUNCH: aligned17b14 (mix-frac 0.5 → 0.4, one variable from the line-best)
+
+| job | what | status | ETA |
+|---|---|---|---|
+| 12037 | `qat_stream_aligned17b14.pbs` — deep 9.85 base, lr 2.5e-6, 6 000 aligned (cached), **mix 0.4** | queued | 2 000 steps ≈5 h + end eval ≈1 h |
