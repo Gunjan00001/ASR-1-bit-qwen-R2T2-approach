@@ -3129,5 +3129,5 @@ end-of-run phase with minutes of walltime left. Guardrails ended 20.0 / 31.76 /
 42.12 — noise, as always.
 
 Snapshot taken (`last_aligned17b13_end.pt`) and the sweep is submitted
-(1 200 / 1 600 / final, `11899`–`11901`). This is the scaling curve's third
+(1 200 / 1 600 / final, `11967`–`11969`). This is the scaling curve's third
 point: 1 200 → 6 000 gave +1.4 clean; 8 000 asks whether it is flattening.

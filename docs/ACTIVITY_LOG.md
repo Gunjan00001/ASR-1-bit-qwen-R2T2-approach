@@ -1080,4 +1080,4 @@ Tagged `0.2.50`. The sweep jobs `11891`–`11893` finished; no new runs launched
 
 | job | what | status | ETA |
 |---|---|---|---|
-| 11899–11901 | b13's state sweep (1 200 / 1 600 / final; 8 000-aligned arm) | queued | full samples ≈1–2 h each |
+| 11967–11969 | b13's state sweep (1 200 / 1 600 / final; 8 000-aligned arm) | queued | full samples ≈1–2 h each |
