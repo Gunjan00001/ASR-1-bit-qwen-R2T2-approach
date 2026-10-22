@@ -3336,3 +3336,24 @@ clean after three arms that matched or lost it. The early state is again
 under-repaired (35.70 at step 1 200), exactly the predicted risk, and the late
 repair is what carries it. Whether this becomes the line-best **pair** depends
 on the `other` split, still computing (the bar: ≤ 18.98).
+
+## 2026-10-22 (23:15) — The 1.25e-6 arm: new CLEAN record (14.94) but `other` regresses (21.59) — the pair stands
+
+| state | clean | other | loops (c/o) |
+|---|---:|---:|---|
+| step 1 200 | 35.70 | 31.93 | 4 / 2 |
+| **step 1 600** | **14.94** | 21.59 | 6 / 0 |
+| final (2 000) | 16.31 | 22.16 | 4 / 0 |
+
+Two facts:
+- **The clean record moves:** 14.94 at step 1 600 — the best clean number in the
+  1.7B line, beating b12's 15.15. The second LR halving genuinely helps the
+  clean split.
+- **`other` pays for it:** 21.59 vs b12's 18.98 (+2.61). The LR axis is a
+  trade-off, not a monotone win: 2.5e-6 is the *balanced* pair, 1.25e-6 is the
+  *clean-heavy* point.
+
+So the line-best **pair** remains b12 (15.15/18.98), and the single-split clean
+record is now b16/step1600 = **14.94**. Both are recorded as measured; the LR
+axis now has three points (5e-6, 2.5e-6, 1.25e-6), and its shape is clear:
+clean improves as LR falls, `other` turns over between 2.5e-6 and 1.25e-6.
