@@ -3357,3 +3357,23 @@ So the line-best **pair** remains b12 (15.15/18.98), and the single-split clean
 record is now b16/step1600 = **14.94**. Both are recorded as measured; the LR
 axis now has three points (5e-6, 2.5e-6, 1.25e-6), and its shape is clear:
 clean improves as LR falls, `other` turns over between 2.5e-6 and 1.25e-6.
+
+## 2026-10-22 (23:20) — LAUNCHED: aligned17b17, the quantizer-side ablation (FFN-only 1.58-bit, attention fp16)
+
+Job `12342` submitted after grep-verifying the decisive flags
+(`--policy decoder_ffn`, `--bit-width 1.58`, deep 9.85 base, `--aligned-n 6000`
+from cache, `--lr 2.5e-6`, mix 0.5, 2 000 steps, mem=64gb, 12h walltime).
+
+**Why this is the highest-value next experiment.** The four recipe axes are
+settled and the remaining gap is quantization damage (+22.4 offline at the
+1.7B). This arm asks *where* the damage lives: quantize the FFN only and leave
+the attention — the streaming-sensitive sliding-window stack — in fp16.
+- If streaming recovers sharply, the attention carries the damage and the gate's
+  path is a **mixed-precision policy** (FFN ternary, attention fp16).
+- If it does not, the damage is in the FFN and the mixed-precision idea is dead
+  before it costs another run.
+
+One variable from b12 (`--policy decoder_attn_ffn` → `decoder_ffn`). Note the
+practical shape: the model is no longer fully 1-bit — the attention (~20 % of
+parameters) stays fp16 — so a win here trades compression for accuracy, which is
+the honest trade the gate has been asking about.

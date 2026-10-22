@@ -1099,3 +1099,9 @@ Tagged `0.2.50`. The sweep jobs `11891`–`11893` finished; no new runs launched
 | job | what | status | ETA |
 |---|---|---|---|
 | 12204 | `qat_stream_aligned17b16.pbs` — deep 9.85 base, **lr 1.25e-6**, 6 000 aligned (cached), mix 0.5, 2 000 steps | queued | training ≈6 h + end phase; state sweep follows |
+
+## 2026-10-22 (23:20) — LAUNCH: aligned17b17 (quantizer-side ablation: FFN-only 1.58-bit, attention fp16)
+
+| job | what | status | ETA |
+|---|---|---|---|
+| 12342 | `qat_stream_aligned17b17.pbs` — **policy decoder_ffn** (FFN ternary, attn fp16), deep 9.85 base, lr 2.5e-6, 6 000 aligned (cached), mix 0.5, 2 000 steps | queued | training ≈6 h + end phase; state sweep follows |
