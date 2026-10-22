@@ -3297,3 +3297,16 @@ With this, all four recipe axes are measured and settled at their optima: **LR
 2.5e-6, aligned set 6 000, mix 0.5, 2 000 steps**. The remaining gap to the gate
 is quantizer-side, not recipe-side, and the next work is either the untested
 co-training lever or the Stage-5 edge-deployment track.
+
+## 2026-10-22 (13:25) — LAUNCHED: aligned17b16, the LR's second halving (2.5e-6 → 1.25e-6)
+
+Job `12204` submitted after grep-verifying the decisive flags (deep 9.85 base,
+`--aligned-n 6000` from cache, `--op-mix-frac 0.5`, `--lr 1.25e-6`, `--steps 2000`,
+mem=64gb, 12h walltime). One variable from the line-best b12.
+
+The LR direction was monotone across its one measured step (5e-6 → 2.5e-6
+improved the pair from 18.43/25.34 to 16.53/22.05 and then 15.15/18.98 with the
+scaled set), so halving again tests whether that trend continues or turns. The
+risk is under-repair: at 2.5e-6 the early states were still broken at step 1 200,
+and 1.25e-6 may not finish repairing within 2 000 steps — which is why the state
+sweep is the measurement here, not the final checkpoint.
