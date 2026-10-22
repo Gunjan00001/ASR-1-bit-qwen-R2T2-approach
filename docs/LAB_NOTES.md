@@ -3310,3 +3310,15 @@ scaled set), so halving again tests whether that trend continues or turns. The
 risk is under-repair: at 2.5e-6 the early states were still broken at step 1 200,
 and 1.25e-6 may not finish repairing within 2 000 steps — which is why the state
 sweep is the measurement here, not the final checkpoint.
+
+## 2026-10-22 (16:55) — The 1.25e-6 arm finished 2 000 steps; sweep submitted
+
+`aligned17b16` (lr 1.25e-6 on the line-best recipe) completed and exited
+cleanly (`step2000.pt` saved). Guardrails were the wildest yet — **9.65 at
+step 1 500** (the lowest reading of any arm) then **53.65 at 2 000** — which is
+the cleanest possible illustration that the 20-utt number carries no signal.
+
+Snapshot taken (`last_aligned17b16_end.pt`); the sweep is submitted
+(1 200 / 1 600 / 2 000). The measurement: does the second LR halving continue
+the monotone improvement (2.5e-6 → 15.15/18.98) or under-repair, as its
+slower adaptation predicts?
