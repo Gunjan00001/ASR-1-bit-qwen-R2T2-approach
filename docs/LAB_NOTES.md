@@ -3274,3 +3274,26 @@ late-phase drift.
 The `other` splits for steps 2 400 and 6 000 are still computing; if step 2 400's
 `other` is at or below 18.98 it ties the pair, and otherwise the pair stands.
 Either way the duration axis is closed: **settled at 2 000 steps.**
+
+## 2026-10-22 (13:20) — Long-run `other` splits close the duration axis: the line-best pair STANDS
+
+| state | clean | other |
+|---|---:|---:|
+| **b15 step 2 400** | **15.15** | 19.55 |
+| b15 step 3 600 | 27.97 | 28.64 |
+| b15 step 4 800 | 37.50 | 40.45 |
+| b15 step 6 000 | 26.69 | 30.57 |
+| **b12 step 1 600 (line-best)** | **15.15** | **18.98** |
+
+The 6 000-step run's peak (step 2 400) **ties** the line-best on clean exactly
+but is 0.57 worse on `other`, and every later state degrades on both splits. So:
+
+- The duration axis is **closed**: 2 000 steps is the right schedule; extra
+  steps buy nothing and cost drift.
+- The line-best **pair remains b12 (15.15 / 18.98)** — the only state that wins
+  both splits.
+
+With this, all four recipe axes are measured and settled at their optima: **LR
+2.5e-6, aligned set 6 000, mix 0.5, 2 000 steps**. The remaining gap to the gate
+is quantizer-side, not recipe-side, and the next work is either the untested
+co-training lever or the Stage-5 edge-deployment track.
