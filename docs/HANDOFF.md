@@ -84,8 +84,17 @@ indexes every failed/successful attempt with its number.
   is worth a further ~1.4 clean. **State selection is load-bearing**: step 1 200
   of that same run reads 131.57 (121 loop truncations) while step 1 600 reads
   15.15. Every arm gets a state sweep; aligned words are cached
-  (`data/aligned_cache/`, keys for 1 200/2 400/6 000), so re-runs skip the
-  aligner pass. (3) **The 0.6B line** is saturated by
+  (`data/aligned_cache/`, keys for 1 200/2 400/6 000/8 000), so re-runs skip
+  the aligner pass.
+
+  **(2b) All four recipe axes are now measured and settled at their optima:**
+  lr **2.5e-6** (warmup neutral, halving from 5e-6 is the rescuer), aligned set
+  **6 000** (`other` improves monotonically with size — 8 000 gives the best
+  `other` 17.95 — but `clean` peaks at 6 000), mix **0.5** (0.4 is worse on
+  both splits and loops rose), and **2 000 steps** (6 000 steps tie clean at
+  best and degrade afterwards). The remaining gap to the gate is
+  **quantizer-side, not recipe-side**; the untested lever there is co-training
+  (mixed ternary/binary), and the Stage-5 edge-deployment track is unstarted. (3) **The 0.6B line** is saturated by
   measurement: best clean **9.96** (`aligned8/step1000`, tag 0.2.48) and best
   other **18.98** (`aligned5/step1000`) — two different holders, both recorded;
   the scaled aligned set (6 000) reached 11.55, the mix-ratio arm 13.67, the
