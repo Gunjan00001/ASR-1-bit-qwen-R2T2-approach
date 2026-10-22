@@ -81,7 +81,11 @@ seed:
 |---:|---:|---:|---:|
 | 16.53 | 19.39 | 24.09 | +2.86 |
 | **10.81** | **16.63** | **23.41** | +5.82 |
-| 9.85 | 18.43 | 25.34 | +8.58 |
+| 9.85 (lr 5e-6) | 18.43 | 25.34 | +8.58 |
+| 9.85 (lr 2.5e-6, 1 200 aligned) | 16.53 | 22.05 | +6.68 |
+| **9.85 (lr 2.5e-6, 6 000 aligned — LINE-BEST PAIR)** | **15.15** | **18.98** | +5.30 |
+| 9.85 (lr 2.5e-6, 8 000 aligned — best single `other`) | 21.72 | **17.95** | — |
+| 9.85 (lr 1.25e-6, 6 000 aligned — best single `clean`) | **14.94** | 21.59 | — |
 
 **Corrected 2026-10-19 (20:55):** a fourth point changes the shape — the same
 deep base (9.85) with the Stage-B **learning rate halved to 2.5e-6** reaches
@@ -94,10 +98,10 @@ the pipeline's sweet spot so far, and the in-run evidence says why: the deeper
 the base, the larger the aligned replay's *early* perturbation (b7 +0.84, b8
 +3.1 at step 1 500). A heavily recovered state is harder to re-align than a
 partially recovered one, so the *re-alignment* recipe — not the recovery — is
-the binding constraint at depth. Two arms are measuring that directly: a seed
-replicate of the 10.81-base run (`aligned17b9`) to bound the noise, and a
-warmup arm (`aligned17b10`, `--warmup-steps 500`) to test whether a gentler
-early phase absorbs the perturbation.
+the binding constraint at depth. Both arms were measured: the seed replicate
+(`aligned17b9`) reproduced b7 to the digit (runs are deterministic), and the
+warmup arm (`aligned17b10`) landed neutral (19.17/22.39) — the rescuer was the
+**learning rate**, not the warmup (see the corrected table above).
 
 ## 3. The recipes that got here (and the failures, with numbers)
 
@@ -115,17 +119,23 @@ early phase absorbs the perturbation.
 5. **A resume overwrote a checkpoint once** (the 0.6B's binary arm) — hence the
    standing rule: snapshot before resuming; and `--keep-step-checkpoints 400`
    makes every run's trajectory selectable here.
+6. **The four recipe axes were each closed by a matched arm:** LR (5e-6 →
+   2.5e-6 rescues the deep base; 1.25e-6 buys clean but costs `other`), aligned
+   set (1 200 → 6 000 improves `other`; 8 000 improves it further but costs
+   clean), mix (0.4 worse on both splits, loops rose), duration (6 000 steps
+   ties clean at its best and degrades after). **State selection is load-bearing
+   every time** — b12's step 1 200 reads 131.57 while step 1 600 reads 15.15.
 
 ## 4. Honest gate status
 
 Neither size is at the gate (≤ 3.74 clean / ≤ 6.11 other). The 0.6B's promoted
-state streams at 11.55/18.98; the 1.7B's line now reaches 19.39/24.09 and is
-improving along a *measured* pipeline rather than by luck. The remaining gap is
-quantization damage; the working levers are (in order of measured effect):
-**more recovery depth at lr 5e-6** (cycle 3 projects to ~9–10 offline),
-**re-alignment after every recovery** (zero loops, base preserved), and then
-either more aligned data (2 400 aligned utterances is the current cap) or the
-quantizer-side options.
+state streams at 9.96/18.98; the 1.7B's line reaches **15.15/18.98** (b12),
+with single-split records at 14.94 clean (b16, lr 1.25e-6) and 17.95 other
+(b13, 8 000 aligned). The remaining gap is **quantization damage** — the fp16
+anchors are 2.24/4.61 and 2.54/6.27 — and the recipe-side levers are now
+*measured and settled*: lr 2.5e-6, 6 000 aligned, mix 0.5, 2 000 steps (see §3
+for the four arms that closed each axis). What remains is quantizer-side
+(co-training is the untested option) or scale.
 
 ## 5. Reproduce
 
