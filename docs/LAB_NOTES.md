@@ -3236,3 +3236,16 @@ schedule advances to the resumed position. The run is intended as a 2–3 chunk
 chain (0→~2 900→~5 800→6 000); each chunk starts training immediately from the
 cached 6 000-aligned set. Disk headroom is ample (320 T free; each full
 checkpoint set ~40 GB).
+
+## 2026-10-22 (08:55) — The 6 000-step run finished in ~6 h; a four-state sweep is evaluating
+
+`aligned17b15` completed all 6 000 steps (single chunk — the ~18.6 steps/min pace
+made the resume chain unnecessary) with the full 400-step checkpoint grid
+(15 states). Guardrails ended noisy (28.0 at 5 750 and 6 000; 13.6 at 1 250),
+so they say nothing; the sweep does.
+
+**Sweep submitted:** a spread across the long trajectory — steps 2 400, 3 600,
+4 800, 6 000 (`12073`–`12076`) — because a 6 000-step cosine schedule's peak is
+not predictable from the 2 000-step runs (b12 peaked at 1 600/2 000). Snapshot
+taken (`last_aligned17b15_end.pt`). The question: does the longer schedule beat
+the line-best pair (15.15/18.98), and where is its peak?
