@@ -3322,3 +3322,17 @@ Snapshot taken (`last_aligned17b16_end.pt`); the sweep is submitted
 (1 200 / 1 600 / 2 000). The measurement: does the second LR halving continue
 the monotone improvement (2.5e-6 → 15.15/18.98) or under-repair, as its
 slower adaptation predicts?
+
+## 2026-10-22 (20:50) — The 1.25e-6 arm's step 1 600 reads 14.94 clear — a new clean best
+
+| state | clean | loop truncations |
+|---|---:|---:|
+| step 1 200 | 35.70 | 4 |
+| **step 1 600** | **14.94** | 6 |
+| final (2 000) | *running* | — |
+
+Step 1 600 beats the line-best's clean (15.15) by 0.21 — the first movement on
+clean after three arms that matched or lost it. The early state is again
+under-repaired (35.70 at step 1 200), exactly the predicted risk, and the late
+repair is what carries it. Whether this becomes the line-best **pair** depends
+on the `other` split, still computing (the bar: ≤ 18.98).
