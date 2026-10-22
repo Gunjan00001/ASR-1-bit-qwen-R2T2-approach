@@ -3245,7 +3245,11 @@ made the resume chain unnecessary) with the full 400-step checkpoint grid
 so they say nothing; the sweep does.
 
 **Sweep submitted:** a spread across the long trajectory — steps 2 400, 3 600,
-4 800, 6 000 (`12073`–`12076`) — because a 6 000-step cosine schedule's peak is
+4 800, 6 000 (`12085`–`12088`) — because a 6 000-step cosine schedule's peak is
 not predictable from the 2 000-step runs (b12 peaked at 1 600/2 000). Snapshot
 taken (`last_aligned17b15_end.pt`). The question: does the longer schedule beat
 the line-best pair (15.15/18.98), and where is its peak?
+
+**Process note (second occurrence):** I wrote the sweep's job ids from
+expectation instead of from `qsub`'s output — again. The rule is now explicit:
+job ids are transcribed, never predicted; the `qsub` output is the source.
