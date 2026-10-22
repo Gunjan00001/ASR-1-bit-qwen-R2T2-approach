@@ -3253,3 +3253,24 @@ the line-best pair (15.15/18.98), and where is its peak?
 **Process note (second occurrence):** I wrote the sweep's job ids from
 expectation instead of from `qsub`'s output — again. The rule is now explicit:
 job ids are transcribed, never predicted; the `qsub` output is the source.
+
+## 2026-10-22 (10:55) — The 6 000-step run peaks at step 2 400 and TIES the line-best (15.15); later states degrade badly
+
+Full-sample clean across the long trajectory:
+
+| state | clean | loop truncations |
+|---|---:|---:|
+| **step 2 400** | **15.15** | **0** |
+| step 3 600 | 27.97 | 10 |
+| step 4 800 | 37.50 | 1 |
+| step 6 000 | 26.69 | 0 |
+
+The longer cosine schedule's best point is **exactly the b12 line-best clean
+number (15.15, zero loops)** — a tie, not a gain — and from step 3 600 on the
+model degrades sharply (28 → 38 → 27). So duration is **not** the lever: the
+2 000-step recipe reaches the same peak, and the extra 4 000 steps only add
+late-phase drift.
+
+The `other` splits for steps 2 400 and 6 000 are still computing; if step 2 400's
+`other` is at or below 18.98 it ties the pair, and otherwise the pair stands.
+Either way the duration axis is closed: **settled at 2 000 steps.**
