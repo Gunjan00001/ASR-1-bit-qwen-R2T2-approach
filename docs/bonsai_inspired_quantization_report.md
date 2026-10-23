@@ -111,16 +111,27 @@ untrained, so no comparison to the trained ternary model is claimed.
 
 ## F. Deployment measurements
 
-| quantity | ternary baseline | g64 | rotation+g64 |
-|---|---:|---:|---:|
-| per-weight code | ~2 bits packed | 2 | 2 |
-| scale metadata | 16/N ≈ 0 | 16/64 = 0.25 | 0.25 |
-| **effective bits/param (analytic)** | **≈2.00** | **2.25** | **2.25** |
-| extra runtime work | — | none | activation Hadamard per block |
+**Measured by serialising real layer-0 projections** (2-bit codes packed four
+per byte, fp16 scales, shape header; `scripts/bonsai_pack_measure.py`):
 
-These are **analytic estimates**, not measurements: this repository has no packed
-ternary runtime, so model size, peak memory and latency cannot be measured yet.
-That limitation is explicit, per the brief.
+| representation | measured bits/param | vs fp16 |
+|---|---:|---:|
+| fp16 | 16.000 | 1.0× |
+| ternary, per-tensor | **2.000** | 8.0× |
+| ternary, g128 | 2.125 | 7.5× |
+| ternary, g64 | 2.250 | 7.1× |
+| **2-bit (4 levels), per-tensor** | **2.000** | **8.0×** |
+| 2-bit, g64 | 2.250 | 7.1× |
+
+Two consequences: (a) group scales cost a real 12.5 % at g64; (b) in a 2-bit-slot
+packing, **four levels are free** — 2-bit is byte-identical in size to ternary
+while offering a lower quantization floor. Only a dense-trit packing (as Bonsai
+ships) would make ternary smaller (1.75 bits), and this project has no such
+runtime, so on the representation actually available here the 2-bit arm
+dominates ternary on storage **and** reconstruction.
+
+Peak memory and latency remain **NOT MEASURED**: there is no packed inference
+runtime in this repository, only the simulated (dequantize-then-matmul) path.
 
 ## G. Reproducibility
 
@@ -137,8 +148,8 @@ That limitation is explicit, per the brief.
 
 ## H. Final decision
 
-**Retain the current ternary approach.** Do not adopt group-wise, rotation, or
-the combination as a training change on this evidence.
+**Provisional: retain ternary, with the 2-bit arm as the leading challenger.**
+Do not adopt group-wise or rotation as training changes on this evidence.
 
 Reasoning, with trade-offs:
 
@@ -152,9 +163,10 @@ Reasoning, with trade-offs:
   improves the compression objective.
 - **Deployment:** no packed runtime exists here, so gains could not be realized
   even if they were large.
-- **2-bit fallback:** promising on reconstruction and cheap to try, but
-  **untrained**; it stays the single highest-value follow-up experiment once
-  GPUs free up, because it changes the noise floor rather than nudging it.
+- **2-bit:** the strongest candidate on this evidence — it costs **no extra
+  storage** under the 2-bit packing (measured 2.000 bits/param, identical to
+  ternary), quantizes four levels instead of three, and is trained as arm
+  `12478`. The decision waits on its official streaming WER.
 
 If one representation change must be carried forward, it is **g64 group scales**
 (cheapest to adopt, no runtime change, −5.2 % reconstruction), not rotation —
