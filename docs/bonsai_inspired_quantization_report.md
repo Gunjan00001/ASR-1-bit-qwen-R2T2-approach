@@ -75,6 +75,19 @@ by ~2 points of relative error.
    while the WER gap to the gate is ~11 points. The threshold therefore looks
    *generous*, not conservative.
 
+## C2. Training experiments in flight (queued, not yet results)
+
+| arm | change vs b12 line-best | PBS | status |
+|---|---|---|---|
+| `aligned17b20` | `--bit-width 2.0` (four levels), everything else identical | **12478** | QUEUED (GPU queue full) |
+| `aligned17b21` | `--group-size 64`, bit width unchanged | **12479** | QUEUED |
+
+Supporting fixes made before queuing: the in-training guardrail is now
+width-aware (a 2-bit run previously would have been scored as 1.58-bit), and the
+official evaluator takes `BIT_WIDTH` alongside `POLICY` so a 2-bit checkpoint
+cannot be scored at the wrong width — the same class of bug that invalidated
+b17's first evaluation. Both are covered by tests (354 total).
+
 ## D. Training results
 
 `aligned17b17` (FFN-only, attention fp16) completed 2 000 steps; official

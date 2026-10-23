@@ -51,8 +51,14 @@ def evaluate_precisions(
             set_precision(model, 1.0, 1.0)
             results["binary"] = evaluate(wrapper, utterances, n)
         if both or bit_width != 1.0:
-            set_precision(model, 1.58, 1.0)
-            results["ternary"] = evaluate(wrapper, utterances, n)
+            # Evaluate at the *training* width. For a non-ternary width (e.g. the
+            # 2-bit mode) the label follows the width so a guardrail can never be
+            # silently reported as ternary (2-bit runs would otherwise evaluate a
+            # 1.58-bit model they never trained).
+            width = 1.58 if bit_width in (1.0, 1.58) else bit_width
+            set_precision(model, width, 1.0)
+            key = "ternary" if width == 1.58 else f"bw{width}"
+            results[key] = evaluate(wrapper, utterances, n)
     model.train()
     return results
 
