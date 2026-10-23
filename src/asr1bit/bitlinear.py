@@ -18,9 +18,15 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from asr1bit.quant import dequantize_weights, quantize_binary, quantize_ternary
+from asr1bit.quant import (
+    dequantize_weights,
+    quantize_2bit,
+    quantize_binary,
+    quantize_ternary,
+)
 
 _TERNARY_WIDTHS = (1.58, "ternary")
+_TWO_BIT_WIDTHS = (2.0, "2bit")
 
 
 def absmax_quantize_activations(x: torch.Tensor, bits: int = 8) -> torch.Tensor:
@@ -105,6 +111,8 @@ class BitLinear(nn.Module):
                 qw, _ = quantize_ternary(
                     self.weight, self.group_size, gamma=gamma.detach(), stochastic=round_stochastic
                 )
+            elif self.bit_width in _TWO_BIT_WIDTHS:
+                qw, _ = quantize_2bit(self.weight, self.group_size, gamma=gamma.detach())
             else:
                 qw, _ = quantize_binary(self.weight, self.group_size, stochastic=round_stochastic)
             dequantized = dequantize_weights(qw, gamma, self.group_size)
@@ -112,6 +120,8 @@ class BitLinear(nn.Module):
             round_stochastic = self.stochastic and self.training
             if self.bit_width in _TERNARY_WIDTHS:
                 qw, scale = quantize_ternary(self.weight, self.group_size, stochastic=round_stochastic)
+            elif self.bit_width in _TWO_BIT_WIDTHS:
+                qw, scale = quantize_2bit(self.weight, self.group_size)
             else:
                 qw, scale = quantize_binary(self.weight, self.group_size, stochastic=round_stochastic)
             dequantized = dequantize_weights(qw, scale, self.group_size)

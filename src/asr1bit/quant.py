@@ -66,6 +66,38 @@ def quantize_binary(
     return q.reshape(original_shape), scale
 
 
+def quantize_2bit(
+    weight: torch.Tensor, group_size: int | None = None, gamma: torch.Tensor | None = None
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Quantize ``weight`` to four levels ``{-3, -1, +1, +3}`` times a scale.
+
+    The candidate rule, not a claim of optimality: threshold at 2x the mean
+    magnitude in each group, so ``|W| < 2*scale -> +-1`` and above -> ``+-3``.
+    Returns unit levels and the scale, matching the ternary contract so
+    :func:`dequantize_weights` and :class:`~asr1bit.bitlinear.BitLinear` need no
+    special case.
+    """
+    grouped, _ = _group_view(weight, group_size)
+    if gamma is None:
+        scale = grouped.abs().mean(dim=1, keepdim=True).to(weight.dtype)
+    else:
+        scale = gamma.to(weight.dtype)
+        if scale.numel() not in (1, grouped.shape[0]):
+            raise ValueError(
+                f"gamma has {scale.numel()} scales but weight has {grouped.shape[0]} groups"
+            )
+        if scale.numel() == 1 and grouped.shape[0] > 1:
+            scale = scale.reshape(1, 1)
+    safe = scale.clamp(min=torch.finfo(weight.dtype).tiny)
+    ratio = grouped.abs() / safe
+    magnitude = torch.where(ratio >= 2.0, 3.0, 1.0)
+    q = torch.sign(grouped) * magnitude
+    q = torch.where(grouped == 0, torch.ones_like(q), q)
+    if group_size is None:
+        return q.reshape(weight.shape), scale.reshape(())
+    return q.reshape(weight.shape), scale
+
+
 def quantize_ternary(
     weight: torch.Tensor,
     group_size: int | None = None,
