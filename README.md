@@ -275,6 +275,28 @@ always better. "50-utt" means a fixed 50-utterance `test-clean` slice (seed 0),
   that unlocked Stage 3 — *the schedule, not the optimizer or the rounding, is
   what moves a damaged model.*
 
+### 3.ter `stage3_streaming.png` — the 1.7B line against the gate (Stages 3/4)
+
+![Stage 3/4 streaming states](docs/figures/stage3_streaming.png)
+
+- **Axes:** x = **clean** WER (320 ms, 50 utts, official prefix algorithm);
+  y = **other** WER on the same protocol. Each point is one measured
+  checkpoint, coloured by arm.
+- **Left panel — the full picture:** the gate box (clean ≤ 3.74 / other ≤ 6.11,
+  dashed) sits far to the lower-left; the fp16 1.7B anchors (2.24/4.61 dotted,
+  2.54/6.27) mark what unquantized streaming achieves; every quantized state
+  clusters at 14–22 clean. **The distance between the cluster and the gate is
+  the quantization damage**, drawn rather than argued.
+- **Right panel — the frontier zoom:** the three record-holders and what each
+  chose: **b12's pair** (15.15/18.98, starred), **b16's clean record**
+  (14.94/21.59, from the second LR halving), **b13's other record**
+  (17.95 at 21.72 clean, from 8 000 aligned). The fringe shows why no single
+  arm wins both splits: lowering the LR buys clean and costs `other`, scaling
+  the aligned set buys `other` and costs clean.
+- **Read it for:** where the line actually is after all the recipe work — and
+  that the remaining gap is quantizer-side, not another axis of the same
+  recipe.
+
 ### 4. `quantizer_error.png` — what quantization costs in weights
 
 ![Quantizer error](docs/figures/quantizer_error.png)
