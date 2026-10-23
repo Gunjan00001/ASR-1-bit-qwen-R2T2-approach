@@ -7,6 +7,7 @@ Reads the run logs (``EVAL`` lines) and final ablation JSONs, then writes:
 - ``docs/figures/quantizer_error.png``   quantizer relative error by config
 - ``docs/figures/fp16_drift.png``        fp16 readout vs step (shadow drift)
 - ``docs/figures/roadmap.png``           stage status overview
+- ``docs/figures/stage3_streaming.png``   the 1.7B line's states vs the gate (Pareto)
 - ``artifacts/stage1/wer_summary.json``  the extracted numbers
 
 Run:  PYTHONPATH=src python scripts/make_plots.py
@@ -245,10 +246,10 @@ def fig_roadmap() -> dict:
          "machinery written, tested, audited; loss controllable; naive run's offline gate missed -> Stage 2"),
         ("Stage 2: accuracy recovery", 0.9, "#2ca02c",
          "recipe scaled on the full 28 539-utt cache: ternary 7.52 / binary 10.70 offline (best 9.1/10.7); +1.5 offline bar open"),
-        ("Stage 3: scale to 1.7B", 0.35, "#ff7f0e",
-         "two-stage pipeline works: multi-cycle offline recovery 20.55 -> 11.76 (lr 5e-6, fp32 AdamW) -> aligned streaming replay at 19.39/24.09; cycle 3 + Stage B\' running"),
-        ("Stage 4: streaming parity (LSP)", 0.75, "#ff7f0e",
-         "official algorithm fixed: 203.5 -> 11.55 clean / 18.98 other, zero loops (tag 0.2.47); gate (~3.7/6.1) open - gap is quantization damage"),
+        ("Stage 3: scale to 1.7B", 0.8, "#ff7f0e",
+         "recipe settled by matched arms: deep 9.85 base -> lr 2.5e-6 -> 6 000 aligned -> line-best 15.15/18.98 (b12); clean record 14.94 (b16), other record 17.95 (b13); quantizer-side ablation running"),
+        ("Stage 4: streaming parity (LSP)", 0.85, "#ff7f0e",
+         "official algorithm fixed: 203.5 -> 9.96 clean / 18.98 other (0.6B, split records); gate (~3.7/6.1) open - gap is quantization damage"),
         ("Stage 5: edge deployment", 0.0, "#bbbbbb", "not started"),
         ("Stage 6: evaluation & writeup", 0.15, "#1f77b4",
          "started: status/handoff/results docs + figures regenerated from artifacts"),
@@ -269,7 +270,7 @@ def fig_roadmap() -> dict:
                      va="center", ha="left", fontsize=8)
     plt.xlim(0, 1.25)
     plt.xticks([0, 0.25, 0.5, 0.75, 1.0], ["0 %", "25 %", "50 %", "75 %", "100 %"])
-    plt.title("Project roadmap status (2026-10-15)")
+    plt.title("Project roadmap status (2026-10-23)")
     plt.grid(axis="x", alpha=0.25)
     plt.tight_layout()
     plt.savefig(FIG / "roadmap.png", dpi=150)
@@ -427,6 +428,91 @@ def fig_streaming_results() -> dict:
                          "best_clean": best_clean, "best_other": best_other}}
 
 
+def fig_stage3_streaming() -> dict:
+    """The 1.7B line's streaming states against the gate (Stage 3/4).
+
+    Left: the full picture — every measured (clean, other) pair across the
+    ``aligned17b*`` arms, the fp16 anchors and the gate box, so the distance is
+    visible rather than argued. Right: a zoom on the states near the frontier,
+    where b12's pair, b16's clean record and b13's other record live.
+
+    Reads the JSONs directly: the logs are streams, the JSONs are records
+    (LAB_NOTES 2026-10-19).
+    """
+    arms = [
+        ("b7 (10.81 base, 5e-6)", "aligned17b7", "#7f7f7f"),
+        ("b8 (9.85 base, 5e-6)", "aligned17b8", "#bcbd22"),
+        ("b10 (warmup 500)", "aligned17b10", "#17becf"),
+        ("b11 (lr 2.5e-6, 1 200 aligned)", "aligned17b11", "#1f77b4"),
+        ("b12 (lr 2.5e-6, 6 000 aligned)", "aligned17b12", "#d62728"),
+        ("b13 (8 000 aligned)", "aligned17b13", "#9467bd"),
+        ("b14 (mix 0.4)", "aligned17b14", "#8c564b"),
+        ("b15 (6 000 steps)", "aligned17b15", "#e377c2"),
+        ("b16 (lr 1.25e-6)", "aligned17b16", "#2ca02c"),
+    ]
+    payload, plotted = {}, []
+    for label, stem, color in arms:
+        cleans, others = {}, {}
+        for path in sorted(ART.glob(f"streaming_qat_stream_{stem}*.json")):
+            record = json.loads(path.read_text())
+            quant = (record.get("conditions") or {}).get("quantized")
+            if not quant:
+                continue
+            state = Path(record.get("checkpoint", "?")).name
+            split = record.get("config") or "clean"
+            (cleans if split == "clean" else others)[state] = float(quant["wer"])
+        points = [(cleans[s], others[s]) for s in cleans
+                  if s in others and cleans[s] < 100 and others[s] < 100]
+        if not points:
+            continue
+        payload[label] = [{"clean": x, "other": y} for x, y in points]
+        plotted.append((label, color, points))
+
+    fig, (ax_full, ax_zoom) = plt.subplots(1, 2, figsize=(14, 6), width_ratios=[1.1, 1])
+
+    def draw(ax, xlim, ylim, title, annotate):
+        for label, color, points in plotted:
+            ax.scatter([p[0] for p in points], [p[1] for p in points], s=36, color=color,
+                       label=label, alpha=0.85, edgecolor="white", linewidth=0.6)
+        ax.axvline(3.74, color="black", linestyle="--", linewidth=1.2, alpha=0.8)
+        ax.axhline(6.11, color="black", linestyle="--", linewidth=1.2, alpha=0.8)
+        ax.axhline(4.61, color="black", linestyle=":", linewidth=1.0, alpha=0.8)
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+        ax.set_xlabel("clean WER % (320 ms, 50 utts, official algorithm)")
+        ax.set_ylabel("other WER % (320 ms, 50 utts)")
+        ax.set_title(title, fontsize=10)
+        ax.grid(alpha=0.25)
+        if annotate:
+            ax.scatter([], [], marker="*", s=300, color="#d62728", edgecolor="black",
+                       linewidth=1.1, label="line-best pair (b12/step1600)")
+            for x, y, text in ((15.15, 18.98, "b12: 15.15 / 18.98"),
+                               (14.94, 21.59, "b16: 14.94 / 21.59"),
+                               (21.72, 17.95, "b13: 21.72 / 17.95")):
+                ax.annotate(text, (x, y), textcoords="offset points", xytext=(8, -4), fontsize=8)
+            ax.scatter([15.15], [18.98], marker="*", s=380, color="#d62728",
+                       edgecolor="black", linewidth=1.2, zorder=5)
+
+    draw(ax_full, (0, 24), (0, 32),
+         "all measured states: the gate is far left", False)
+    ax_full.scatter([3.74, 6.11], [6.11, 6.11], alpha=0)
+    ax_full.text(4.1, 7.2, "gate\nclean<=3.74 / other<=6.11", fontsize=8)
+    ax_full.text(19.5, 5.0, "fp16 1.7B other 4.61", fontsize=7, ha="right")
+    ax_full.annotate("fp16 anchors\n(2.24/4.61, 2.54/6.27)", (2.6, 8.0), fontsize=7)
+    ax_full.legend(fontsize=7, loc="lower right")
+
+    draw(ax_zoom, (13.5, 23), (16.5, 26),
+         "zoom: the frontier at 320 ms (b12 pair, b16 clean, b13 other)", True)
+    ax_zoom.legend(fontsize=7, loc="lower left")
+
+    fig.suptitle("Stage 3/4 — the 1.7B line: every measured streaming state vs the gate "
+                 "(quantization damage is the remaining distance)", fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    fig.savefig(FIG / "stage3_streaming.png", dpi=150)
+    plt.close(fig)
+    return payload
+
+
 def fig_stage3_offline() -> dict:
     """The 1.7B's offline recovery trajectories (Stage 3).
 
@@ -493,6 +579,7 @@ def main() -> int:
         "roadmap": fig_roadmap(),
         "streaming": fig_streaming_results(),
         "stage3_offline": fig_stage3_offline(),
+        "stage3_streaming": fig_stage3_streaming(),
     }
     out = ART / "wer_summary.json"
     out.write_text(json.dumps(summary, indent=2), encoding="utf-8")
