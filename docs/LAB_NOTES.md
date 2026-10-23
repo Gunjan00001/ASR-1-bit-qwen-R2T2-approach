@@ -3377,3 +3377,28 @@ One variable from b12 (`--policy decoder_attn_ffn` → `decoder_ffn`). Note the
 practical shape: the model is no longer fully 1-bit — the attention (~20 % of
 parameters) stays fp16 — so a win here trades compression for accuracy, which is
 the honest trade the gate has been asking about.
+
+## 2026-10-23 (07:35) — b17's loop explosion was TRANSIENT: recovered to 18.4 by step 1 000
+
+The Phase-1 diagnosis (docs/b17_diagnostic.md) called the FFN-only arm's
+streaming collapse "streaming-state instability". The run has since corrected
+itself, which changes the classification:
+
+| step | 250 | 500 | 1000 | 1250 |
+|---|---:|---:|---:|---:|
+| stream WER | 1 349.65 | 902.12 | **18.35** | 18.82 |
+| stream CER | 784.05 | 455.81 | **8.09** | 8.89 |
+| offline ternary | — | 19.39 | 20.97 | — |
+
+By step 1 000 the guardrail is 18.4/8.1 (CER sane), i.e. in b12's band at the
+same steps. So the collapse was an **early-training transient** — the same
+under-repair phase b12 showed (its step 1 200 streamed at 131.57) — amplified
+here because the unquantized attention lets the LSP rollout drift further
+before the head re-anchors. It was not a persistent failure, and it was right
+not to kill the run.
+
+**Implication for Phase 3:** the lower-LR pilots are still the correct test of
+*whether* a gentler entry removes the transient, but their precondition has
+changed — a 5e-7/1e-7 pilot that is merely *slower* will look worse, since the
+full-rate arm now reaches a healthy state by step 1 000. Watch the *shape*,
+not the early value.
