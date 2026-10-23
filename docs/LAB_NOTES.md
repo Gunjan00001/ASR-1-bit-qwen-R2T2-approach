@@ -3402,3 +3402,47 @@ not to kill the run.
 changed — a 5e-7/1e-7 pilot that is merely *slower* will look worse, since the
 full-rate arm now reaches a healthy state by step 1 000. Watch the *shape*,
 not the early value.
+
+## 2026-10-23 (15:40) — Phase 3 refuted, Phase 4 confounded, b17 completed
+
+**Phase 3 (lower-LR pilots) — hypothesis refuted.** Both pilots ran their 500
+steps on the FFN-only policy:
+
+| arm | lr | stream @500 | offline ternary @500 |
+|---|---:|---:|---:|
+| b17 (reference) | 2.5e-6 | 902 (then **18.4 @1 000**) | 19.39 (20.97 @1 000) |
+| b18 | 5e-7 | 1 809 | **51.06** |
+| b19 | 1e-7 | 595 | **86.55** |
+
+Lower LR does **not** remove the transient and does not train: at 5e-7 the
+offline readout is 2.6× worse, at 1e-7 4.4× worse. The transient therefore is
+not an LR-calibration problem — it is the ordinary early under-repair phase,
+and the full-rate arm is the one that recovers. b18/b19 are closed.
+
+**Phase 4 (layer screen) — the instrument is confounded, and that is the finding.**
+Screening 20 utts, b12/step1600, dimensions = modules flipped from ternary to
+their fp16 shadow:
+
+| mask (flipped) | WER | CER | loops |
+|---|---:|---:|---:|
+| none (all ternary) | **15.92** | 10.08 | 0 |
+| k | 26.11 | 19.15 | 0 |
+| q | 36.62 | 30.17 | 26 |
+| attn (all four) | 99.36 | 97.35 | 414 |
+| ffn | 114.97 | 92.16 | 10 |
+| o | 145.54 | 101.59 | 386 |
+| v | 394.59 | 528.34 | 330 |
+
+The `none` row reproduces the official 15.15 (20-utt screening), so the harness
+is right. But **flipping any component to its fp16 shadow destroys the model**,
+which means the shadow is *not* the function the network co-adapted with —
+this screen measures precision-switch mismatch, not quantization sensitivity.
+It cannot rank components, and no selective-precision decision can be based on
+it. A valid sensitivity test requires *retraining* each configuration (or
+training from fp16 with one component quantized), which is real GPU time.
+Recorded as a negative methodological result; `ffn_in`/`ffn_out`/`all` were cut
+by the job's walltime and are not needed given the confound.
+
+**Phase 2 (b17 completed).** All 2 000 steps ran; final offline ternary
+**17.90** (its best of the run), final stream guardrail 18.12/7.69. The
+official three-state sweep is submitted (`12448`–`12450`: steps 1 200/1 600/2 000).
