@@ -3471,3 +3471,24 @@ policy/bit-width arm must pass both explicitly, and its JSON must be checked
 for the policy field before the numbers are trusted. Note the evaluator does
 not record `policy` in its JSON — that gap is why this was only caught by the
 guardrail/offline contradiction.
+
+## 2026-10-23 (18:55) — b17's CORRECTED official scores are bad (69–119 clean): FFN-only fails
+
+With `POLICY=decoder_ffn` now applied (the earlier 90–93 numbers were a policy
+mismatch and are quarantined), two of the three b17 states have official
+results:
+
+| state | clean WER | loop truncations |
+|---|---:|---:|
+| step 1 200 | _running_ | — |
+| step 1 600 | **119.17** | 392 |
+| step 2 000 | **69.28** | 351 |
+
+Both are far worse than the b12 line-best (15.15) and even than the arm's own
+20-utt guardrail (18.12 at step 2 000). Two readings are possible and both are
+recorded: (a) FFN-only quantization genuinely fails, or (b) a second protocol
+factor separates the guardrail from the official harness — the guardrail runs
+the portable streamer with **no LSP truncation**, the official harness runs LSP
+with `truncate_loops` and is cutting hundreds of loops per 50 utterances. The
+number that decides is the official one, and it says this configuration is not
+viable. Diagnostics of the guardrail-vs-official gap continue.
