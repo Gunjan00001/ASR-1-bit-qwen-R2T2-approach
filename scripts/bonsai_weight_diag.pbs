@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -N asr1bit-bonsai
+#PBS -q workq
+#PBS -l select=1:ncpus=8:mem=64gb
+#PBS -l walltime=02:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/bonsai_diag.out
+#
+# CPU-only real-weight diagnostic (no GPU contention with the official evals).
+# Reads the 1.7B safetensors wherever this node keeps them and measures group
+# and rotation reconstruction error per projection.
+set -u
+ROOT="/home/jiit_992401210050/Desktop/asr1bit-bonsai"
+cd "$ROOT" || exit 1
+export PYTHONPATH="$ROOT/src"
+OUT="$ROOT/artifacts/stage1/bonsai_17b"
+mkdir -p "$OUT"
+echo "=== host $(hostname) | $(date) ==="
+ls -la /tmp/asr1bit/models/Qwen3-ASR-1.7B 2>/dev/null | head -5
+ls -d /tmp/asr1bit/hf/hub/models--Qwen--Qwen3-ASR-1.7B 2>/dev/null
+/home/jiit_992401210050/miniconda3/bin/python scripts/bonsai_weight_diag.py \
+  --out "$OUT" 2>&1 | tee "$OUT/weight_diag.log"
