@@ -1,0 +1,51 @@
+#!/bin/bash
+#PBS -N asr1bit-screen
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=64gb
+#PBS -l walltime=03:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/screen.out
+#
+# Phase 4 — layer-sensitivity screening on the line-best trained model.
+# Loads b12/step1600 (trained under decoder_attn_ffn), then flips one component
+# at a time from its ternary forward to its fp16 shadow and measures official
+# streaming WER on 20 utterances. No training, so each mask is a pure measurement
+# of the marginal cost of quantizing that component. Screening only: any signal
+# is confirmed later on the full 50-utterance protocol.
+#
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage3/screen_layer_sensitivity.log"
+
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-1.7B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-1.7B
+else
+  MODEL=Qwen/Qwen3-ASR-1.7B
+fi
+
+PICK=$(bash scripts/pick_gpu_wait.sh 45000 "${PICK_WAIT_MIN:-240}") || exit 0
+PICK="${QAT_GPU:-$PICK}"
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+/home/jiit_992401210050/miniconda3/bin/python scripts/screen_alpha_masks.py \
+  --model "$MODEL" \
+  --checkpoint data/checkpoints/qat_stream_aligned17b12/step1600.pt \
+  --policy decoder_attn_ffn \
+  --bit-width 1.58 \
+  --chunk-ms 320 \
+  --n 20 \
+  --masks none,attn,ffn,q,k,v,o,ffn_in,ffn_out,all \
+  --out artifacts/stage1/screen_alpha_b12_step1600.json \
+  2>&1 | tee -a "$LOG"

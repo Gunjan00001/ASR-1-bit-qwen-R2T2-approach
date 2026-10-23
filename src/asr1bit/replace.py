@@ -38,12 +38,41 @@ def _decoder_attn_ffn(name: str) -> bool:
     return bool(_ATTN.search(name) or _FFN.search(name)) and not _is_encoder(name)
 
 
+# Individual projections, for layer-sensitivity ablations (Phase 4). Each entry
+# is the decoder-only component a mask can restore to high precision.
+COMPONENTS: dict[str, re.Pattern] = {
+    "q": re.compile(r"(?:^|\.)self_attn\.q_proj$"),
+    "k": re.compile(r"(?:^|\.)self_attn\.k_proj$"),
+    "v": re.compile(r"(?:^|\.)self_attn\.v_proj$"),
+    "o": re.compile(r"(?:^|\.)self_attn\.o_proj$"),
+    "ffn_in": re.compile(r"(?:^|\.)mlp\.(?:gate|up)_proj$"),
+    "ffn_out": re.compile(r"(?:^|\.)mlp\.down_proj$"),
+    "attn": re.compile(r"(?:^|\.)self_attn\.(?:q|k|v|o)_proj$"),
+    "ffn": re.compile(r"(?:^|\.)mlp\.(?:gate|up|down)_proj$"),
+}
+
+
+def component_of(name: str) -> str | None:
+    """The Component key a module name belongs to (decoder projections only)."""
+    if _is_encoder(name):
+        return None
+    for key, pattern in COMPONENTS.items():
+        if pattern.search(name):
+            return key
+    return None
+
+
+def _policy_for(keys: set[str]) -> Callable[[str], bool]:
+    return lambda name: bool(not _is_encoder(name) and any(
+        COMPONENTS[key].search(name) for key in keys))
+
+
 POLICIES: dict[str, Callable[[str], bool]] = {
     "none": lambda name: False,
     "decoder_attn": _decoder_attn,
     "decoder_ffn": _decoder_ffn,
     "decoder_attn_ffn": _decoder_attn_ffn,
-}
+} | {f"decoder_{key}": _policy_for({key}) for key in COMPONENTS}
 
 
 def _resolve_policy(policy: str | Callable[[str], bool]) -> Callable[[str], bool]:
