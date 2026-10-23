@@ -3446,3 +3446,28 @@ by the job's walltime and are not needed given the confound.
 **Phase 2 (b17 completed).** All 2 000 steps ran; final offline ternary
 **17.90** (its best of the run), final stream guardrail 18.12/7.69. The
 official three-state sweep is submitted (`12448`–`12450`: steps 1 200/1 600/2 000).
+
+## 2026-10-23 (17:12) — CAUGHT: b17 was evaluated under the wrong policy; invalid results quarantined
+
+The first official scores for b17 read **90.36 / 91.63 / 93.01** clean — five
+times worse than the model's own 20-utt streaming guardrail (18.1 at step 2 000)
+and than its offline readout (17.90). That contradiction was the tell.
+
+**Root cause:** `scripts/eval_streaming_17b.pbs` hardcoded
+`--policy decoder_attn_ffn`. b17 was *trained* with `decoder_ffn`, so the
+evaluator built a fully-quantized architecture and loaded a checkpoint whose
+attention shadows came from a different lineage — a precision mismatch that
+destroys the model. The numbers measure the mismatch, not the arm.
+
+**Actions:** the three running evaluations were killed; the three invalid JSONs
+are kept and renamed `*_WRONGPOLICY.json`; the launcher now takes
+`POLICY` (default unchanged, so every earlier result stays valid — they were
+all `decoder_attn_ffn` arms); b17's three states are re-submitted with
+`POLICY=decoder_ffn`.
+
+**Process lesson (the fourth of this class):** a launcher that hardcodes an
+architecture parameter silently invalidates any arm that changes it. Any future
+policy/bit-width arm must pass both explicitly, and its JSON must be checked
+for the policy field before the numbers are trusted. Note the evaluator does
+not record `policy` in its JSON — that gap is why this was only caught by the
+guardrail/offline contradiction.

@@ -54,7 +54,7 @@ for CFG in clean other; do
   "$PY" scripts/eval_streaming.py \
     --model "$MODEL" \
     --checkpoint "$CKPT" \
-    --policy decoder_attn_ffn \
+    --policy "${POLICY:-decoder_attn_ffn}" \
     --bit-width 1.58 \
     --chunk-ms 320 \
     --n 50 \
