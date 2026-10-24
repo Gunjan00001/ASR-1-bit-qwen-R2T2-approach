@@ -38,6 +38,8 @@ def parse_args() -> argparse.Namespace:
                    help="QAT checkpoint to restore; omit to evaluate the pretrained model.")
     p.add_argument("--policy", default="decoder_attn_ffn")
     p.add_argument("--bit-width", type=float, default=1.58)
+    p.add_argument("--group-size", type=int, default=0,
+                   help="0 = per-tensor; must match the checkpoint's training layout.")
     p.add_argument("--chunk-ms", type=int, default=320)
     p.add_argument("--n", type=int, default=50)
     p.add_argument("--config", default="clean", choices=["clean", "other"],
@@ -73,7 +75,8 @@ def main() -> int:
     )
     model = wrapper.model
     patch_outer_forward(model)
-    apply_layer_policy(model, args.policy, bit_width=args.bit_width, learnable_scale=True)
+    apply_layer_policy(model, args.policy, bit_width=args.bit_width,
+                       group_size=args.group_size or None, learnable_scale=True)
     model.to("cuda:0")
     if args.checkpoint:
         step = load_checkpoint(args.checkpoint, model)

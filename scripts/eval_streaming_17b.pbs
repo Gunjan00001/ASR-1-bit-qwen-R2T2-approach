@@ -56,6 +56,7 @@ for CFG in clean other; do
     --checkpoint "$CKPT" \
     --policy "${POLICY:-decoder_attn_ffn}" \
     --bit-width "${BIT_WIDTH:-1.58}" \
+    --group-size "${GROUP_SIZE:-0}" \
     --chunk-ms 320 \
     --n 50 \
     --max-new-tokens 32 \
