@@ -1,3 +1,6 @@
+# NOTE (2026-10-16): this file is not loaded by any script yet - the runner
+# builds its flags in code and the .pbs launchers set them explicitly. Kept
+# for provenance. When configs are wired in, validate every key first.
 # Base run configuration (Stage 0).
 name: base
 
@@ -10,7 +13,7 @@ quantization:
   bit_width: 1          # 1 = binary {-1,+1}; 1.58 = ternary {-1,0,+1}
   quantize_activations: true
   learnable_scales: true
-  layer_policy: decoder_projections
+  layer_policy: decoder_attn_ffn  # real policy name; "decoder_projections" never existed
 
 streaming:
   chunk_ms: 320
