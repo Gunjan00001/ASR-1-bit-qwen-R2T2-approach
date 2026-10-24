@@ -12,7 +12,7 @@ path._
 | 3 | Rotation prototype + correctness gates | **COMPLETED** | `src/asr1bit/rotate.py`, `tests/test_rotate.py` (6 gates) | caught an orientation bug; equivalence incl. remainders |
 | 4 | Real-weight diagnostic on 1.7B (groups + rotation + combination, per projection/layer) | **COMPLETED** | local CPU task `s1hq4uxy`; output `artifacts/stage1/bonsai_17b/` (worktree) | weights obtained via HF snapshot into `/tmp/asr1bit/hf`; 28 decoder layers, sampling 0/7/14/21/27 |
 | 5 | PBS CPU copy of #4 (workq) | **FAILED** | PBS `12477` | node had no model weights; superseded by #4 after the snapshot download |
-| 6 | Group-wise ASR pilot (g64, b12 recipe) | **COMPLETED (5/6 numbers)** | trained `12479`; evals `12510`–`12512` invalid (missing `--group-size`), corrected `12582`–`12584` | step 1200: 26.27/27.95; **step 1600: 15.68/21.82** vs b12 15.15/18.98 → **worse, rejected**; step 2000 queued (`12584`) |
+| 6 | Group-wise ASR pilot (g64, b12 recipe) | **COMPLETED (6/6)** | trained `12479`; evals `12510`–`12512` invalid (missing `--group-size`), corrected `12582`–`12584` | step 1200: 26.27/27.95; **step 1600: 15.68/21.82** vs b12 15.15/18.98 → **worse, rejected**; step 2000: **15.68 / 21.48** (`12584`, completed 10-24 23:09) → worse on both, rejected |
 | 7 | Rotation ASR pilot | **NOT_STARTED** | — | rotation gains only 2.1% alone and 7.4% combined; queued behind #6/#10 on evidence priority |
 | 8 | Combined (rotation × group) ASR pilot | **NOT_STARTED** | — | blocked on #6/#7 evidence |
 | 9 | 2-bit quantizer implementation + tests | **COMPLETED** | `src/asr1bit/quant.py`, `tests/test_quant_2bit.py` | lower reconstruction error than ternary on synthetic weights |
