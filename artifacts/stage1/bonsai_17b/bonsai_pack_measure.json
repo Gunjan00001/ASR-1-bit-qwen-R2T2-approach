@@ -1,0 +1,436 @@
+{
+  "thinker.model.layers.0.mlp.down_proj.weight": [
+    {
+      "kind": "ternary",
+      "group": "tensor",
+      "params": 12582912,
+      "bytes": 3145738,
+      "bytes_per_param": 0.250000794728597,
+      "bits_per_param": 2.000006357828776,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 128,
+      "params": 12582912,
+      "bytes": 3342344,
+      "bytes_per_param": 0.2656256357828776,
+      "bits_per_param": 2.125005086263021,
+      "scales": 98304,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 64,
+      "params": 12582912,
+      "bytes": 3538952,
+      "bytes_per_param": 0.2812506357828776,
+      "bits_per_param": 2.250005086263021,
+      "scales": 196608,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": "tensor",
+      "params": 12582912,
+      "bytes": 3145738,
+      "bytes_per_param": 0.250000794728597,
+      "bits_per_param": 2.000006357828776,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": 64,
+      "params": 12582912,
+      "bytes": 3538952,
+      "bytes_per_param": 0.2812506357828776,
+      "bits_per_param": 2.250005086263021,
+      "scales": 196608,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "fp16",
+      "group": "-",
+      "params": 12582912,
+      "bytes": 25165824,
+      "bytes_per_param": 2.0,
+      "bits_per_param": 16.0,
+      "scales": 0,
+      "roundtrip_error": 0.0
+    }
+  ],
+  "thinker.model.layers.0.mlp.gate_proj.weight": [
+    {
+      "kind": "ternary",
+      "group": "tensor",
+      "params": 12582912,
+      "bytes": 3145738,
+      "bytes_per_param": 0.250000794728597,
+      "bits_per_param": 2.000006357828776,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 128,
+      "params": 12582912,
+      "bytes": 3342344,
+      "bytes_per_param": 0.2656256357828776,
+      "bits_per_param": 2.125005086263021,
+      "scales": 98304,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 64,
+      "params": 12582912,
+      "bytes": 3538952,
+      "bytes_per_param": 0.2812506357828776,
+      "bits_per_param": 2.250005086263021,
+      "scales": 196608,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": "tensor",
+      "params": 12582912,
+      "bytes": 3145738,
+      "bytes_per_param": 0.250000794728597,
+      "bits_per_param": 2.000006357828776,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": 64,
+      "params": 12582912,
+      "bytes": 3538952,
+      "bytes_per_param": 0.2812506357828776,
+      "bits_per_param": 2.250005086263021,
+      "scales": 196608,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "fp16",
+      "group": "-",
+      "params": 12582912,
+      "bytes": 25165824,
+      "bytes_per_param": 2.0,
+      "bits_per_param": 16.0,
+      "scales": 0,
+      "roundtrip_error": 0.0
+    }
+  ],
+  "thinker.model.layers.0.self_attn.v_proj.weight": [
+    {
+      "kind": "ternary",
+      "group": "tensor",
+      "params": 2097152,
+      "bytes": 524298,
+      "bytes_per_param": 0.25000476837158203,
+      "bits_per_param": 2.0000381469726562,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 128,
+      "params": 2097152,
+      "bytes": 557064,
+      "bytes_per_param": 0.2656288146972656,
+      "bits_per_param": 2.125030517578125,
+      "scales": 16384,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 64,
+      "params": 2097152,
+      "bytes": 589832,
+      "bytes_per_param": 0.2812538146972656,
+      "bits_per_param": 2.250030517578125,
+      "scales": 32768,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": "tensor",
+      "params": 2097152,
+      "bytes": 524298,
+      "bytes_per_param": 0.25000476837158203,
+      "bits_per_param": 2.0000381469726562,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": 64,
+      "params": 2097152,
+      "bytes": 589832,
+      "bytes_per_param": 0.2812538146972656,
+      "bits_per_param": 2.250030517578125,
+      "scales": 32768,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "fp16",
+      "group": "-",
+      "params": 2097152,
+      "bytes": 4194304,
+      "bytes_per_param": 2.0,
+      "bits_per_param": 16.0,
+      "scales": 0,
+      "roundtrip_error": 0.0
+    }
+  ],
+  "thinker.model.layers.0.self_attn.q_proj.weight": [
+    {
+      "kind": "ternary",
+      "group": "tensor",
+      "params": 4194304,
+      "bytes": 1048586,
+      "bytes_per_param": 0.250002384185791,
+      "bits_per_param": 2.000019073486328,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 128,
+      "params": 4194304,
+      "bytes": 1114120,
+      "bytes_per_param": 0.2656269073486328,
+      "bits_per_param": 2.1250152587890625,
+      "scales": 32768,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 64,
+      "params": 4194304,
+      "bytes": 1179656,
+      "bytes_per_param": 0.2812519073486328,
+      "bits_per_param": 2.2500152587890625,
+      "scales": 65536,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": "tensor",
+      "params": 4194304,
+      "bytes": 1048586,
+      "bytes_per_param": 0.250002384185791,
+      "bits_per_param": 2.000019073486328,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": 64,
+      "params": 4194304,
+      "bytes": 1179656,
+      "bytes_per_param": 0.2812519073486328,
+      "bits_per_param": 2.2500152587890625,
+      "scales": 65536,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "fp16",
+      "group": "-",
+      "params": 4194304,
+      "bytes": 8388608,
+      "bytes_per_param": 2.0,
+      "bits_per_param": 16.0,
+      "scales": 0,
+      "roundtrip_error": 0.0
+    }
+  ],
+  "thinker.model.layers.0.self_attn.o_proj.weight": [
+    {
+      "kind": "ternary",
+      "group": "tensor",
+      "params": 4194304,
+      "bytes": 1048586,
+      "bytes_per_param": 0.250002384185791,
+      "bits_per_param": 2.000019073486328,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 128,
+      "params": 4194304,
+      "bytes": 1114120,
+      "bytes_per_param": 0.2656269073486328,
+      "bits_per_param": 2.1250152587890625,
+      "scales": 32768,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 64,
+      "params": 4194304,
+      "bytes": 1179656,
+      "bytes_per_param": 0.2812519073486328,
+      "bits_per_param": 2.2500152587890625,
+      "scales": 65536,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": "tensor",
+      "params": 4194304,
+      "bytes": 1048586,
+      "bytes_per_param": 0.250002384185791,
+      "bits_per_param": 2.000019073486328,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": 64,
+      "params": 4194304,
+      "bytes": 1179656,
+      "bytes_per_param": 0.2812519073486328,
+      "bits_per_param": 2.2500152587890625,
+      "scales": 65536,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "fp16",
+      "group": "-",
+      "params": 4194304,
+      "bytes": 8388608,
+      "bytes_per_param": 2.0,
+      "bits_per_param": 16.0,
+      "scales": 0,
+      "roundtrip_error": 0.0
+    }
+  ],
+  "thinker.model.layers.0.mlp.up_proj.weight": [
+    {
+      "kind": "ternary",
+      "group": "tensor",
+      "params": 12582912,
+      "bytes": 3145738,
+      "bytes_per_param": 0.250000794728597,
+      "bits_per_param": 2.000006357828776,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 128,
+      "params": 12582912,
+      "bytes": 3342344,
+      "bytes_per_param": 0.2656256357828776,
+      "bits_per_param": 2.125005086263021,
+      "scales": 98304,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 64,
+      "params": 12582912,
+      "bytes": 3538952,
+      "bytes_per_param": 0.2812506357828776,
+      "bits_per_param": 2.250005086263021,
+      "scales": 196608,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": "tensor",
+      "params": 12582912,
+      "bytes": 3145738,
+      "bytes_per_param": 0.250000794728597,
+      "bits_per_param": 2.000006357828776,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": 64,
+      "params": 12582912,
+      "bytes": 3538952,
+      "bytes_per_param": 0.2812506357828776,
+      "bits_per_param": 2.250005086263021,
+      "scales": 196608,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "fp16",
+      "group": "-",
+      "params": 12582912,
+      "bytes": 25165824,
+      "bytes_per_param": 2.0,
+      "bits_per_param": 16.0,
+      "scales": 0,
+      "roundtrip_error": 0.0
+    }
+  ],
+  "thinker.model.layers.0.self_attn.k_proj.weight": [
+    {
+      "kind": "ternary",
+      "group": "tensor",
+      "params": 2097152,
+      "bytes": 524298,
+      "bytes_per_param": 0.25000476837158203,
+      "bits_per_param": 2.0000381469726562,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 128,
+      "params": 2097152,
+      "bytes": 557064,
+      "bytes_per_param": 0.2656288146972656,
+      "bits_per_param": 2.125030517578125,
+      "scales": 16384,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "ternary",
+      "group": 64,
+      "params": 2097152,
+      "bytes": 589832,
+      "bytes_per_param": 0.2812538146972656,
+      "bits_per_param": 2.250030517578125,
+      "scales": 32768,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": "tensor",
+      "params": 2097152,
+      "bytes": 524298,
+      "bytes_per_param": 0.25000476837158203,
+      "bits_per_param": 2.0000381469726562,
+      "scales": 1,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "2bit",
+      "group": 64,
+      "params": 2097152,
+      "bytes": 589832,
+      "bytes_per_param": 0.2812538146972656,
+      "bits_per_param": 2.250030517578125,
+      "scales": 32768,
+      "roundtrip_error": 0.0
+    },
+    {
+      "kind": "fp16",
+      "group": "-",
+      "params": 2097152,
+      "bytes": 4194304,
+      "bytes_per_param": 2.0,
+      "bits_per_param": 16.0,
+      "scales": 0,
+      "roundtrip_error": 0.0
+    }
+  ]
+}
