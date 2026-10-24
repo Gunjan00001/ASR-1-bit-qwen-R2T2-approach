@@ -3523,3 +3523,18 @@ evaluations are submitted: `12507`–`12509` (b20, `BIT_WIDTH=2.0`) and
 **Bug fixed before interpreting b20:** the EVAL record only carried
 `ternary_wer`, so a 2-bit run's offline number would have been silently absent;
 `quant_bw`/`quant_wer` are now written.
+
+## 2026-10-24 (16:10) — 2-bit is measured and loses; g64's corrected evaluation is queue-blocked
+
+**2-bit (b20), valid evaluation:** 36.86/44.09 → 29.24/33.75 → **28.18/34.77**
+(clean/other at steps 1 200/1 600/2 000, zero loops). Worse than the ternary
+line-best (15.15/18.98) on both splits despite identical measured storage
+(2.000 bits/param) and lower reconstruction error. Closed.
+
+**g64 (b21): first evaluation batch was invalid** — `eval_streaming.py` had no
+`--group-size`, so a per-tensor model was built for a grouped checkpoint. The
+bug is fixed (`--group-size`, `GROUP_SIZE` env) and three corrected runs were
+submitted (`12582`–`12584`). They are **still queued**: the gpu queue holds 32
+queued and 27 running jobs cluster-wide, so this is an external scheduling
+blocker, not a code or configuration problem. No g64 ASR number exists yet and
+none is reported.
