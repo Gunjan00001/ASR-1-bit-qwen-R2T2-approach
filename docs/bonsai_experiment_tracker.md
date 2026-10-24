@@ -12,12 +12,12 @@ path._
 | 3 | Rotation prototype + correctness gates | **COMPLETED** | `src/asr1bit/rotate.py`, `tests/test_rotate.py` (6 gates) | caught an orientation bug; equivalence incl. remainders |
 | 4 | Real-weight diagnostic on 1.7B (groups + rotation + combination, per projection/layer) | **COMPLETED** | local CPU task `s1hq4uxy`; output `artifacts/stage1/bonsai_17b/` (worktree) | weights obtained via HF snapshot into `/tmp/asr1bit/hf`; 28 decoder layers, sampling 0/7/14/21/27 |
 | 5 | PBS CPU copy of #4 (workq) | **FAILED** | PBS `12477` | node had no model weights; superseded by #4 after the snapshot download |
-| 6 | Group-wise ASR pilot (g64, b12 recipe) | **COMPLETED (5/6 numbers)** | trained `12479`; evals `12510`–`12512` invalid (missing `--group-size`), corrected `12582`–`12584` | step 1200: 26.27/27.95; **step 1600: 15.68/21.82** vs b12 15.15/18.98 → **worse, rejected**; step 2000 queued (`12584`) |
+| 6 | Group-wise ASR pilot (g64, b12 recipe) | **COMPLETED (6/6)** | trained `12479`; evals `12510`–`12512` invalid (missing `--group-size`), corrected `12582`–`12584` | step 1200: 26.27/27.95; **step 1600: 15.68/21.82** vs b12 15.15/18.98 → **worse, rejected**; step 2000: **15.68 / 21.48** (`12584`, completed 10-24 23:09) → worse on both, rejected |
 | 7 | Rotation ASR pilot | **NOT_STARTED** | — | rotation gains only 2.1% alone and 7.4% combined; queued behind #6/#10 on evidence priority |
 | 8 | Combined (rotation × group) ASR pilot | **NOT_STARTED** | — | blocked on #6/#7 evidence |
 | 9 | 2-bit quantizer implementation + tests | **COMPLETED** | `src/asr1bit/quant.py`, `tests/test_quant_2bit.py` | lower reconstruction error than ternary on synthetic weights |
 | 10 | 2-bit ASR training (per-tensor, b12 recipe) | **COMPLETED** | trained `12478`; evals `12507`–`12509` | best 28.18 clean / 34.77 other (step 2000), zero loops → **worse than ternary, rejected** |
-| 11 | Streaming-state distillation implementation | **NOT_STARTED** | audit: `docs/distillation_audit.md` | output-logit KL exists; no state supervision; insertion point documented |
+| 11 | Streaming-state distillation | **NOT_STARTED** (design complete) | `docs/streaming_state_distillation_design.md` | 7 required tests + controlled pair; no implementation yet |
 | 12 | Deployment: serialized size (measured) | **COMPLETED** | `scripts/bonsai_pack_measure.py`, `artifacts/stage1/bonsai_17b/bonsai_pack_measure.json` | ternary 2.000, g64 2.250, 2-bit 2.000 bits/param; latency/memory NOT MEASURED (no packed runtime) |
 
 ## Dependencies
