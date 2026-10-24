@@ -17,7 +17,7 @@ path._
 | 8 | Combined (rotation × group) ASR pilot | **NOT_STARTED** | — | blocked on #6/#7 evidence |
 | 9 | 2-bit quantizer implementation + tests | **COMPLETED** | `src/asr1bit/quant.py`, `tests/test_quant_2bit.py` | lower reconstruction error than ternary on synthetic weights |
 | 10 | 2-bit ASR training (per-tensor, b12 recipe) | **COMPLETED** | trained `12478`; evals `12507`–`12509` | best 28.18 clean / 34.77 other (step 2000), zero loops → **worse than ternary, rejected** |
-| 11 | Streaming-state distillation | **NOT_STARTED** (design complete) | `docs/streaming_state_distillation_design.md` | 7 required tests + controlled pair; no implementation yet |
+| 11 | Streaming-state distillation | **RUNNING** | branch `state-distill` @ `2a84979`; jobs `12642` (B), `12643` (C), `12644` (D), `12645` (E) | implemented + 23 tests; pre-registered A–G matrix; official evals pending |
 | 12 | Deployment: serialized size (measured) | **COMPLETED** | `scripts/bonsai_pack_measure.py`, `artifacts/stage1/bonsai_17b/bonsai_pack_measure.json` | ternary 2.000, g64 2.250, 2-bit 2.000 bits/param; latency/memory NOT MEASURED (no packed runtime) |
 
 ## Dependencies

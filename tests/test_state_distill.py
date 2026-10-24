@@ -263,6 +263,7 @@ class TestCliContract:
         assert args.state_distill_weight == 0.0
         assert args.state_distill_layer == -1
         assert args.state_distill_normalize == 1
+        assert args.seed == 0
 
     def test_state_flags_are_accepted(self, monkeypatch):
         module = _load_trainer()
