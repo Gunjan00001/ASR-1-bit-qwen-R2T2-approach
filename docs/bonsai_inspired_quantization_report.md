@@ -80,7 +80,7 @@ by ~2 points of relative error.
 | arm | change vs b12 line-best | PBS | status |
 |---|---|---|---|
 | `aligned17b20` | `--bit-width 2.0` (four levels), everything else identical | **12478** | QUEUED (GPU queue full) |
-| `aligned17b21` | `--group-size 64`, bit width unchanged | **12479** | QUEUED |
+| `aligned17b21` | `--group-size 64`, bit width unchanged | **12479** trained; evals `12510`–`12512` invalid (missing `--group-size`), corrected `12582`–`12584` | **step 1600: 15.68 / 21.82**; step 2000 still queued |
 
 Supporting fixes made before queuing: the in-training guardrail is now
 width-aware (a 2-bit run previously would have been scored as 1.58-bit), and the

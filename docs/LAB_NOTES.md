@@ -3538,3 +3538,18 @@ submitted (`12582`–`12584`). They are **still queued**: the gpu queue holds 32
 queued and 27 running jobs cluster-wide, so this is an external scheduling
 blocker, not a code or configuration problem. No g64 ASR number exists yet and
 none is reported.
+
+## 2026-10-24 (17:45) — g64 with the corrected evaluator: no improvement over per-tensor
+
+| g64 state | clean | other |
+|---|---:|---:|
+| 1 200 | 26.27 | 27.95 |
+| **1 600** | **15.68** | **21.82** |
+| 2 000 | *corrected eval still queued (`12584`); old file is invalid* | — |
+| b12 per-tensor, best state (1 600) | **15.15** | **18.98** |
+
+With the layout fixed, group-64 lands **0.53 worse on clean and 2.84 worse on
+`other`** than the per-tensor line-best at the comparable state. It does beat the
+invalid pre-fix numbers by ~19 points, which confirms the earlier g64 scores were
+an evaluator artifact. Group-wise ternary therefore **does not win** on this
+evidence; its reconstruction gain (−5.2 %) does not transfer.
