@@ -3492,3 +3492,34 @@ the portable streamer with **no LSP truncation**, the official harness runs LSP
 with `truncate_loops` and is cutting hundreds of loops per 50 utterances. The
 number that decides is the official one, and it says this configuration is not
 viable. Diagnostics of the guardrail-vs-official gap continue.
+
+## 2026-10-24 (08:20) — Overnight: b17 fully evaluated (dead), 2-bit and g64 trained, six official evals submitted
+
+**b17 (FFN-only) is complete and clearly non-viable** — all six official numbers:
+
+| state | clean | other |
+|---|---:|---:|
+| step 1 200 | 133.05 (740 loops) | 111.82 (789 loops) |
+| step 1 600 | 119.17 (392) | 126.25 (514) |
+| step 2 000 | 69.28 (351) | 107.27 (421) |
+
+Every state is 4–9× worse than the b12 line-best with hundreds of loops; the
+pattern worsens toward earlier steps, consistent with an unrepairable
+streaming head under this policy. Closed.
+
+**Both queued arms trained to 2 000 steps:**
+
+| arm | change vs b12 | final guardrail | latest offline readout |
+|---|---|---|---|
+| `aligned17b20` | **2-bit** (`--bit-width 2.0`) | 22.59 (1750: 25.18) | fp16 15.47 (2-bit readout now recorded as `quant_wer`) |
+| `aligned17b21` | **g64 group scales** | **15.06** (1750: 15.29) — best guardrails of the lineage | **13.35** ternary at 2000 |
+
+`b21`'s guardrail series is both the lowest and the tightest seen (13–15 across
+the second half), which is at least consistent with group scaling stabilising
+the streaming head. Guardrails do not promote anything; the six official
+evaluations are submitted: `12507`–`12509` (b20, `BIT_WIDTH=2.0`) and
+`12510`–`12512` (b21), steps 1 200/1 600/2 000.
+
+**Bug fixed before interpreting b20:** the EVAL record only carried
+`ternary_wer`, so a 2-bit run's offline number would have been silently absent;
+`quant_bw`/`quant_wer` are now written.

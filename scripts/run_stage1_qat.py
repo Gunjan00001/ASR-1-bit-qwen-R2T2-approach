@@ -534,7 +534,12 @@ def main() -> int:
             ev = {"step": step + 1, "alpha": alpha,
                   "fp16_wer": prec["fp16"]["wer"] if "fp16" in prec else None,
                   "binary_wer": prec["binary"]["wer"] if "binary" in prec else None,
-                  "ternary_wer": prec["ternary"]["wer"] if "ternary" in prec else None}
+                  "ternary_wer": prec["ternary"]["wer"] if "ternary" in prec else None,
+                  # non-ternary widths (e.g. 2-bit) are recorded under their own
+                  # key by evaluate_precisions; surface them so a 2-bit run's
+                  # offline readout is not silently missing from the EVAL line.
+                  "quant_bw": args.bit_width,
+                  "quant_wer": (prec.get(f"bw{args.bit_width:g}") or prec.get("ternary") or {}).get("wer")}
             history.append(ev)
             print("EVAL " + json.dumps(ev), flush=True)
             set_precision(model, args.bit_width, alpha)  # restore training precision
