@@ -42,10 +42,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from asr1bit.data.load import iter_librispeech
@@ -82,6 +84,13 @@ from asr1bit.train.qat import (
 )
 from asr1bit.train.samples import interleave_with_ratio, select_evenly
 from asr1bit.train.schedules import build_lr_lambda
+from asr1bit.train.state_distill import (
+    HiddenStateCapture,
+    combine_losses,
+    decoder_layer,
+    resolve_layer,
+    streaming_state_loss,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -109,6 +118,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--distill-weight", type=float, default=0.0,
                    help="Weight of self-distillation KL (teacher = same shadows at alpha=0).")
     p.add_argument("--distill-temp", type=float, default=2.0, help="Distillation temperature.")
+    p.add_argument(
+        "--state-distill-weight", type=float, default=0.0,
+        help="Weight of the per-chunk hidden-state MSE term (0 = disabled, the "
+             "existing path; requires --frozen-teacher 1).",
+    )
+    p.add_argument(
+        "--state-distill-layer", type=int, default=-1,
+        help="Decoder layer whose hidden states are matched (-1 = middle layer).",
+    )
+    p.add_argument(
+        "--state-distill-normalize", type=int, default=1,
+        help="1 = LayerNorm both states before MSE (scale-free; recommended).",
+    )
     p.add_argument("--frozen-teacher", type=int, default=0,
                    help="1 = distillation teacher is a frozen fp copy of the pretrained model.")
     p.add_argument("--log-grad-norms", type=int, default=1)
@@ -202,11 +224,21 @@ def parse_args() -> argparse.Namespace:
                    help="Keep every N-th empty-target (stop) aligned sample (half of all chunks "
                         "have no new words; stride 1 keeps them all).")
     p.add_argument("--out", default="artifacts/stage1")
+    p.add_argument(
+        "--seed", type=int, default=0,
+        help="Seed for python/numpy/torch (default 0). The recipe is deterministic "
+             "without it; the flag makes matched-seed comparisons explicit.",
+    )
     return p.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
     if args.op_rollout and not args.lazy_collate:
         print("--op-rollout enables --lazy-collate (the mix changes across refreshes)", flush=True)
         args.lazy_collate = 1
@@ -247,6 +279,25 @@ def main() -> int:
         for param in teacher.parameters():
             param.requires_grad_(False)
         print("frozen teacher loaded", flush=True)
+
+    state_layer = None
+    if args.state_distill_weight > 0:
+        if teacher is None:
+            raise ValueError(
+                "--state-distill-weight > 0 requires --frozen-teacher 1 "
+                "(the state target must be the frozen full-precision teacher)"
+            )
+        state_layer = resolve_layer(model, args.state_distill_layer)
+        teacher_layer = resolve_layer(teacher, args.state_distill_layer)
+        if state_layer != teacher_layer:
+            raise ValueError(
+                f"student/teacher layer mismatch: {state_layer} vs {teacher_layer}"
+            )
+        print(
+            f"streaming-state distillation: layer {state_layer}, weight "
+            f"{args.state_distill_weight}, normalize={bool(args.state_distill_normalize)}",
+            flush=True,
+        )
 
 # Training data: a small cache while developing, the full 28.5k-utterance
 # cache for production runs. Cached audio means the GPU never waits on I/O.
@@ -431,28 +482,86 @@ def main() -> int:
         else:
             batch = batches[step % len(batches)]
         batch = {k: (v.cuda() if torch.is_tensor(v) else v) for k, v in batch.items()}
+        # The collator marks rows that are true streaming chunk states; the
+        # state loss uses it and the model must not receive it as a kwarg.
+        state_mask = batch.pop("state_mask", None)
+        state_weight = float(args.state_distill_weight)
+        if state_weight and step == 0:
+            masks = state_mask.tolist() if state_mask is not None else None
+            valid = int((batch["labels"] != -100).sum())
+            streaming_valid = valid
+            if state_mask is not None:
+                streaming_valid = int(
+                    ((batch["labels"] != -100) & (state_mask.reshape(-1, 1) != 0)).sum()
+                )
+            print(
+                f"STATE batch: rows={tuple(batch['labels'].shape)} "
+                f"state_mask={masks} label_positions={valid} "
+                f"streaming_label_positions={streaming_valid}",
+                flush=True,
+            )
         optimizer.zero_grad()
         ce_value = None
         kl_value = None
-        if args.distill_weight > 0:
+        state_value = None
+        if args.distill_weight > 0 or state_weight > 0:
+            teacher_hidden = None
             if teacher is not None:
                 # Anchored distillation: frozen fp copy of the pretrained model.
-                with torch.no_grad():
-                    teacher_out = teacher(**batch)
+                if state_weight > 0:
+                    capture = HiddenStateCapture(decoder_layer(teacher, state_layer))
+                    with torch.no_grad(), capture:
+                        teacher_out = teacher(**batch)
+                    teacher_hidden = capture.value
+                else:
+                    with torch.no_grad():
+                        teacher_out = teacher(**batch)
             else:
                 # Self-distillation: the teacher is the same shadows at alpha=0.
                 set_qat_alpha(model, 0.0)
-                with torch.no_grad():
-                    teacher_out = model(**batch)
+                if state_weight > 0:
+                    capture = HiddenStateCapture(decoder_layer(model, state_layer))
+                    with torch.no_grad(), capture:
+                        teacher_out = model(**batch)
+                    teacher_hidden = capture.value
+                else:
+                    with torch.no_grad():
+                        teacher_out = model(**batch)
                 set_qat_alpha(model, alpha)
-            out = model(**batch)
+            if state_weight > 0:
+                capture = HiddenStateCapture(decoder_layer(model, state_layer))
+                with capture:
+                    out = model(**batch)
+                student_hidden = capture.value
+            else:
+                out = model(**batch)
             ce = out.loss if hasattr(out, "loss") else out[0]
-            kl = distillation_loss(
-                out.logits, teacher_out.logits, batch["labels"], temperature=args.distill_temp
+            kl = None
+            if args.distill_weight > 0:
+                kl = distillation_loss(
+                    out.logits, teacher_out.logits, batch["labels"],
+                    temperature=args.distill_temp,
+                )
+                kl_value = float(kl.detach())
+            state = None
+            if state_weight > 0:
+                state = streaming_state_loss(
+                    student_hidden,
+                    teacher_hidden,
+                    batch["labels"],
+                    batch.get("attention_mask"),
+                    state_mask,
+                    normalize=bool(args.state_distill_normalize),
+                )
+                state_value = float(state.detach())
+            loss = combine_losses(
+                ce,
+                kl,
+                state,
+                distill_weight=args.distill_weight,
+                state_weight=state_weight,
             )
-            loss = (1.0 - args.distill_weight) * ce + args.distill_weight * kl
             ce_value = float(ce.detach())
-            kl_value = float(kl.detach())
             loss.backward()
             check_finite_grads(model)
             norms = grad_norms(model)
@@ -487,6 +596,9 @@ def main() -> int:
             if ce_value is not None:
                 record["ce"] = ce_value
                 record["kl"] = kl_value
+            if state_value is not None:
+                record["state"] = state_value
+                record["state_weight"] = state_weight
             record.update(scale_stats(model))
             history.append(record)
             print(json.dumps(record), flush=True)
@@ -587,6 +699,12 @@ def main() -> int:
         f"{args.policy}_bw{args.bit_width}_g{group_size}_lr{args.lr}_"
         f"{args.optimizer}_{args.alpha_mode}_ls{args.learnable_scale}_n{args.train_n}"
     )
+    if args.state_distill_weight > 0:
+        # Never let a state-distillation arm overwrite the control's JSON.
+        tag += (
+            f"_sd{args.state_distill_weight:g}"
+            f"_l{args.state_distill_layer}_norm{args.state_distill_normalize}"
+        )
     (out_dir / f"stage1_{tag}.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     print("wrote", out_dir / f"stage1_{tag}.json", flush=True)
     return 0

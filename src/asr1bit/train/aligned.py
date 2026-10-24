@@ -81,6 +81,7 @@ def build_aligned_examples(
                     "audio": audio,
                     "prefix_text": prefix + example.prefix_text,
                     "target": example.target_text,
+                    "streaming": True,
                 }
             )
         if progress is not None and (index + 1) % 50 == 0:

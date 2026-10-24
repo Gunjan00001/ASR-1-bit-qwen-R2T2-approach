@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import argparse
 
+import torch
+
 from asr1bit.data.load import iter_librispeech, load_utterance_cache
 from asr1bit.train.qat import make_sft_labels
 
@@ -52,14 +54,31 @@ def build_examples(
                 if not target:
                     continue
                 examples.append(
-                    {"audio": utt.audio, "prefix_text": prefix + partial, "target": target}
+                    {
+                        "audio": utt.audio,
+                        "prefix_text": prefix + partial,
+                        "target": target,
+                        "streaming": False,
+                    }
                 )
         else:
-            examples.append({"audio": utt.audio, "prefix_text": prefix, "target": utt.text})
+            examples.append(
+                {
+                    "audio": utt.audio,
+                    "prefix_text": prefix,
+                    "target": utt.text,
+                    "streaming": False,
+                }
+            )
         if silence_sec:
             n = max(1, int(silence_sec * 16000))
             examples.append(
-                {"audio": utt.audio[:n], "prefix_text": prefix, "target": ""}
+                {
+                    "audio": utt.audio[:n],
+                    "prefix_text": prefix,
+                    "target": "",
+                    "streaming": False,
+                }
             )
     return examples
 
@@ -75,6 +94,15 @@ def collate(examples: list[dict], processor) -> dict:
     full_inputs["labels"] = make_sft_labels(
         full_inputs["input_ids"], prefix_lens, processor.tokenizer.pad_token_id
     )
+    # Mark which rows are streaming chunk states. The state-distillation loss
+    # (train/state_distill.py) uses this to supervise only samples whose audio
+    # is truncated at the chunk boundary; ordinary full-utterance samples must
+    # not contribute, or the loss would see future audio.
+    if any("streaming" in example for example in examples):
+        full_inputs["state_mask"] = torch.tensor(
+            [1.0 if example.get("streaming", False) else 0.0 for example in examples],
+            dtype=torch.float32,
+        )
     return full_inputs
 
 

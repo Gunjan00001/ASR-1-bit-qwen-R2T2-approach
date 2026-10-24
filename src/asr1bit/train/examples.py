@@ -68,7 +68,12 @@ def build_onpolicy_examples(
                     # base prompt directly, exactly like the standard samples.
                     target = " ".join(remainder)
             examples.append(
-                {"audio": sample.audio, "prefix_text": sample.prompt, "target": target}
+                {
+                    "audio": sample.audio,
+                    "prefix_text": sample.prompt,
+                    "target": target,
+                    "streaming": True,
+                }
             )
     return examples
 
@@ -107,10 +112,11 @@ def build_distill_examples(
                 if prompt_raw is not None and prompt.startswith(prompt_raw):
                     prompt = prompt_raw + clean_stream_text(prompt[len(prompt_raw) :])
             examples.append(
-                {"audio": sample.audio, "prefix_text": prompt, "target": target}
+                {
+                    "audio": sample.audio,
+                    "prefix_text": prompt,
+                    "target": target,
+                    "streaming": True,
+                }
             )
     return examples
-
-
-def __len__(self) -> int:
-        return len(self.examples)
