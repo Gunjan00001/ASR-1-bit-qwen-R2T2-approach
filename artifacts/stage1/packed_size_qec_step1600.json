@@ -1,0 +1,18 @@
+{
+  "checkpoint": "data/checkpoints/qat_qec_b12/step1600.pt",
+  "checkpoint_step": 1600,
+  "base_bytes": 4698521512,
+  "base_params_bf16_equivalent": 2349260756,
+  "quantized_layers": 196,
+  "quantized_params": 1409286144,
+  "quantized_fraction": 0.5998849384431636,
+  "quantization": "ternary {-1,0,+1}, 2-bit slots, per-tensor fp16 scale",
+  "packed_weight_bytes": 352321536,
+  "scale_bytes": 392,
+  "compressed_bytes": 2232271152,
+  "compressed_mib": 2128.859664916992,
+  "compression_ratio_vs_bf16": 2.1048166607315455,
+  "effective_bits_per_param": 7.601612196683713,
+  "non_quantized_bytes_bf16": 1879949224,
+  "note": "Serialized representation only; no packed runtime exists, so latency/throughput are NOT measured."
+}

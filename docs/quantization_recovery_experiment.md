@@ -157,7 +157,20 @@ new mechanism.
   transfer: the project's reconstruction-to-WER disconnect is confirmed at the
   layer-output level.
 
-### 8.6 Next justified step (not run here)
+### 8.6 Compression and runtime
+
+The QEC checkpoint has exactly the baseline layout (196 ternary projections,
+2-bit slots + fp16 per-tensor scales): **2 232 271 152 bytes (2.23 GB)**,
+**2.10× vs bf16**, **7.60 effective bits/param**, 60.0% of parameters ternary.
+QEC adds no inference parameters. The measured streaming RTF was 3.07 (clean)
+and 2.70 (other) on the evaluation GPU; the control's 21.96/21.73 was measured
+under heavier contention, so RTF is not a controlled comparison and no
+speedup is claimed. There is no packed inference runtime; latency, throughput
+and memory for a packed deployment were not measured.
+
+Artifact: `artifacts/stage1/packed_size_qec_step1600.json`.
+
+### 8.7 Next justified step (not run here)
 
 A **quantized-vs-fp self-consistency objective on the task output** (match the
 quantized student's logits to its own fp logits, or a co-training schedule that
