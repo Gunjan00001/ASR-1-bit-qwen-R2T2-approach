@@ -1,9 +1,11 @@
 # Streaming-state distillation — design (implemented, pre-registered)
 
-_Updated 2026-10-25. Status: implementation + tests COMPLETE; GPU experiments
-pre-registered below. This document is the pre-registration: the seven arms,
-the single variable per arm, the budget, and the acceptance rule are fixed
-before any result is observed._
+_Updated 2026-10-25. Status: implementation + tests **COMPLETE**; all seven arms
+trained and officially evaluated. Results:
+[`docs/streaming_state_distillation_results.md`](streaming_state_distillation_results.md)
+and [`docs/final_experiment_report.md`](final_experiment_report.md). The
+pre-registration (seven arms, one variable each, budget, acceptance rule) below
+was fixed before any result was observed._
 
 ## Verified starting point (code inspection, not assumption)
 

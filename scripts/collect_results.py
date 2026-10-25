@@ -54,10 +54,20 @@ ARM_CONFIG = {
     "aligned17b17": ("decoder_ffn", 1.58, "per-tensor", "2.5e-6"),
     "aligned17b20": ("decoder_attn_ffn", 2.0, "per-tensor", "2.5e-6"),
     "aligned17b21": ("decoder_attn_ffn", 1.58, "g64", "2.5e-6"),
+    "b12": ("decoder_attn_ffn", 1.58, "per-tensor", "2.5e-6"),
+    "b12_step1600_n100": ("decoder_attn_ffn", 1.58, "per-tensor", "2.5e-6"),
+    "b05": ("decoder_attn_ffn", 1.58, "per-tensor", "2.5e-6"),
+    "c01": ("decoder_attn_ffn", 1.58, "per-tensor", "2.5e-6"),
+    "d20": ("decoder_attn_ffn", 1.58, "per-tensor", "2.5e-6"),
+    "e08": ("decoder_attn_ffn", 1.58, "per-tensor", "2.5e-6"),
+    "f20": ("decoder_attn_ffn", 1.58, "per-tensor", "2.5e-6"),
+    "g_noLN": ("decoder_attn_ffn", 1.58, "per-tensor", "2.5e-6"),
 }
 
 PATTERNS = (
     re.compile(r"streaming_qat_stream_(?P<arm>aligned17b\d+)_(?P<state>step\d+|last)_?\(?(?P<split>clean|other)\)?\.json$"),
+    re.compile(r"streaming_sd_(?P<arm>b05|c01|d20|e08|f20|g_noLN)_(?P<state>step\d+)(?:_n(?P<n>\d+))?_(?P<split>clean|other)\.json$"),
+    re.compile(r"streaming_(?P<arm>b12)_(?P<state>step\d+)_n(?P<n>\d+)_(?P<split>clean|other)\.json$"),
     re.compile(r"streaming_(?P<arm>[a-z0-9]+(?:_[a-z0-9]+)*)_?(?P<state>c?\d+)?_?(?P<split>clean|other)?\.json$"),
 )
 

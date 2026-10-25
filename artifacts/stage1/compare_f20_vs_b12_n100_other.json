@@ -1,0 +1,17 @@
+{
+  "control": "artifacts/stage1/streaming_b12_step1600_n100_other.json",
+  "candidate": "artifacts/stage1/streaming_sd_f20_step1600_n100_other.json",
+  "n_utterances": 100,
+  "control_wer": 19.9887,
+  "candidate_wer": 20.0453,
+  "delta_wer": 0.0566,
+  "bootstrap_95ci": [
+    -1.4467,
+    1.6986
+  ],
+  "candidate_better_utterances": 12,
+  "candidate_worse_utterances": 15,
+  "ties": 73,
+  "resamples": 10000,
+  "seed": 0
+}

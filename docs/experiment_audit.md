@@ -139,7 +139,42 @@ table and CSV.
   switch, not quantization sensitivity. Not used for any decision.
 - **The 15.15/18.98 pair is a 50-utt diagnostic**, not a full-split number.
 
-## 7. Machine-readable record
+## 7. State-distillation phase (2026-10-25, added after §1–§6)
+
+Seven pre-registered arms (A control + B–G) trained to 2 000 steps on the b12
+recipe; one variable each. All official evaluations are terminal; no job of
+ours is running.
+
+| arm | variable | clean (50) | other (50) | status |
+|---|---|---:|---:|---|
+| A | control (`aligned17b12/step1600`) | 15.15 | 18.98 | verified baseline |
+| B | λ=0.05, layer 14 | 15.25 | 21.14 | complete, pair fails |
+| C | λ=0.01, layer 14 | 14.94 | 21.36 | complete, pair fails |
+| D | λ=0.20, layer 14 | 15.04 | 19.43 | complete, pair fails (near-tie) |
+| E | λ=0.05, layer 8 | 14.83 | 20.57 | complete, pair fails |
+| F | λ=0.05, layer 20 | **14.62** | **18.18** | **best pair at 50 utts; 100-utt other ties** |
+| G | λ=0.05, layer 14, no LN | 14.94 | 19.09 | complete, pair fails by 0.11 |
+
+**100-utt paired confirmation (A vs F):** clean 15.75 vs **14.98** (−0.77);
+other **19.99** vs 20.05 (+0.06). Every paired bootstrap CI includes zero.
+Verdict: clean-only gain, **no robust both-splits improvement**.
+
+**Step-2000 checks:** D 15.89/26.59; E 20.76/25.34; F 17.80/23.07;
+G 15.15/22.73 — all worse than their step-1600 states. State selection remains
+load-bearing.
+
+**Job ledger:** training `12642` (B), `12649` (C after OOM retry), `12651` (D
+after OOM retry), `12645` (E), `12654` (F), `12657` (G); evaluations `12652`,
+`12653`, `12655`, `12656`, `12693`, `12697`, `12695`, `12700`, `12703`,
+`12704`, `12698`, `12699`. `12643`/`12644` are the preserved GPU-race OOM
+attempts; `12694` skipped a not-yet-written checkpoint. Full detail:
+`docs/final_experiment_report.md`.
+
+**Invalidity audit:** none of the state-distillation evaluations used a
+mismatched policy or width; the eval JSONs record policy/width from this phase
+onward, and the earlier SD JSONs are backed by their committed launchers.
+
+## 8. Machine-readable record
 
 `docs/experiment_results.csv` (regenerated from the artifacts by
 `scripts/collect_results.py`) contains 127 official rows with branch, commit,

@@ -1,0 +1,72 @@
+#!/bin/bash
+#PBS -N asr1bit-sd-confirm
+#PBS -q gpu
+#PBS -l select=1:ncpus=1:ngpus=1:mem=64gb
+#PBS -l walltime=12:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/sd_confirm.out
+#
+# Paired confirmation evaluation on a larger deterministic LibriSpeech subset.
+# The same `--n` and seed are used for the control and the candidate, so the
+# two systems see identical utterances. Official prefix algorithm, 320 ms,
+# LSP policy on.
+#
+#   qsub -v CKPT=<ckpt>,TAG=<tag>,N=100 scripts/eval_sd_confirm.pbs
+#
+# Writes artifacts/stage1/streaming_<tag>_<split>.json per split.
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+CKPT="${CKPT:?set CKPT=<checkpoint>}"
+TAG="${TAG:?set TAG=<tag>}"
+N="${N:-100}"
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage3/eval_confirm_${TAG}.log"
+
+PY=/home/jiit_992401210050/miniconda3/bin/python
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then PY=/tmp/asr1bit/miniconda3/bin/python; fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-1.7B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-1.7B
+else
+  MODEL=Qwen/Qwen3-ASR-1.7B
+fi
+
+PICK=$(bash scripts/pick_gpu_wait.sh 45000 "${PICK_WAIT_MIN:-90}") || exit 0
+export CUDA_VISIBLE_DEVICES="${EVAL_GPU:-$PICK}"
+
+{
+  echo "=== confirm $TAG n=$N | host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+for CFG in clean other; do
+  OUT="artifacts/stage1/streaming_${TAG}_${CFG}.json"
+  if [ -f "$OUT" ]; then
+    echo "skip existing $OUT" | tee -a "$LOG"
+    continue
+  fi
+  echo "=== $TAG $CFG n=$N ===" | tee -a "$LOG"
+  "$PY" scripts/eval_streaming.py \
+    --model "$MODEL" \
+    --checkpoint "$CKPT" \
+    --policy "${POLICY:-decoder_attn_ffn}" \
+    --bit-width "${BIT_WIDTH:-1.58}" \
+    --group-size "${GROUP_SIZE:-0}" \
+    --chunk-ms 320 \
+    --n "$N" \
+    --max-new-tokens 32 \
+    --unfixed-token-num 5 \
+    --lsp-margin-words 3 \
+    --lsp-truncate-loops 1 \
+    --conditions quantized \
+    --config "$CFG" \
+    --out "$OUT" \
+    2>&1 | tee -a "$LOG"
+done

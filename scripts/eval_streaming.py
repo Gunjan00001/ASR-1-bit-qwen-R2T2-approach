@@ -96,6 +96,16 @@ def main() -> int:
         "config": args.config,
         "n": len(utterances),
         "unfixed_token_num": args.unfixed_token_num,
+        # Provenance: the evaluator must record the architecture it built, or a
+        # policy/width mismatch is invisible after the fact (the b17/b21
+        # invalid-evaluation lesson).
+        "policy": args.policy,
+        "bit_width": args.bit_width,
+        "group_size": args.group_size,
+        "learnable_scale": True,
+        "dataset": "openslr/librispeech_asr",
+        "split": "test",
+        "sample_seed": 0,
         "conditions": {},
     }
     wanted = {name.strip() for name in args.conditions.split(",") if name.strip()}
