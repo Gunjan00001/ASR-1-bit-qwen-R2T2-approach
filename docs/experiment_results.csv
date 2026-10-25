@@ -1,70 +1,13 @@
-arm,checkpoint_step,split,were,loop_truncations,evaluated_at,artifact,commit,status
-b10,last,clean,19.17,0,2026-10-20 01:17,artifacts/stage1/streaming_qat_stream_aligned17b10_last_clean.json,687fa70,COMPLETED
-b10,last,other,22.39,0,2026-10-20 02:27,artifacts/stage1/streaming_qat_stream_aligned17b10_last_other.json,687fa70,COMPLETED
-b10,step1200,clean,22.25,0,2026-10-19 23:09,artifacts/stage1/streaming_qat_stream_aligned17b10_step1200_clean.json,687fa70,COMPLETED
-b10,step1200,other,25.8,0,2026-10-20 00:35,artifacts/stage1/streaming_qat_stream_aligned17b10_step1200_other.json,687fa70,COMPLETED
-b10,step800,clean,19.28,1,2026-10-19 23:10,artifacts/stage1/streaming_qat_stream_aligned17b10_step800_clean.json,687fa70,COMPLETED
-b10,step800,other,21.93,0,2026-10-20 00:37,artifacts/stage1/streaming_qat_stream_aligned17b10_step800_other.json,687fa70,COMPLETED
-b11,last,clean,16.53,0,2026-10-19 19:32,artifacts/stage1/streaming_qat_stream_aligned17b11_clean.json,687fa70,COMPLETED
-b11,last,other,22.05,0,2026-10-19 20:36,artifacts/stage1/streaming_qat_stream_aligned17b11_other.json,687fa70,COMPLETED
-b11,step1200,clean,32.2,14,2026-10-19 22:34,artifacts/stage1/streaming_qat_stream_aligned17b11_step1200_clean.json,687fa70,COMPLETED
-b11,step1200,other,35.68,0,2026-10-19 23:59,artifacts/stage1/streaming_qat_stream_aligned17b11_step1200_other.json,687fa70,COMPLETED
-b11,step800,clean,35.91,16,2026-10-19 22:36,artifacts/stage1/streaming_qat_stream_aligned17b11_step800_clean.json,687fa70,COMPLETED
-b11,step800,other,25.0,0,2026-10-19 23:59,artifacts/stage1/streaming_qat_stream_aligned17b11_step800_other.json,687fa70,COMPLETED
-b12,last,clean,15.89,3,2026-10-20 15:56,artifacts/stage1/streaming_qat_stream_aligned17b12_last_clean.json,687fa70,COMPLETED
-b12,last,other,22.16,1,2026-10-20 17:53,artifacts/stage1/streaming_qat_stream_aligned17b12_last_other.json,687fa70,COMPLETED
-b12,step1200,clean,131.57,121,2026-10-20 17:05,artifacts/stage1/streaming_qat_stream_aligned17b12_step1200_clean.json,687fa70,COMPLETED
-b12,step1200,other,59.66,45,2026-10-20 18:58,artifacts/stage1/streaming_qat_stream_aligned17b12_step1200_other.json,687fa70,COMPLETED
-b12,step1600,clean,15.15,0,2026-10-20 15:54,artifacts/stage1/streaming_qat_stream_aligned17b12_step1600_clean.json,687fa70,COMPLETED
-b12,step1600,other,18.98,4,2026-10-20 17:49,artifacts/stage1/streaming_qat_stream_aligned17b12_step1600_other.json,687fa70,COMPLETED
-b13,last,clean,21.72,27,2026-10-21 13:55,artifacts/stage1/streaming_qat_stream_aligned17b13_last_clean.json,687fa70,COMPLETED
-b13,last,other,17.95,1,2026-10-21 14:28,artifacts/stage1/streaming_qat_stream_aligned17b13_last_other.json,687fa70,COMPLETED
-b13,step1200,clean,28.81,85,2026-10-21 11:59,artifacts/stage1/streaming_qat_stream_aligned17b13_step1200_clean.json,687fa70,COMPLETED
-b13,step1600,clean,27.33,62,2026-10-21 12:43,artifacts/stage1/streaming_qat_stream_aligned17b13_step1600_clean.json,687fa70,COMPLETED
-b13,step1600,other,19.2,1,2026-10-21 13:19,artifacts/stage1/streaming_qat_stream_aligned17b13_step1600_other.json,687fa70,COMPLETED
-b14,step1200,clean,38.14,12,2026-10-22 00:07,artifacts/stage1/streaming_qat_stream_aligned17b14_step1200_clean.json,687fa70,COMPLETED
-b14,step1200,other,36.14,11,2026-10-22 01:12,artifacts/stage1/streaming_qat_stream_aligned17b14_step1200_other.json,687fa70,COMPLETED
-b14,step1600,clean,28.18,19,2026-10-22 00:09,artifacts/stage1/streaming_qat_stream_aligned17b14_step1600_clean.json,687fa70,COMPLETED
-b14,step1600,other,27.73,0,2026-10-22 01:12,artifacts/stage1/streaming_qat_stream_aligned17b14_step1600_other.json,687fa70,COMPLETED
-b14,step2000,clean,18.01,12,2026-10-22 00:06,artifacts/stage1/streaming_qat_stream_aligned17b14_step2000_clean.json,687fa70,COMPLETED
-b14,step2000,other,28.41,4,2026-10-22 01:10,artifacts/stage1/streaming_qat_stream_aligned17b14_step2000_other.json,687fa70,COMPLETED
-b15,step2400,clean,15.15,0,2026-10-22 10:09,artifacts/stage1/streaming_qat_stream_aligned17b15_step2400_clean.json,687fa70,COMPLETED
-b15,step2400,other,19.55,0,2026-10-22 11:13,artifacts/stage1/streaming_qat_stream_aligned17b15_step2400_other.json,687fa70,COMPLETED
-b15,step3600,clean,27.97,10,2026-10-22 10:11,artifacts/stage1/streaming_qat_stream_aligned17b15_step3600_clean.json,687fa70,COMPLETED
-b15,step3600,other,28.64,4,2026-10-22 11:15,artifacts/stage1/streaming_qat_stream_aligned17b15_step3600_other.json,687fa70,COMPLETED
-b15,step4800,clean,37.5,1,2026-10-22 10:09,artifacts/stage1/streaming_qat_stream_aligned17b15_step4800_clean.json,687fa70,COMPLETED
-b15,step4800,other,40.45,0,2026-10-22 11:14,artifacts/stage1/streaming_qat_stream_aligned17b15_step4800_other.json,687fa70,COMPLETED
-b15,step6000,clean,26.69,0,2026-10-22 10:09,artifacts/stage1/streaming_qat_stream_aligned17b15_step6000_clean.json,687fa70,COMPLETED
-b15,step6000,other,30.57,0,2026-10-22 11:14,artifacts/stage1/streaming_qat_stream_aligned17b15_step6000_other.json,687fa70,COMPLETED
-b16,step1200,clean,35.7,4,2026-10-22 20:16,artifacts/stage1/streaming_qat_stream_aligned17b16_step1200_clean.json,687fa70,COMPLETED
-b16,step1200,other,31.93,2,2026-10-22 20:52,artifacts/stage1/streaming_qat_stream_aligned17b16_step1200_other.json,687fa70,COMPLETED
-b16,step1600,clean,14.94,6,2026-10-22 20:26,artifacts/stage1/streaming_qat_stream_aligned17b16_step1600_clean.json,687fa70,COMPLETED
-b16,step1600,other,21.59,0,2026-10-22 20:59,artifacts/stage1/streaming_qat_stream_aligned17b16_step1600_other.json,687fa70,COMPLETED
-b16,step2000,clean,16.31,4,2026-10-22 22:01,artifacts/stage1/streaming_qat_stream_aligned17b16_step2000_clean.json,687fa70,COMPLETED
-b16,step2000,other,22.16,0,2026-10-22 23:10,artifacts/stage1/streaming_qat_stream_aligned17b16_step2000_other.json,687fa70,COMPLETED
-b17,step1200,clean,133.05,740,2026-10-23 19:39,artifacts/stage1/streaming_qat_stream_aligned17b17_step1200_clean.json,687fa70,COMPLETED
-b17,step1200,other,111.82,789,2026-10-23 21:02,artifacts/stage1/streaming_qat_stream_aligned17b17_step1200_other.json,687fa70,COMPLETED
-b17,step1600,clean,119.17,392,2026-10-23 18:51,artifacts/stage1/streaming_qat_stream_aligned17b17_step1600_clean.json,687fa70,COMPLETED
-b17,step1600,other,126.25,514,2026-10-23 20:36,artifacts/stage1/streaming_qat_stream_aligned17b17_step1600_other.json,687fa70,COMPLETED
-b17,step2000,clean,69.28,351,2026-10-23 18:45,artifacts/stage1/streaming_qat_stream_aligned17b17_step2000_clean.json,687fa70,COMPLETED
-b17,step2000,other,107.27,421,2026-10-23 20:23,artifacts/stage1/streaming_qat_stream_aligned17b17_step2000_other.json,687fa70,COMPLETED
-b20,step1200,clean,36.86,0,2026-10-24 09:48,artifacts/stage1/streaming_qat_stream_aligned17b20_step1200_clean.json,687fa70,COMPLETED
-b20,step1200,other,44.09,0,2026-10-24 11:01,artifacts/stage1/streaming_qat_stream_aligned17b20_step1200_other.json,687fa70,COMPLETED
-b20,step1600,clean,29.24,0,2026-10-24 09:48,artifacts/stage1/streaming_qat_stream_aligned17b20_step1600_clean.json,687fa70,COMPLETED
-b20,step1600,other,33.75,0,2026-10-24 11:00,artifacts/stage1/streaming_qat_stream_aligned17b20_step1600_other.json,687fa70,COMPLETED
-b20,step2000,clean,28.18,0,2026-10-24 09:48,artifacts/stage1/streaming_qat_stream_aligned17b20_step2000_clean.json,687fa70,COMPLETED
-b20,step2000,other,34.77,0,2026-10-24 11:01,artifacts/stage1/streaming_qat_stream_aligned17b20_step2000_other.json,687fa70,COMPLETED
-b21,step1200,clean,26.27,22,2026-10-24 16:30,artifacts/stage1/streaming_qat_stream_aligned17b21_step1200_clean.json,687fa70,COMPLETED
-b21,step1200,other,27.95,22,2026-10-24 16:46,artifacts/stage1/streaming_qat_stream_aligned17b21_step1200_other.json,687fa70,COMPLETED
-b21,step1600,clean,15.68,0,2026-10-24 17:04,artifacts/stage1/streaming_qat_stream_aligned17b21_step1600_clean.json,687fa70,COMPLETED
-b21,step1600,other,21.82,25,2026-10-24 17:20,artifacts/stage1/streaming_qat_stream_aligned17b21_step1600_other.json,687fa70,COMPLETED
-b21,step2000,clean,15.68,1,2026-10-24 22:54,artifacts/stage1/streaming_qat_stream_aligned17b21_step2000_clean.json,687fa70,COMPLETED
-b21,step2000,other,21.48,0,2026-10-24 23:09,artifacts/stage1/streaming_qat_stream_aligned17b21_step2000_other.json,687fa70,COMPLETED
-b5,last,clean,19.39,0,2026-10-17 01:07,artifacts/stage1/streaming_qat_stream_aligned17b5_clean.json,687fa70,COMPLETED
-b5,last,other,24.09,0,2026-10-17 01:25,artifacts/stage1/streaming_qat_stream_aligned17b5_other.json,687fa70,COMPLETED
-b6,last,clean,21.08,0,2026-10-18 13:30,artifacts/stage1/streaming_qat_stream_aligned17b6_clean.json,687fa70,COMPLETED
-b6,last,other,28.3,1,2026-10-18 14:04,artifacts/stage1/streaming_qat_stream_aligned17b6_other.json,687fa70,COMPLETED
-b7,last,clean,16.63,0,2026-10-18 19:22,artifacts/stage1/streaming_qat_stream_aligned17b7_clean.json,687fa70,COMPLETED
-b7,last,other,23.41,0,2026-10-18 19:40,artifacts/stage1/streaming_qat_stream_aligned17b7_other.json,687fa70,COMPLETED
-b8,last,clean,18.43,0,2026-10-19 06:33,artifacts/stage1/streaming_qat_stream_aligned17b8_clean.json,687fa70,COMPLETED
-b8,last,other,25.34,0,2026-10-19 07:21,artifacts/stage1/streaming_qat_stream_aligned17b8_other.json,687fa70,COMPLETED
+experiment,arm,branch,commit,config,checkpoint,step,split,n,chunk_ms,policy,bit_width,fp16_layers,wer,cer,loops,rtf,packed_bytes,effective_bits_per_param,artifact,status,notes
+baseline,b12,stage-1,bdcf58a,ternary1.58 decoder_attn_ffn per-tensor,data/checkpoints/qat_stream_aligned17b12/step1600.pt,1600,clean,50,320,decoder_attn_ffn,1.58,0,15.1483,6.668,0,21.96,2232271152,7.6016,artifacts/stage1/streaming_qat_stream_aligned17b12_step1600_clean.json,COMPLETED,control; RTF contention-dependent
+baseline,b12,stage-1,bdcf58a,ternary1.58 decoder_attn_ffn per-tensor,data/checkpoints/qat_stream_aligned17b12/step1600.pt,1600,other,50,320,decoder_attn_ffn,1.58,0,18.9773,7.6005,4,21.73,2232271152,7.6016,artifacts/stage1/streaming_qat_stream_aligned17b12_step1600_other.json,COMPLETED,control; RTF contention-dependent
+baseline,b12,stage-1,bdcf58a,ternary1.58 decoder_attn_ffn per-tensor,data/checkpoints/qat_stream_aligned17b12/step1600.pt,1600,clean,100,320,decoder_attn_ffn,1.58,0,15.7546,6.7757,0,7.768,2232271152,7.6016,artifacts/stage1/streaming_b12_step1600_n100_clean.json,COMPLETED,100-utt reference from state-distill branch
+baseline,b12,stage-1,bdcf58a,ternary1.58 decoder_attn_ffn per-tensor,data/checkpoints/qat_stream_aligned17b12/step1600.pt,1600,other,100,320,decoder_attn_ffn,1.58,0,19.9887,8.1157,4,6.691,2232271152,7.6016,artifacts/stage1/streaming_b12_step1600_n100_other.json,COMPLETED,100-utt reference from state-distill branch
+QEC,qec0.5,quant-recovery,c28dda1,ternary1.58 + QEC lambda0.5,data/checkpoints/qat_qec_b12/step1600.pt,1600,clean,50,320,decoder_attn_ffn,1.58,0,15.4661,7.022,0,3.066,2232271152,7.6016,artifacts/stage1/streaming_qec_step1600_clean.json,REJECTED,both splits worse
+QEC,qec0.5,quant-recovery,c28dda1,ternary1.58 + QEC lambda0.5,data/checkpoints/qat_qec_b12/step1600.pt,1600,other,50,320,decoder_attn_ffn,1.58,0,19.0909,7.5784,0,2.7,2232271152,7.6016,artifacts/stage1/streaming_qec_step1600_other.json,REJECTED,both splits worse
+co-training,ct25,quant-recovery,d04c755,ternary1.58 + cotrain every4,data/checkpoints/qat_cotrain_b12/step1600.pt,1600,clean,50,320,decoder_attn_ffn,1.58,0,16.3136,9.2054,0,4.264,2232271152,7.6016,artifacts/stage1/streaming_cotrain_step1600_clean.json,REJECTED,"clean worse, other better; split trade-off"
+co-training,ct25,quant-recovery,d04c755,ternary1.58 + cotrain every4,data/checkpoints/qat_cotrain_b12/step1600.pt,1600,other,50,320,decoder_attn_ffn,1.58,0,17.3864,8.1308,0,4.08,2232271152,7.6016,artifacts/stage1/streaming_cotrain_step1600_other.json,REJECTED,"clean worse, other better; split trade-off"
+co-training,ct12.5,next-experiments,30a89f6,ternary1.58 + cotrain every8,data/checkpoints/qat_cotrain12_b12/step1600.pt,1600,clean,50,320,decoder_attn_ffn,1.58,0,16.5254,9.1267,0,3.469,2232271152,7.6016,artifacts/stage1/streaming_cotrain12_step1600_clean.json,REJECTED,lower dose did not reduce clean regression
+co-training,ct12.5,next-experiments,30a89f6,ternary1.58 + cotrain every8,data/checkpoints/qat_cotrain12_b12/step1600.pt,1600,other,50,320,decoder_attn_ffn,1.58,0,18.2955,7.9319,0,3.67,2232271152,7.6016,artifacts/stage1/streaming_cotrain12_step1600_other.json,REJECTED,lower dose did not reduce clean regression
+mixed-precision,mixed-k-fp16,next-experiments,30a89f6,28 k_proj fp16 + 168 ternary,data/checkpoints/qat_mixed_k/step1600.pt,1600,clean,50,320,mixed,1.58,28,37.7119,29.4453,5,23.754,2335031544,7.9515,artifacts/stage1/streaming_mixed_k_step1600_clean.json,REJECTED,clean collapsed; other running
+mixed-precision,mixed-k-fp16,next-experiments,30a89f6,28 k_proj fp16 + 168 ternary,data/checkpoints/qat_mixed_k/step1600.pt,1600,other,50,320,mixed,1.58,28,,,,,2335031544,7.9515,artifacts/stage1/streaming_mixed_k_step1600_other.json,RUNNING,official eval job 12758

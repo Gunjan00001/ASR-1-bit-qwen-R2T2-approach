@@ -10,9 +10,11 @@ Only committed artifacts are used; pending cells are not guessed._
 | Baseline verification | — | verified (checkpoint SHA `0728fe2e…b1e345`) |
 | Experiment B — sensitivity screen | 12738, 12740 | **complete** |
 | Experiment A — 12.5% co-training pilot | 12735 | **passed** |
-| Experiment A — 12.5% full run | 12737 | running |
+| Experiment A — 12.5% full run | 12737 | **complete** (killed in end-of-run ablation after step 2000; step-1600 safe) |
+| Experiment A — 12.5% evaluation | 12749 | **complete** |
 | Experiment C — mixed k-fp16 pilot | 12739 | **passed** (168 ternary + 28 fp16 layers, 1.350B trainable) |
-| Experiment C — mixed k-fp16 full run | 12741 | queued |
+| Experiment C — mixed k-fp16 full run | 12741 | complete to step 2000; step-1600 saved |
+| Experiment C — mixed k-fp16 evaluation | 12758 | clean complete (rejected); other running for the record |
 
 ## 2. Baseline (unchanged)
 
@@ -44,18 +46,51 @@ k-fp16 candidate.
 - 25% co-training: **16.314 / 17.386** at 50 utts; clean worse, other better;
   rejected as a pair improvement.
 
-## 5. Experiment A — 12.5% co-training
+## 5. Experiment A — 12.5% co-training — REJECT
 
 Pilot (12735) passed: the schedule alternates every 8th step, losses finite,
-no NaN/OOM. Full run (12737) is still training. Results will be appended from
-the official JSONs at step 1600 (primary) and, if warranted, step 2000.
+no NaN/OOM. Full run (12737) reached step 2000; the step-1600 checkpoint is
+on disk. Official 50-utt evaluation (job 12749):
 
-## 6. Experiment C — mixed k-fp16
+| state | clean | other | CER c/o | loops c/o |
+|---|---:|---:|---:|---:|
+| **control b12/step1600** | **15.148** | **18.977** | 6.668 / 7.601 | 0 / 4 |
+| 12.5% CT / step1600 | 16.525 | 18.296 | 9.127 / 7.932 | 0 / 0 |
+
+Deltas: **+1.377 clean / −0.682 other**. Paired bootstrap: clean
+[−3.093, +7.582], other [−2.545, +1.040]; both include zero.
+**The lower dose did not reduce the clean regression** — it is slightly worse
+than the 25% arm on both splits (25%: 16.314 / 17.386). The dose-response is
+therefore not useful: the 25% arm strictly dominates the 12.5% arm. **Close
+the co-training direction**; do not run another dose.
+
+## 6. Experiment C — mixed k-fp16 — REJECT
 
 Pilot (12739) passed: 28 k layers kept fp16, 168 projections ternary,
 1,350,566,056 trainable parameters, 336 shadow tensors, finite loss. The full
-run (12741) is queued. Results, packed size and RTF will be appended from the
-official evaluation.
+run (12741) trained 2 000 steps (max grad 415, no non-finite) and saved
+step 1600. Official evaluation (job 12758), 50 utts at 320 ms:
+
+| state | clean | other | CER c/o | loops c/o | RTF c/o |
+|---|---:|---:|---:|---:|---:|
+| **control b12/step1600** | **15.148** | **18.977** | 6.668 / 7.601 | 0 / 4 | 21.96 / 21.73* |
+| mixed k-fp16 / step1600 | **37.712** | _running_ | 29.445 / — | 5 / — | 23.75 / — |
+
+The mixed candidate is **much worse on clean** (+22.56 WER; raw 48.09 with 5
+loop truncations). The k-fp16 transplant + 2 000-step ternary-only fine-tune
+did not recover the function: the 28 k layers kept their pretrained fp16
+weights while the rest were the baseline's ternary shadows, and the frozen
+pretrained attention keys created a mismatch the 168 ternary layers could not
+adapt to. The first-order sensitivity ranking did **not** translate into a
+WER improvement.
+
+Packed size (measured, 168 ternary + 28 base-bf16 k layers):
+**2 335 031 544 bytes = 2.335 GB, 2.012× vs bf16, 7.952 effective bits/param**.
+The compression cost is small; the accuracy cost is not.
+
+**Reject C.** Do not launch a broader mixed-precision search on this evidence.
+The `other` split is being completed only for the record; it cannot change the
+clean failure.
 
 ## 7. Job ledger
 
