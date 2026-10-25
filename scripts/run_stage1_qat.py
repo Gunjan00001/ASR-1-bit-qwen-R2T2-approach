@@ -80,6 +80,7 @@ from asr1bit.train.qat import (
     set_activation_quant,
     set_qat_alpha,
 )
+from asr1bit.train.qec import QECController
 from asr1bit.train.samples import interleave_with_ratio, select_evenly
 from asr1bit.train.schedules import build_lr_lambda
 
@@ -109,6 +110,16 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--distill-weight", type=float, default=0.0,
                    help="Weight of self-distillation KL (teacher = same shadows at alpha=0).")
     p.add_argument("--distill-temp", type=float, default=2.0, help="Distillation temperature.")
+    p.add_argument(
+        "--qec-weight", type=float, default=0.0,
+        help="Weight of the output-aware quantization-error compensation term "
+             "(0 = disabled; training-only, adds no parameters and does not "
+             "change the deployed ternary model).",
+    )
+    p.add_argument("--qec-stride", type=int, default=1,
+                   help="Apply QEC to every N-th BitLinear (1 = all layers).")
+    p.add_argument("--qec-eps", type=float, default=1e-6,
+                   help="Denominator floor for the relative output error.")
     p.add_argument("--frozen-teacher", type=int, default=0,
                    help="1 = distillation teacher is a frozen fp copy of the pretrained model.")
     p.add_argument("--log-grad-norms", type=int, default=1)
@@ -287,6 +298,14 @@ def main() -> int:
     # QAT-only: freeze everything except BitLinear shadows and learnable scales.
     trainable = freeze_non_bitlinear(model)
     set_activation_quant(model, bool(args.activation_quant))
+    qec = None
+    if args.qec_weight > 0:
+        qec = QECController(model, stride=args.qec_stride, eps=args.qec_eps)
+        print(
+            f"QEC enabled: weight={args.qec_weight}, stride={args.qec_stride}, "
+            f"eps={args.qec_eps}",
+            flush=True,
+        )
     if args.grad_checkpointing:
         model.gradient_checkpointing_enable()
         if hasattr(model.config, "use_cache"):
@@ -434,25 +453,37 @@ def main() -> int:
         optimizer.zero_grad()
         ce_value = None
         kl_value = None
-        if args.distill_weight > 0:
-            if teacher is not None:
-                # Anchored distillation: frozen fp copy of the pretrained model.
-                with torch.no_grad():
-                    teacher_out = teacher(**batch)
-            else:
-                # Self-distillation: the teacher is the same shadows at alpha=0.
-                set_qat_alpha(model, 0.0)
-                with torch.no_grad():
-                    teacher_out = model(**batch)
-                set_qat_alpha(model, alpha)
+        qec_value = None
+        if qec is not None:
+            qec.reset()
+        if args.distill_weight > 0 or qec is not None:
+            teacher_out = None
+            if args.distill_weight > 0:
+                if teacher is not None:
+                    # Anchored distillation: frozen fp copy of the pretrained model.
+                    with torch.no_grad():
+                        teacher_out = teacher(**batch)
+                else:
+                    # Self-distillation: the teacher is the same shadows at alpha=0.
+                    set_qat_alpha(model, 0.0)
+                    with torch.no_grad():
+                        teacher_out = model(**batch)
+                    set_qat_alpha(model, alpha)
             out = model(**batch)
             ce = out.loss if hasattr(out, "loss") else out[0]
-            kl = distillation_loss(
-                out.logits, teacher_out.logits, batch["labels"], temperature=args.distill_temp
-            )
-            loss = (1.0 - args.distill_weight) * ce + args.distill_weight * kl
+            loss = ce
+            if args.distill_weight > 0:
+                kl = distillation_loss(
+                    out.logits, teacher_out.logits, batch["labels"],
+                    temperature=args.distill_temp,
+                )
+                loss = (1.0 - args.distill_weight) * ce + args.distill_weight * kl
+                kl_value = float(kl.detach())
+            qec_loss = qec.loss() if qec is not None else None
+            if qec_loss is not None:
+                loss = loss + args.qec_weight * qec_loss
+                qec_value = float(qec_loss.detach())
             ce_value = float(ce.detach())
-            kl_value = float(kl.detach())
             loss.backward()
             check_finite_grads(model)
             norms = grad_norms(model)
@@ -487,6 +518,9 @@ def main() -> int:
             if ce_value is not None:
                 record["ce"] = ce_value
                 record["kl"] = kl_value
+            if qec_value is not None:
+                record["qec"] = qec_value
+                record["qec_weight"] = args.qec_weight
             record.update(scale_stats(model))
             history.append(record)
             print(json.dumps(record), flush=True)
@@ -564,6 +598,8 @@ def main() -> int:
         results["mix_size"] = len(train_examples)
     if args.save_dir:
         save_checkpoint(Path(args.save_dir) / "last.pt", model, args.steps, args)
+    if qec is not None:
+        qec.close()  # eval is hook-free; remove the training-only observer
 
     print("=== ablations (offline WER) ===", flush=True)
     disable = getattr(model, "gradient_checkpointing_disable", None)
@@ -587,6 +623,9 @@ def main() -> int:
         f"{args.policy}_bw{args.bit_width}_g{group_size}_lr{args.lr}_"
         f"{args.optimizer}_{args.alpha_mode}_ls{args.learnable_scale}_n{args.train_n}"
     )
+    if args.qec_weight > 0:
+        # Never let a QEC arm overwrite the control's results JSON.
+        tag += f"_qec{args.qec_weight:g}_s{args.qec_stride}"
     (out_dir / f"stage1_{tag}.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     print("wrote", out_dir / f"stage1_{tag}.json", flush=True)
     return 0
