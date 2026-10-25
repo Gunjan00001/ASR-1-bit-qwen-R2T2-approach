@@ -1,5 +1,10 @@
 # Experiment audit — authoritative record
 
+> **Table note (2026-10-25):** the stage-1 machine-readable table is now
+> `docs/experiment_results_stage1.csv`; `docs/experiment_results.csv` is the
+> next-experiments matrix and `docs/next_experiment_results.md` is its
+> narrative record.
+
 _2026-10-25. Branches `stage-1` @ `687fa70`, `bonsai-quant` @ `8cc5b4c`. Working
 trees clean. Every number below comes from an official-harness JSON under
 `artifacts/stage1/`; guardrail and offline readouts are excluded from verdicts._

@@ -22,7 +22,8 @@ official-evaluation JSON; diagnostic subsets are labelled._
   official clean WER is **37.712** (CER 29.445, 5 loops, raw 48.09) vs 15.148.
   The 2 000-step ternary-only adaptation could not absorb the frozen pretrained
   k layers. Packed size 2.335 GB (2.012×, 7.952 bits/param). Its `other` split
-  is being completed only for the record; it cannot change the clean failure.
+  was stopped as non-informative after the clean rejection and is recorded as
+  **NOT RUN**, not as a result.
 - **No candidate is promoted.** The baseline remains the best pair; the gate
   (≤3.74 clean / ≤6.11 other) is unmet.
 
@@ -49,7 +50,7 @@ official-evaluation JSON; diagnostic subsets are labelled._
 | QEC λ=0.5 | output-error regularizer | 15.466 | 19.091 | +0.318 / +0.114 | 0 / 0 | REJECT |
 | CT 25% | fp every 4th step | 16.314 | 17.386 | +1.165 / −1.591 | 0 / 0 | REJECT (pair) |
 | CT 12.5% | fp every 8th step | 16.525 | 18.296 | +1.377 / −0.682 | 0 / 0 | **REJECT** |
-| Mixed k-fp16 | 28 k fp16, 168 ternary | 37.712 | _running_ | +22.56 / — | 5 / — | **REJECT** |
+| Mixed k-fp16 | 28 k fp16, 168 ternary | 37.712 | _not run_ | +22.56 / — | 5 / — | **REJECT** |
 
 All 50-utt comparisons use the same utterances and protocol; paired bootstrap
 CIs for CT12.5 are clean [−3.093, +7.582], other [−2.545, +1.040] (both include

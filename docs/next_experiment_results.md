@@ -14,7 +14,7 @@ Only committed artifacts are used; pending cells are not guessed._
 | Experiment A — 12.5% evaluation | 12749 | **complete** |
 | Experiment C — mixed k-fp16 pilot | 12739 | **passed** (168 ternary + 28 fp16 layers, 1.350B trainable) |
 | Experiment C — mixed k-fp16 full run | 12741 | complete to step 2000; step-1600 saved |
-| Experiment C — mixed k-fp16 evaluation | 12758 | clean complete (rejected); other running for the record |
+| Experiment C — mixed k-fp16 evaluation | 12758 | clean complete (rejected); other stopped as non-informative (NOT RUN) |
 
 ## 2. Baseline (unchanged)
 
@@ -74,7 +74,7 @@ step 1600. Official evaluation (job 12758), 50 utts at 320 ms:
 | state | clean | other | CER c/o | loops c/o | RTF c/o |
 |---|---:|---:|---:|---:|---:|
 | **control b12/step1600** | **15.148** | **18.977** | 6.668 / 7.601 | 0 / 4 | 21.96 / 21.73* |
-| mixed k-fp16 / step1600 | **37.712** | _running_ | 29.445 / — | 5 / — | 23.75 / — |
+| mixed k-fp16 / step1600 | **37.712** | _not run_ | 29.445 / — | 5 / — | 23.75 / — |
 
 The mixed candidate is **much worse on clean** (+22.56 WER; raw 48.09 with 5
 loop truncations). The k-fp16 transplant + 2 000-step ternary-only fine-tune
@@ -89,8 +89,9 @@ Packed size (measured, 168 ternary + 28 base-bf16 k layers):
 The compression cost is small; the accuracy cost is not.
 
 **Reject C.** Do not launch a broader mixed-precision search on this evidence.
-The `other` split is being completed only for the record; it cannot change the
-clean failure.
+The `other` split was stopped after the clean failure: the candidate was
+already rejected by +22.56 WER on the primary split, and the other split could
+not change that verdict. It is recorded as **NOT RUN**, not as a result.
 
 ## 7. Job ledger
 
