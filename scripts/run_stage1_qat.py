@@ -41,6 +41,7 @@ training. Streaming/vLLM eval is deferred to scripts/eval_streaming.py.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -50,7 +51,7 @@ import torch
 
 from asr1bit.data.load import iter_librispeech
 from asr1bit.qwen import backends
-from asr1bit.replace import apply_layer_policy
+from asr1bit.replace import apply_layer_policy, apply_mixed_precision
 from asr1bit.train.aligned import build_aligned_examples
 from asr1bit.train.checkpoints import (
     load_checkpoint,
@@ -90,6 +91,12 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", default="Qwen/Qwen3-ASR-0.6B")
     p.add_argument("--policy", default="decoder_attn")
+    p.add_argument(
+        "--fp16-layers-file", default=None,
+        help="JSON list (or one-per-line text) of decoder projection names kept "
+             "at full precision while every other decoder projection is "
+             "quantized. The mixed model is the only representation change.",
+    )
     p.add_argument("--bit-width", type=float, default=1.0)
     p.add_argument("--group-size", type=int, default=0, help="0 = per-tensor")
     p.add_argument("--steps", type=int, default=60)
@@ -229,9 +236,22 @@ def main() -> int:
         print("--op-rollout enables --lazy-collate (the mix changes across refreshes)", flush=True)
         args.lazy_collate = 1
     group_size = args.group_size or None
+    fp16_layers = None
+    if args.fp16_layers_file:
+        path = Path(args.fp16_layers_file)
+        if path.suffix == ".json":
+            fp16_layers = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            fp16_layers = [
+                line.strip() for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+        if not fp16_layers:
+            raise ValueError(f"empty fp16 layer list: {path}")
+        print(f"mixed precision: {len(fp16_layers)} fp16 layers from {path}", flush=True)
 # Freeze the exact configuration into the results: every number a run
 # produces must be traceable to the flags that produced it.
-    config_record = vars(args) | {"group_size": group_size}
+    config_record = vars(args) | {"group_size": group_size, "fp16_layers": fp16_layers}
     print("=== environment ===")
     print(json.dumps(backends.environment_report(), indent=2), flush=True)
     print("=== config ===")
@@ -288,19 +308,30 @@ def main() -> int:
     results["pretrained"] = evaluate(wrapper, eval_utts, args.eval_n)
     print(json.dumps(results["pretrained"]), flush=True)
 
-    apply_layer_policy(
-        model,
-        args.policy,
-        bit_width=args.bit_width,
-        group_size=group_size,
-        learnable_scale=bool(args.learnable_scale),
-        stochastic=bool(args.quant_stochastic),
-    )
+    if fp16_layers:
+        apply_mixed_precision(
+            model,
+            set(fp16_layers),
+            bit_width=args.bit_width,
+            group_size=group_size,
+            learnable_scale=bool(args.learnable_scale),
+            stochastic=bool(args.quant_stochastic),
+        )
+    else:
+        apply_layer_policy(
+            model,
+            args.policy,
+            bit_width=args.bit_width,
+            group_size=group_size,
+            learnable_scale=bool(args.learnable_scale),
+            stochastic=bool(args.quant_stochastic),
+        )
 # Replace the chosen projections with quantized layers. The policy decides
 # *which* matrices (attention only / +FFN / all), the bit width decides how
 # aggressive the quantization is.
     model.to("cuda:0")
     results["bitlinear_replaced"] = getattr(model, "bitlinear_replaced", 0)
+    results["fp16_layers"] = fp16_layers
 
     # QAT-only: freeze everything except BitLinear shadows and learnable scales.
     trainable = freeze_non_bitlinear(model)
@@ -641,6 +672,9 @@ def main() -> int:
         tag += f"_qec{args.qec_weight:g}_s{args.qec_stride}"
     if args.cotrain_fp_every > 0:
         tag += f"_ct{args.cotrain_fp_every}"
+    if fp16_layers:
+        digest = hashlib.sha1("\n".join(sorted(fp16_layers)).encode()).hexdigest()[:8]
+        tag += f"_mix{len(fp16_layers)}_{digest}"
     (out_dir / f"stage1_{tag}.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     print("wrote", out_dir / f"stage1_{tag}.json", flush=True)
     return 0

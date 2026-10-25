@@ -1,0 +1,57 @@
+#!/bin/bash
+#PBS -N asr1bit-sensitivity
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=64gb
+#PBS -l walltime=02:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/layer_sensitivity.out
+#
+# Task-aware layer-sensitivity screening of the ternary baseline. Read-only:
+# loads the baseline checkpoint, runs first-order impact scoring on a small
+# streaming calibration set, writes JSON + CSV. No training, no checkpoint
+# modification.
+#
+# Submit: qsub scripts/layer_sensitivity.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage3/layer_sensitivity.log"
+
+PY=/home/jiit_992401210050/miniconda3/bin/python
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-1.7B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-1.7B
+else
+  MODEL=Qwen/Qwen3-ASR-1.7B
+fi
+if [ -f /tmp/asr1bit/qat_clean_train.100_n8000.pt ]; then
+  CACHE=/tmp/asr1bit/qat_clean_train.100_n8000.pt
+else
+  CACHE="$ROOT/data/qat_clean_train.100_n8000.pt"
+fi
+
+PICK=$(bash scripts/pick_gpu_wait.sh 25000 "${PICK_WAIT_MIN:-90}") || exit 0
+export CUDA_VISIBLE_DEVICES="${SENS_GPU:-$PICK}"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+"$PY" scripts/analyze_layer_sensitivity.py \
+  --model "$MODEL" \
+  --checkpoint data/checkpoints/qat_stream_aligned17b12/step1600.pt \
+  --train-cache "$CACHE" \
+  --aligned-n 6000 \
+  --calibration-utts 8 \
+  --calibration-examples 16 \
+  --chunk-ms 320 \
+  --out artifacts/stage1/layer_sensitivity.json \
+  --csv docs/layer_sensitivity.csv \
+  2>&1 | tee -a "$LOG"

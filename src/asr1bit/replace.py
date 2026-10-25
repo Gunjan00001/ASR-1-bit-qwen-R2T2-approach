@@ -121,6 +121,58 @@ def apply_layer_policy(
     return model
 
 
+def apply_mixed_precision(
+    model: nn.Module,
+    fp16_layers: set[str] | list[str],
+    *,
+    bit_width: float = 1.58,
+    quantize_activations: bool = True,
+    group_size: int | None = None,
+    learnable_scale: bool = False,
+    stochastic: bool = False,
+) -> nn.Module:
+    """Quantize decoder projections except ``fp16_layers``, which stay nn.Linear.
+
+    The excluded layers are validated to be decoder projections; everything
+    else that the ``decoder_attn_ffn`` policy would quantize becomes BitLinear.
+    The excluded layers keep the model's loaded (full-precision) weights, so a
+    checkpoint containing only BitLinear shadows restores the quantized part
+    and leaves the fp16 part at its pretrained initialization.
+    """
+    excluded = set(fp16_layers)
+    if not excluded:
+        raise ValueError("fp16_layers must contain at least one module name")
+    linear_names = {
+        name for name, module in model.named_modules()
+        if isinstance(module, nn.Linear) and not isinstance(module, BitLinear)
+    }
+    missing = sorted(excluded - linear_names)
+    if missing:
+        raise ValueError(f"fp16 layers are not plain nn.Linear modules: {missing}")
+    not_decoder = sorted(name for name in excluded if not (
+        not _is_encoder(name) and bool(_ATTN.search(name) or _FFN.search(name))
+    ))
+    if not_decoder:
+        raise ValueError(f"fp16 layers are not decoder projections: {not_decoder}")
+
+    def predicate(name: str) -> bool:
+        return name not in excluded and not _is_encoder(name) and bool(
+            _ATTN.search(name) or _FFN.search(name)
+        )
+
+    apply_layer_policy(
+        model,
+        predicate,
+        bit_width=bit_width,
+        quantize_activations=quantize_activations,
+        group_size=group_size,
+        learnable_scale=learnable_scale,
+        stochastic=stochastic,
+    )
+    model.fp16_layers = sorted(excluded)
+    return model
+
+
 def count_bitlinear(model: nn.Module) -> int:
     """Number of :class:`BitLinear` modules in ``model``."""
     return sum(1 for module in model.modules() if isinstance(module, BitLinear))

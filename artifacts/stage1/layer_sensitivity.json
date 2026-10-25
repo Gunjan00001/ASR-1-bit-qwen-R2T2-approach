@@ -1,0 +1,2021 @@
+{
+  "model": "Qwen/Qwen3-ASR-1.7B",
+  "checkpoint": "data/checkpoints/qat_stream_aligned17b12/step1600.pt",
+  "checkpoint_step": 1600,
+  "checkpoint_sha256": "0728fe2e09f0679b3043bb7c301f4c8c7f6f86c08859c7b6cd7dc9fe78b1e345",
+  "commit": "742b5d1",
+  "policy": "decoder_attn_ffn",
+  "bit_width": 1.58,
+  "chunk_ms": 320,
+  "calibration_utterances": 8,
+  "calibration_examples": 16,
+  "aligned_cache_key": "b62bc2a4e7d638c0",
+  "mean_calibration_loss": 1.0996943317586556,
+  "method": "first-order task-loss impact of the ternary output error",
+  "layers": [
+    {
+      "name": "thinker.model.layers.1.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.22805445548146963,
+      "task_impact": 0.0529030248944764,
+      "task_impact_share": 0.035887304383661126,
+      "task_impact_per_param": 4.204354675171884e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.0.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.44163404032588005,
+      "task_impact": 0.0395419129235961,
+      "task_impact_share": 0.026823658341500238,
+      "task_impact_per_param": 1.8855053388402987e-08,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.0.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.4497498869895935,
+      "task_impact": 0.031988134775019716,
+      "task_impact_share": 0.02169947619491541,
+      "task_impact_per_param": 7.62656564116948e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.0.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.30450867116451263,
+      "task_impact": 0.030614339921157807,
+      "task_impact_share": 0.020767548499295168,
+      "task_impact_per_param": 1.459805484826937e-08,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.19.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2983078472316265,
+      "task_impact": 0.02871740774207865,
+      "task_impact_share": 0.019480745284515606,
+      "task_impact_per_param": 1.3693527098693203e-08,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.16.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.3240715116262436,
+      "task_impact": 0.027218323655688437,
+      "task_impact_share": 0.018463826365185437,
+      "task_impact_per_param": 1.2978708103031367e-08,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.17.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.32902583479881287,
+      "task_impact": 0.027148317691171542,
+      "task_impact_share": 0.018416337107958636,
+      "task_impact_per_param": 1.2945326657853862e-08,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.18.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2760294172912836,
+      "task_impact": 0.025106694531132234,
+      "task_impact_share": 0.01703138129631633,
+      "task_impact_per_param": 1.1971804872099034e-08,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.20.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.27444205433130264,
+      "task_impact": 0.024113282845064532,
+      "task_impact_share": 0.016357490386915422,
+      "task_impact_per_param": 1.1498109266788736e-08,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.21.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.28801588900387287,
+      "task_impact": 0.023178904764790786,
+      "task_impact_share": 0.015723645523732448,
+      "task_impact_per_param": 1.1052563078303712e-08,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.1.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.3152972087264061,
+      "task_impact": 0.021331765290597104,
+      "task_impact_share": 0.014470619696160428,
+      "task_impact_per_param": 1.0171778340624382e-08,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.25.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.32698813267052174,
+      "task_impact": 0.020591942662576912,
+      "task_impact_share": 0.01396875350051964,
+      "task_impact_per_param": 9.819003421104866e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.22.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.3075993377715349,
+      "task_impact": 0.019016205553270993,
+      "task_impact_share": 0.012899836224369783,
+      "task_impact_per_param": 9.067633415828225e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.2.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.22764635551720858,
+      "task_impact": 0.018653737592103425,
+      "task_impact_share": 0.012653952400567796,
+      "task_impact_per_param": 1.4824658705475668e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.2.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.28087627701461315,
+      "task_impact": 0.018627294288307894,
+      "task_impact_share": 0.012636014316798243,
+      "task_impact_per_param": 1.4803643455750064e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.0.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2970151547342539,
+      "task_impact": 0.018607744183100294,
+      "task_impact_share": 0.012622752304319427,
+      "task_impact_per_param": 1.4788106428067123e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.0.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.2561847288161516,
+      "task_impact": 0.018182828949647956,
+      "task_impact_share": 0.012334506738955722,
+      "task_impact_per_param": 1.4450414140739405e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.1.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.30084546469151974,
+      "task_impact": 0.017345681921142386,
+      "task_impact_share": 0.011766619547518516,
+      "task_impact_per_param": 4.135532837186429e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.13.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2792160324752331,
+      "task_impact": 0.01653579215053469,
+      "task_impact_share": 0.011217222593885216,
+      "task_impact_per_param": 7.884880137698502e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.1.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.28871260955929756,
+      "task_impact": 0.016381190231186338,
+      "task_impact_share": 0.011112346811280736,
+      "task_impact_per_param": 1.3018600329706143e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.23.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.296732759103179,
+      "task_impact": 0.01609358232599334,
+      "task_impact_share": 0.010917245066959005,
+      "task_impact_per_param": 7.674018061634702e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.1.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.20848601590842009,
+      "task_impact": 0.015876734572884743,
+      "task_impact_share": 0.010770144190662351,
+      "task_impact_per_param": 1.2617694992132777e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.0.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.4509991891682148,
+      "task_impact": 0.015748316039207566,
+      "task_impact_share": 0.010683030173727235,
+      "task_impact_per_param": 3.7546911333102145e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.24.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.33010793291032314,
+      "task_impact": 0.015383006961201318,
+      "task_impact_share": 0.010435219049454573,
+      "task_impact_per_param": 7.335189323998126e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.2.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.19238213449716568,
+      "task_impact": 0.015008989228590508,
+      "task_impact_share": 0.010181500320858915,
+      "task_impact_per_param": 1.1928072952104019e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.0.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.24161257687956095,
+      "task_impact": 0.014899149164193659,
+      "task_impact_share": 0.010106989197300418,
+      "task_impact_per_param": 1.184077991183095e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.2.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2866597920656204,
+      "task_impact": 0.01485967125336174,
+      "task_impact_share": 0.01008020895542801,
+      "task_impact_per_param": 7.08564341228568e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.15.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.27983105182647705,
+      "task_impact": 0.014190227648214204,
+      "task_impact_share": 0.009626085084939586,
+      "task_impact_per_param": 6.766427826029875e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.1.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.25449973717331886,
+      "task_impact": 0.012935358321556123,
+      "task_impact_share": 0.008774831728872976,
+      "task_impact_per_param": 6.1680595023899665e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.14.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2854425683617592,
+      "task_impact": 0.012405365543600055,
+      "task_impact_share": 0.00841530574370313,
+      "task_impact_per_param": 5.915339252281215e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.19.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.3112472631037235,
+      "task_impact": 0.012228742752995458,
+      "task_impact_share": 0.008295491879370002,
+      "task_impact_per_param": 5.831118942735414e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.2.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.2755596209317446,
+      "task_impact": 0.01110329450602876,
+      "task_impact_share": 0.0075320326275121995,
+      "task_impact_per_param": 2.6472316994735623e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.11.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2796600814908743,
+      "task_impact": 0.010816700721989037,
+      "task_impact_share": 0.007337618822577339,
+      "task_impact_per_param": 5.157804833406943e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.21.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.34539949521422386,
+      "task_impact": 0.01074433617577597,
+      "task_impact_share": 0.007288529597495902,
+      "task_impact_per_param": 5.1232987288360454e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.20.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.3344767801463604,
+      "task_impact": 0.010692480162106222,
+      "task_impact_share": 0.007253352543813214,
+      "task_impact_per_param": 5.09857185464202e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.2.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.24339002836495638,
+      "task_impact": 0.010653649740561377,
+      "task_impact_share": 0.007227011532876594,
+      "task_impact_per_param": 5.080056066780747e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.25.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.36860824935138226,
+      "task_impact": 0.010370048894401407,
+      "task_impact_share": 0.007034628017757984,
+      "task_impact_per_param": 4.944824645233825e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.17.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.43205877020955086,
+      "task_impact": 0.010259941358526703,
+      "task_impact_share": 0.0069599354522052155,
+      "task_impact_per_param": 2.4461606403652913e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.20.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.39562404341995716,
+      "task_impact": 0.010212335180767695,
+      "task_impact_share": 0.006927641317887037,
+      "task_impact_per_param": 2.4348104431075324e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.27.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2399869943037629,
+      "task_impact": 0.009593800004950026,
+      "task_impact_share": 0.006508051697617749,
+      "task_impact_per_param": 7.624467217882495e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.19.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.34732486307621,
+      "task_impact": 0.009592540889570955,
+      "task_impact_share": 0.006507197563908892,
+      "task_impact_per_param": 2.2870399688651455e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.26.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.31086129508912563,
+      "task_impact": 0.009361200509374612,
+      "task_impact_share": 0.006350265466795389,
+      "task_impact_per_param": 4.463768248259836e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.21.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.3374515324831009,
+      "task_impact": 0.009167396183329402,
+      "task_impact_share": 0.006218796333347389,
+      "task_impact_per_param": 2.185677572090483e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.15.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.40076672099530697,
+      "task_impact": 0.009023487970807764,
+      "task_impact_share": 0.006121174735407121,
+      "task_impact_per_param": 2.1513671805400286e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.27.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.1827619904652238,
+      "task_impact": 0.008713327218174527,
+      "task_impact_share": 0.005910774037907939,
+      "task_impact_per_param": 6.924730315347136e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.27.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.23171608243137598,
+      "task_impact": 0.008711241260243696,
+      "task_impact_share": 0.005909359007154129,
+      "task_impact_per_param": 6.923072544927356e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.24.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.36427923291921616,
+      "task_impact": 0.008470137423501,
+      "task_impact_share": 0.005745803770104592,
+      "task_impact_per_param": 4.038876258612156e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.10.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.39190717972815037,
+      "task_impact": 0.008263866107881768,
+      "task_impact_share": 0.005605877527625808,
+      "task_impact_per_param": 1.9702592153267307e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.18.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.37679126486182213,
+      "task_impact": 0.008128920903800463,
+      "task_impact_share": 0.005514336077517032,
+      "task_impact_per_param": 1.9380857715130956e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.17.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.2970557939261198,
+      "task_impact": 0.008113000887533417,
+      "task_impact_share": 0.005503536572749433,
+      "task_impact_per_param": 3.8685802877108655e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.16.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.39746958762407303,
+      "task_impact": 0.008063629954449425,
+      "task_impact_share": 0.005470045298728246,
+      "task_impact_per_param": 1.922519196140629e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.4.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2316754823550582,
+      "task_impact": 0.008053497533182963,
+      "task_impact_share": 0.0054631718678259805,
+      "task_impact_per_param": 6.400344795531402e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.12.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.39890535175800323,
+      "task_impact": 0.007950510755108553,
+      "task_impact_share": 0.005393309740667448,
+      "task_impact_per_param": 1.895549477364672e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.15.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.28472233936190605,
+      "task_impact": 0.007929008522296499,
+      "task_impact_share": 0.005378723482596313,
+      "task_impact_per_param": 3.780845891140222e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.22.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.35654856637120247,
+      "task_impact": 0.00791817209119472,
+      "task_impact_share": 0.0053713724794701625,
+      "task_impact_per_param": 3.775678678128586e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.11.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.39153217896819115,
+      "task_impact": 0.007777703622195986,
+      "task_impact_share": 0.005276084266493313,
+      "task_impact_per_param": 1.8543490462770429e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.18.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2544902674853802,
+      "task_impact": 0.007725615989329526,
+      "task_impact_share": 0.005240750091575496,
+      "task_impact_per_param": 6.139767956200859e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.11.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.30518105812370777,
+      "task_impact": 0.007697194591855805,
+      "task_impact_share": 0.005221470147863716,
+      "task_impact_per_param": 3.6703083953169846e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.12.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.26351124607026577,
+      "task_impact": 0.007472358028280723,
+      "task_impact_share": 0.005068949980828091,
+      "task_impact_per_param": 3.5630979672816865e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.18.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.2990120593458414,
+      "task_impact": 0.007403206970593601,
+      "task_impact_share": 0.005022040658334341,
+      "task_impact_per_param": 3.5301241734474187e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.23.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.39161043241620064,
+      "task_impact": 0.007328805093493429,
+      "task_impact_share": 0.004971569389148212,
+      "task_impact_per_param": 1.7473232969029973e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.23.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.34018657729029655,
+      "task_impact": 0.007270677259839431,
+      "task_impact_share": 0.004932137782663237,
+      "task_impact_per_param": 3.466929082793918e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.9.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2619051216170192,
+      "task_impact": 0.007255003097270674,
+      "task_impact_share": 0.004921505055249521,
+      "task_impact_per_param": 3.459455059657418e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.19.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.25590743124485016,
+      "task_impact": 0.006945475576685567,
+      "task_impact_share": 0.004711533917143249,
+      "task_impact_per_param": 5.519768060593261e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.13.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.27473124116659164,
+      "task_impact": 0.006875200696413231,
+      "task_impact_share": 0.004663862238181806,
+      "task_impact_per_param": 3.278351162153831e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.16.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.27922973595559597,
+      "task_impact": 0.0067394585012152675,
+      "task_impact_share": 0.004571780141052342,
+      "task_impact_per_param": 3.21362423954738e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.22.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.4202525969594717,
+      "task_impact": 0.006726699097271194,
+      "task_impact_share": 0.004563124669762971,
+      "task_impact_per_param": 1.6037700408151612e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.27.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.3840610682964325,
+      "task_impact": 0.006691790200420655,
+      "task_impact_share": 0.004539443864941847,
+      "task_impact_per_param": 1.5954471112300528e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.13.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.40791100077331066,
+      "task_impact": 0.006534233819365909,
+      "task_impact_share": 0.004432563893224197,
+      "task_impact_per_param": 1.5578827427305958e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.3.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.3290410600602627,
+      "task_impact": 0.006279798680225213,
+      "task_impact_share": 0.0042599652317591,
+      "task_impact_per_param": 1.4972206783831626e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.16.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.23524497170001268,
+      "task_impact": 0.006251135315324063,
+      "task_impact_share": 0.004240521146984755,
+      "task_impact_per_param": 4.967955998837204e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.12.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.2789798956364393,
+      "task_impact": 0.006240143594368419,
+      "task_impact_share": 0.004233064801408631,
+      "task_impact_per_param": 2.975532338318071e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.25.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.33115169405937195,
+      "task_impact": 0.00610211396451632,
+      "task_impact_share": 0.004139430999743284,
+      "task_impact_per_param": 1.4548573409357834e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.4.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.2372250473126769,
+      "task_impact": 0.006053174152839347,
+      "task_impact_share": 0.004106232181308348,
+      "task_impact_per_param": 4.810630601914204e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.9.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.28912866301834583,
+      "task_impact": 0.005975378227049077,
+      "task_impact_share": 0.0040534585247128515,
+      "task_impact_per_param": 2.8492823729749095e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.26.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.3234909027814865,
+      "task_impact": 0.005971594320726581,
+      "task_impact_share": 0.004050891673417948,
+      "task_impact_per_param": 4.745796776395306e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.1.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3500719480216503,
+      "task_impact": 0.0059026787284892634,
+      "task_impact_share": 0.004004142081304188,
+      "task_impact_per_param": 1.4073082753394278e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.14.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.37795618548989296,
+      "task_impact": 0.00588486741980887,
+      "task_impact_share": 0.003992059599114188,
+      "task_impact_per_param": 1.4030617284319091e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.24.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.3548128101974726,
+      "task_impact": 0.00585793896971154,
+      "task_impact_share": 0.003973792411422167,
+      "task_impact_per_param": 1.3966414856222964e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.19.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3276620991528034,
+      "task_impact": 0.005832059065596695,
+      "task_impact_share": 0.003956236515549634,
+      "task_impact_per_param": 1.3904712356559504e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.16.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.3566212095320225,
+      "task_impact": 0.005768046425146167,
+      "task_impact_share": 0.003912812890589962,
+      "task_impact_per_param": 4.5840314429173207e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.25.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.3709998857229948,
+      "task_impact": 0.00575439486419782,
+      "task_impact_share": 0.00390355221553324,
+      "task_impact_per_param": 4.57318215703791e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.4.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.23061152640730143,
+      "task_impact": 0.0057429754365330155,
+      "task_impact_share": 0.003895805730765847,
+      "task_impact_per_param": 4.564106811311257e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.19.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.350753303617239,
+      "task_impact": 0.0057341230731253745,
+      "task_impact_share": 0.0038898006401163338,
+      "task_impact_per_param": 4.5570715849601223e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.20.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.25527616310864687,
+      "task_impact": 0.005708110169507563,
+      "task_impact_share": 0.0038721545226798105,
+      "task_impact_per_param": 4.5363983865639074e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.3.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.23797818552702665,
+      "task_impact": 0.005701869052700204,
+      "task_impact_share": 0.0038679207976894826,
+      "task_impact_per_param": 2.7188630355359095e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.16.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2672954201698303,
+      "task_impact": 0.005668917883667746,
+      "task_impact_share": 0.0038455680374224837,
+      "task_impact_per_param": 4.5052511562250025e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.3.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.22532569617033005,
+      "task_impact": 0.00562619182983326,
+      "task_impact_share": 0.003816584384746114,
+      "task_impact_per_param": 4.4712955394055526e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.10.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.2524518584832549,
+      "task_impact": 0.005606364547020348,
+      "task_impact_share": 0.003803134346022861,
+      "task_impact_per_param": 2.673322938451933e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.27.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.29142853058874607,
+      "task_impact": 0.005278863032799563,
+      "task_impact_share": 0.003580970366734441,
+      "task_impact_per_param": 2.5171580471036736e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.10.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.23244999255985022,
+      "task_impact": 0.005268432124466926,
+      "task_impact_share": 0.0035738944540984795,
+      "task_impact_per_param": 2.5121842024168617e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.8.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2727375626564026,
+      "task_impact": 0.005262225565275003,
+      "task_impact_share": 0.0035696841716176563,
+      "task_impact_per_param": 2.5092246843695654e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.14.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.2748479675501585,
+      "task_impact": 0.005247182251878257,
+      "task_impact_share": 0.0035594793871486273,
+      "task_impact_per_param": 2.5020514735595023e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.9.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.36605531349778175,
+      "task_impact": 0.00524138718174072,
+      "task_impact_share": 0.0035555482424482004,
+      "task_impact_per_param": 1.2496440843917656e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.16.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3433861844241619,
+      "task_impact": 0.005124791084199387,
+      "task_impact_share": 0.0034764540951710047,
+      "task_impact_per_param": 1.2218454084871738e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.19.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2690730672329664,
+      "task_impact": 0.005121985868754564,
+      "task_impact_share": 0.003474551148775578,
+      "task_impact_per_param": 4.0705886433558175e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.7.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.3438473306596279,
+      "task_impact": 0.005098792367334681,
+      "task_impact_share": 0.0034588176014625754,
+      "task_impact_per_param": 1.2156468313538268e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.17.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.25939498748630285,
+      "task_impact": 0.005041579242060834,
+      "task_impact_share": 0.0034200064966998785,
+      "task_impact_per_param": 4.0066871977335883e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.8.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.33762036450207233,
+      "task_impact": 0.005029337227824726,
+      "task_impact_share": 0.0034117020019751127,
+      "task_impact_per_param": 1.1990874356805625e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.3.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.23975388333201408,
+      "task_impact": 0.0049976601449088776,
+      "task_impact_share": 0.0033902135309688696,
+      "task_impact_per_param": 3.9717834352722786e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.20.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.3604073077440262,
+      "task_impact": 0.0049417794598412,
+      "task_impact_share": 0.0033523063005564055,
+      "task_impact_per_param": 3.9273734568287533e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.7.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.25668149814009666,
+      "task_impact": 0.004901484487163543,
+      "task_impact_share": 0.0033249717964803373,
+      "task_impact_per_param": 2.3372099338357655e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.18.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.31553599052131176,
+      "task_impact": 0.004834843912249198,
+      "task_impact_share": 0.0032797654854797168,
+      "task_impact_per_param": 3.8423887191209777e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.26.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.3703738860785961,
+      "task_impact": 0.0048296249042323325,
+      "task_impact_share": 0.0032762251183711135,
+      "task_impact_per_param": 1.1514723072605926e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.17.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3778462130576372,
+      "task_impact": 0.0046528608927474124,
+      "task_impact_share": 0.0031563154554191445,
+      "task_impact_per_param": 1.1093284828060657e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.8.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.26020601764321327,
+      "task_impact": 0.004639326187316328,
+      "task_impact_share": 0.003147134050489703,
+      "task_impact_per_param": 2.2122031151372568e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.4.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.31928214244544506,
+      "task_impact": 0.0046392790081881685,
+      "task_impact_share": 0.003147102046048819,
+      "task_impact_per_param": 1.1060903091879293e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.3.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.23157062381505966,
+      "task_impact": 0.004571646332806267,
+      "task_impact_share": 0.0031012227336171955,
+      "task_impact_per_param": 3.6332180760751304e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.22.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.3706726226955652,
+      "task_impact": 0.004542956572549883,
+      "task_impact_share": 0.003081760743285474,
+      "task_impact_per_param": 3.6104175031581587e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.6.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.286739032715559,
+      "task_impact": 0.0044950237206649035,
+      "task_impact_share": 0.0030492450062552306,
+      "task_impact_per_param": 2.14339433701749e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.23.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.3692125119268894,
+      "task_impact": 0.004427639486493717,
+      "task_impact_share": 0.003003534226442832,
+      "task_impact_per_param": 3.518771717146013e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.5.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.3270162772387266,
+      "task_impact": 0.00442386916893156,
+      "task_impact_share": 0.003000976593221554,
+      "task_impact_per_param": 1.0547326013878727e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.26.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.21619093418121338,
+      "task_impact": 0.004403215970341989,
+      "task_impact_share": 0.002986966286140654,
+      "task_impact_per_param": 3.4993616504208164e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.21.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.3531593158841133,
+      "task_impact": 0.00424396742528188,
+      "task_impact_share": 0.0028789384177791227,
+      "task_impact_per_param": 3.3728022776300753e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.26.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.340121166780591,
+      "task_impact": 0.004189704716736742,
+      "task_impact_share": 0.0028421287581778887,
+      "task_impact_per_param": 1.9978068908389768e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.7.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.260546512901783,
+      "task_impact": 0.004167399653852044,
+      "task_impact_share": 0.0028269978921709542,
+      "task_impact_per_param": 3.311951680065826e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.18.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.26073431968688965,
+      "task_impact": 0.004153747830969223,
+      "task_impact_share": 0.0028177370394283207,
+      "task_impact_per_param": 3.301102186019598e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.4.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.26062083523720503,
+      "task_impact": 0.004136754634600948,
+      "task_impact_share": 0.0028062095320365212,
+      "task_impact_per_param": 1.9725583241467226e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.6.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.24894372839480639,
+      "task_impact": 0.004108608660772006,
+      "task_impact_share": 0.0027871164247522296,
+      "task_impact_per_param": 3.2652287966187843e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.22.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2563305925577879,
+      "task_impact": 0.004106087399122771,
+      "task_impact_share": 0.0027854061012987518,
+      "task_impact_per_param": 3.263225077885605e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.17.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.2953769937157631,
+      "task_impact": 0.00409729617422272,
+      "task_impact_share": 0.002779442484576973,
+      "task_impact_per_param": 3.25623844005483e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.5.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.26767720095813274,
+      "task_impact": 0.0040770670843812695,
+      "task_impact_share": 0.0027657198759739187,
+      "task_impact_per_param": 1.944097082319865e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.6.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2733292691409588,
+      "task_impact": 0.00407682376453522,
+      "task_impact_share": 0.0027655548174844433,
+      "task_impact_per_param": 3.2399684306265675e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.22.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.22002916410565376,
+      "task_impact": 0.004002073486844893,
+      "task_impact_share": 0.00271484720721855,
+      "task_impact_per_param": 3.180562247311984e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.6.self_attn.o_proj",
+      "params": 4194304,
+      "component": "o",
+      "local_relative_error": 0.3146920260041952,
+      "task_impact": 0.003962617266097368,
+      "task_impact_share": 0.002688081679035242,
+      "task_impact_per_param": 9.447615781062527e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.15.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.349734827876091,
+      "task_impact": 0.0038623303271378973,
+      "task_impact_share": 0.002620051015168232,
+      "task_impact_per_param": 9.208513086170905e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.10.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.2927189599722624,
+      "task_impact": 0.003803791178143001,
+      "task_impact_share": 0.00258034038874317,
+      "task_impact_per_param": 3.022981626306376e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.20.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.26470877043902874,
+      "task_impact": 0.0037737339443992823,
+      "task_impact_share": 0.0025599507588790313,
+      "task_impact_per_param": 2.9990942831033724e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.24.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.39663078263401985,
+      "task_impact": 0.0037346495446399786,
+      "task_impact_share": 0.002533437459240445,
+      "task_impact_per_param": 2.96803279291787e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.7.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.24321087263524532,
+      "task_impact": 0.0037114521637704456,
+      "task_impact_share": 0.0025177012802633605,
+      "task_impact_per_param": 2.949597170965231e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.3.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2674259413033724,
+      "task_impact": 0.0037110149787622504,
+      "task_impact_share": 0.0025174047113716504,
+      "task_impact_per_param": 1.7695498365222218e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.7.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2514042416587472,
+      "task_impact": 0.0036975804632675136,
+      "task_impact_share": 0.0025082912713033684,
+      "task_impact_per_param": 1.7631437603318756e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.9.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.24521285202354193,
+      "task_impact": 0.0036706862210849067,
+      "task_impact_share": 0.00249004728889782,
+      "task_impact_per_param": 2.9171993105291577e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.2.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3431437686085701,
+      "task_impact": 0.00362814406707912,
+      "task_impact_share": 0.002461188386538502,
+      "task_impact_per_param": 8.650169532487678e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.27.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2547064330428839,
+      "task_impact": 0.0036231607923582487,
+      "task_impact_share": 0.002457807931506072,
+      "task_impact_per_param": 1.72765769594109e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.25.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.22519007325172424,
+      "task_impact": 0.0036165763522149064,
+      "task_impact_share": 0.002453341309642928,
+      "task_impact_per_param": 2.874196650357967e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.6.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.25764248706400394,
+      "task_impact": 0.0036153080200165277,
+      "task_impact_share": 0.0024524809236110595,
+      "task_impact_per_param": 2.8731886704894127e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.20.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.34632508270442486,
+      "task_impact": 0.0036082608139622607,
+      "task_impact_share": 0.0024477003797909597,
+      "task_impact_per_param": 8.602764162927296e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.9.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.2623500991612673,
+      "task_impact": 0.0035999498754790693,
+      "task_impact_share": 0.00244206257023933,
+      "task_impact_per_param": 2.860983113828555e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.8.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.25671909004449844,
+      "task_impact": 0.003516016995490645,
+      "task_impact_share": 0.0023851258484176565,
+      "task_impact_per_param": 2.7942792538727484e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.18.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3332995343953371,
+      "task_impact": 0.003475690903087525,
+      "task_impact_share": 0.0023577702339596727,
+      "task_impact_per_param": 8.286692865103543e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.11.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2693265210837126,
+      "task_impact": 0.0034711845078163606,
+      "task_impact_share": 0.0023547132749466115,
+      "task_impact_per_param": 2.758649593843111e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.13.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3212603162974119,
+      "task_impact": 0.0034689704921220255,
+      "task_impact_share": 0.002353211374907979,
+      "task_impact_per_param": 8.270670156769813e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.21.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.23643071576952934,
+      "task_impact": 0.003462685938757204,
+      "task_impact_share": 0.0023489481842876208,
+      "task_impact_per_param": 2.7518955379781756e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.7.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.25724136270582676,
+      "task_impact": 0.003377663294031663,
+      "task_impact_share": 0.002291272209485508,
+      "task_impact_per_param": 2.684325610821774e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.6.self_attn.v_proj",
+      "params": 2097152,
+      "component": "v",
+      "local_relative_error": 0.2574711740016937,
+      "task_impact": 0.003363063702636282,
+      "task_impact_share": 0.0022813684283439152,
+      "task_impact_per_param": 1.6036337388211641e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.14.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.23155951965600252,
+      "task_impact": 0.0033600939718780864,
+      "task_impact_share": 0.0022793538813143366,
+      "task_impact_per_param": 2.67036276807633e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.10.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2524819867685437,
+      "task_impact": 0.0033553031994415505,
+      "task_impact_share": 0.002276104012162133,
+      "task_impact_per_param": 2.66655540421927e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.25.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2525412943214178,
+      "task_impact": 0.003352383818310045,
+      "task_impact_share": 0.002274123620313326,
+      "task_impact_per_param": 2.6642352885485054e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.11.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.2844241987913847,
+      "task_impact": 0.0033308403058072145,
+      "task_impact_share": 0.0022595093597445885,
+      "task_impact_per_param": 2.647114043082567e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.9.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2601281404495239,
+      "task_impact": 0.0033132569374174636,
+      "task_impact_share": 0.0022475815031664115,
+      "task_impact_per_param": 2.633140037391554e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.17.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.26003326289355755,
+      "task_impact": 0.003302894680928148,
+      "task_impact_share": 0.002240552161205807,
+      "task_impact_per_param": 2.624904855829992e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.14.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2612234950065613,
+      "task_impact": 0.0033010990950970154,
+      "task_impact_share": 0.002239334107315744,
+      "task_impact_per_param": 2.623477852421614e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.8.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2648855745792389,
+      "task_impact": 0.00326105642488983,
+      "task_impact_share": 0.0022121707551836832,
+      "task_impact_per_param": 2.591654797307515e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.21.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.30562255531549454,
+      "task_impact": 0.00325159411659115,
+      "task_impact_share": 0.00220575190222085,
+      "task_impact_per_param": 7.752404490926623e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.14.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2723383717238903,
+      "task_impact": 0.00323519172388842,
+      "task_impact_share": 0.0021946251724975995,
+      "task_impact_per_param": 2.5710993797687054e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.5.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2563835456967354,
+      "task_impact": 0.0031812178544896597,
+      "task_impact_share": 0.002158011449865654,
+      "task_impact_per_param": 2.528204802266486e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.11.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2572212163358927,
+      "task_impact": 0.0031613889577783993,
+      "task_impact_share": 0.002144560316338061,
+      "task_impact_per_param": 2.512446211002985e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.21.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2683852091431618,
+      "task_impact": 0.0031510036260442575,
+      "task_impact_share": 0.002137515321050705,
+      "task_impact_per_param": 2.504192690884477e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.4.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.2513862680643797,
+      "task_impact": 0.0031172335707196908,
+      "task_impact_share": 0.002114607060948317,
+      "task_impact_per_param": 1.4864127973173574e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.14.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.32296913862228394,
+      "task_impact": 0.0031023274868857698,
+      "task_impact_share": 0.0021044953675473568,
+      "task_impact_per_param": 7.396525113310265e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.15.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.26504662074148655,
+      "task_impact": 0.0030718599264218938,
+      "task_impact_share": 0.002083827388384054,
+      "task_impact_per_param": 2.441294929521794e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.8.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.2609417848289013,
+      "task_impact": 0.003062678815695108,
+      "task_impact_share": 0.0020775992886508257,
+      "task_impact_per_param": 2.4339984382749463e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.25.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.34612761437892914,
+      "task_impact": 0.003061838225221436,
+      "task_impact_share": 0.002077029065563378,
+      "task_impact_per_param": 7.299991190961447e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.12.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.274601461365819,
+      "task_impact": 0.003042592858946591,
+      "task_impact_share": 0.002063973775835464,
+      "task_impact_per_param": 2.4180355540486903e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.5.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.24870666675269604,
+      "task_impact": 0.0030422871559494524,
+      "task_impact_share": 0.0020637663991016917,
+      "task_impact_per_param": 2.4177926031346736e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.5.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2440034607425332,
+      "task_impact": 0.003037775261873321,
+      "task_impact_share": 0.0020607057099184182,
+      "task_impact_per_param": 2.414206871885714e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.13.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.24784814845770597,
+      "task_impact": 0.003022150623564812,
+      "task_impact_share": 0.0020501065777897634,
+      "task_impact_per_param": 2.401789525004079e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.26.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2259498191997409,
+      "task_impact": 0.002997125226102071,
+      "task_impact_share": 0.0020331303451856944,
+      "task_impact_per_param": 2.3819011259890166e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.24.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.21972152031958103,
+      "task_impact": 0.0029087177067594894,
+      "task_impact_share": 0.001973158206299872,
+      "task_impact_per_param": 2.311641142177176e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.11.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3869921360164881,
+      "task_impact": 0.002893812354614056,
+      "task_impact_share": 0.0019630470092472313,
+      "task_impact_per_param": 6.899386297736301e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.24.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.34914545342326164,
+      "task_impact": 0.002889690715164761,
+      "task_impact_share": 0.0019602510532547037,
+      "task_impact_per_param": 6.889559543525603e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.12.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.25436338130384684,
+      "task_impact": 0.0028194260507916624,
+      "task_impact_share": 0.0019125863043522933,
+      "task_impact_per_param": 2.240678509705593e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.15.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.24494772776961327,
+      "task_impact": 0.0028110138487136282,
+      "task_impact_share": 0.0019068798016123566,
+      "task_impact_per_param": 2.2339930921503928e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.12.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3412886969745159,
+      "task_impact": 0.002769707046354597,
+      "task_impact_share": 0.0018788589125926613,
+      "task_impact_per_param": 6.603496185194485e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.15.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.27345568872988224,
+      "task_impact": 0.0027607202823674015,
+      "task_impact_share": 0.0018727626499446199,
+      "task_impact_per_param": 2.1940233567296677e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.13.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.26182826422154903,
+      "task_impact": 0.0027530886845852365,
+      "task_impact_share": 0.0018675856780590136,
+      "task_impact_per_param": 2.1879583077313394e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.22.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.2862805165350437,
+      "task_impact": 0.0026994388467755925,
+      "task_impact_share": 0.0018311917655474104,
+      "task_impact_per_param": 6.435963742197973e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.10.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2525711040943861,
+      "task_impact": 0.0026861925198318204,
+      "task_impact_share": 0.0018222059850944996,
+      "task_impact_per_param": 2.134794012571828e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.13.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2771086301654577,
+      "task_impact": 0.002641334514009941,
+      "task_impact_share": 0.0017917761011287925,
+      "task_impact_per_param": 2.099144072540554e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.23.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.27559453435242176,
+      "task_impact": 0.0026341158300056122,
+      "task_impact_share": 0.001786879233499209,
+      "task_impact_per_param": 2.0934071779295701e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.12.mlp.down_proj",
+      "params": 12582912,
+      "component": "ffn_out",
+      "local_relative_error": 0.2527697775512934,
+      "task_impact": 0.00261635771175861,
+      "task_impact_share": 0.0017748328335800666,
+      "task_impact_per_param": 2.0792942935296774e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.24.mlp.up_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.26619443483650684,
+      "task_impact": 0.002594750599200779,
+      "task_impact_share": 0.0017601754292679008,
+      "task_impact_per_param": 2.0621225032812587e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.23.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3253242317587137,
+      "task_impact": 0.0025921837659552693,
+      "task_impact_share": 0.0017584341918591242,
+      "task_impact_per_param": 6.180247702491926e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.5.self_attn.k_proj",
+      "params": 2097152,
+      "component": "k",
+      "local_relative_error": 0.24399331118911505,
+      "task_impact": 0.0025796699155762326,
+      "task_impact_share": 0.0017499452943251954,
+      "task_impact_per_param": 1.2300824716454661e-09,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.9.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3209685031324625,
+      "task_impact": 0.0025486574718343036,
+      "task_impact_share": 0.0017289076880547083,
+      "task_impact_per_param": 6.076472930513152e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.8.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3393619582056999,
+      "task_impact": 0.002366373426411883,
+      "task_impact_share": 0.0016052534540027244,
+      "task_impact_per_param": 5.64187389948817e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.10.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.2812391575425863,
+      "task_impact": 0.002227485081220948,
+      "task_impact_share": 0.0015110371340635125,
+      "task_impact_per_param": 5.310738280346269e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.3.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3401998858898878,
+      "task_impact": 0.0020698013140645344,
+      "task_impact_share": 0.0014040707486896698,
+      "task_impact_per_param": 4.934790883218132e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.23.mlp.gate_proj",
+      "params": 12582912,
+      "component": "ffn_in",
+      "local_relative_error": 0.2130427686497569,
+      "task_impact": 0.001999925995733065,
+      "task_impact_share": 0.0013566701166299994,
+      "task_impact_per_param": 1.589398380703183e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.7.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.28409468568861485,
+      "task_impact": 0.001888756324433416,
+      "task_impact_share": 0.0012812570407213927,
+      "task_impact_per_param": 4.5031459914050484e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.5.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.285876015201211,
+      "task_impact": 0.0015475154439172911,
+      "task_impact_share": 0.0010497728227270955,
+      "task_impact_per_param": 3.689564332764843e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.6.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3496002797037363,
+      "task_impact": 0.0015217857044262928,
+      "task_impact_share": 0.0010323187925526853,
+      "task_impact_per_param": 3.628219853463871e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.4.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.28138065710663795,
+      "task_impact": 0.0014558813763869694,
+      "task_impact_share": 0.0009876119220993324,
+      "task_impact_per_param": 3.4710916909860834e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.26.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.29765331000089645,
+      "task_impact": 0.0013145631914994738,
+      "task_impact_share": 0.000891747295717003,
+      "task_impact_per_param": 3.1341628825651974e-10,
+      "batches": 16
+    },
+    {
+      "name": "thinker.model.layers.27.self_attn.q_proj",
+      "params": 4194304,
+      "component": "q",
+      "local_relative_error": 0.3052745182067156,
+      "task_impact": 0.0008616748457370704,
+      "task_impact_share": 0.0005845258854364521,
+      "task_impact_per_param": 2.054392923681904e-10,
+      "batches": 16
+    }
+  ],
+  "components": {
+    "ffn_in": {
+      "layers": 56,
+      "params": 704643072,
+      "task_impact": 0.34323107199952574,
+      "local_relative_error": 0.24994178500492126,
+      "task_impact_share": 0.23283428460559294
+    },
+    "k": {
+      "layers": 28,
+      "params": 58720256,
+      "task_impact": 0.41209200703087845,
+      "local_relative_error": 0.2898636406420597,
+      "task_impact_share": 0.2795467994484198
+    },
+    "o": {
+      "layers": 28,
+      "params": 117440512,
+      "task_impact": 0.23350859849779226,
+      "local_relative_error": 0.36684538051486015,
+      "task_impact_share": 0.1584029300254122
+    },
+    "v": {
+      "layers": 28,
+      "params": 58720256,
+      "task_impact": 0.22601221443164832,
+      "local_relative_error": 0.2939524936622807,
+      "task_impact_share": 0.15331768173771695
+    },
+    "ffn_out": {
+      "layers": 28,
+      "params": 352321536,
+      "task_impact": 0.1629320957881646,
+      "local_relative_error": 0.2914842408749142,
+      "task_impact_share": 0.11052664241942425
+    },
+    "q": {
+      "layers": 28,
+      "params": 117440512,
+      "task_impact": 0.09636718915112397,
+      "local_relative_error": 0.3318974456217672,
+      "task_impact_share": 0.06537166176343384
+    }
+  }
+}

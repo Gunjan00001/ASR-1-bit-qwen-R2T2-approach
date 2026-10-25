@@ -27,7 +27,7 @@ from asr1bit.data.load import iter_librispeech
 from asr1bit.eval.wer import corpus_cer, corpus_wer
 from asr1bit.qwen import backends
 from asr1bit.qwen.stream import LSPState
-from asr1bit.replace import apply_layer_policy
+from asr1bit.replace import apply_layer_policy, apply_mixed_precision
 from asr1bit.train.qat import set_qat_alpha
 
 
@@ -37,6 +37,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--checkpoint", default=None,
                    help="QAT checkpoint to restore; omit to evaluate the pretrained model.")
     p.add_argument("--policy", default="decoder_attn_ffn")
+    p.add_argument(
+        "--fp16-layers-file", default=None,
+        help="JSON list (or one-per-line text) of decoder projections kept at "
+             "full precision; all other decoder projections are quantized. "
+             "Must match the checkpoint's training configuration.",
+    )
     p.add_argument("--bit-width", type=float, default=1.58)
     p.add_argument("--group-size", type=int, default=0,
                    help="0 = per-tensor; must match the checkpoint's training layout.")
@@ -75,8 +81,25 @@ def main() -> int:
     )
     model = wrapper.model
     patch_outer_forward(model)
-    apply_layer_policy(model, args.policy, bit_width=args.bit_width,
-                       group_size=args.group_size or None, learnable_scale=True)
+    fp16_layers = None
+    if args.fp16_layers_file:
+        path = Path(args.fp16_layers_file)
+        if path.suffix == ".json":
+            fp16_layers = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            fp16_layers = [
+                line.strip() for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+        if not fp16_layers:
+            raise ValueError(f"empty fp16 layer list: {path}")
+        apply_mixed_precision(
+            model, set(fp16_layers), bit_width=args.bit_width,
+            group_size=args.group_size or None, learnable_scale=True,
+        )
+    else:
+        apply_layer_policy(model, args.policy, bit_width=args.bit_width,
+                           group_size=args.group_size or None, learnable_scale=True)
     model.to("cuda:0")
     if args.checkpoint:
         step = load_checkpoint(args.checkpoint, model)
@@ -96,6 +119,10 @@ def main() -> int:
         "config": args.config,
         "n": len(utterances),
         "unfixed_token_num": args.unfixed_token_num,
+        "policy": "mixed" if fp16_layers else args.policy,
+        "bit_width": args.bit_width,
+        "group_size": args.group_size,
+        "fp16_layers": fp16_layers,
         "conditions": {},
     }
     wanted = {name.strip() for name in args.conditions.split(",") if name.strip()}

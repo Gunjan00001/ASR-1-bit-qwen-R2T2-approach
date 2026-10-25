@@ -40,11 +40,16 @@ else
 fi
 
 PICK=$(bash scripts/pick_gpu_wait.sh 20000 "${PICK_WAIT_MIN:-45}") || exit 0
-export CUDA_VISIBLE_DEVICES="$PICK"
+export CUDA_VISIBLE_DEVICES="${EVAL_GPU:-$PICK}"
+
+FP16_ARGS=()
+if [ -n "${FP16_LAYERS_FILE:-}" ]; then
+  FP16_ARGS=(--fp16-layers-file "$FP16_LAYERS_FILE")
+fi
 
 {
   echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | ckpt $CKPT | tag $TAG | $(date) ==="
-  echo "=== model $MODEL (ternary readout, bit-width 1.58) ==="
+  echo "=== model $MODEL | fp16-layers ${FP16_LAYERS_FILE:-none} ==="
   nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
 } | tee "$LOG"
 
@@ -55,6 +60,7 @@ for CFG in clean other; do
     --model "$MODEL" \
     --checkpoint "$CKPT" \
     --policy "${POLICY:-decoder_attn_ffn}" \
+    "${FP16_ARGS[@]}" \
     --bit-width "${BIT_WIDTH:-1.58}" \
     --group-size "${GROUP_SIZE:-0}" \
     --chunk-ms 320 \
