@@ -212,3 +212,65 @@ guardrail or a single split.
 
 **Budget:** pilot ~10 min; full run ~2 h; step-1600 evaluations ~0.5–4 h.
 
+## 10. Experiment 2 results (co-training)
+
+_Appended after the run; the pre-registration is §9._
+
+### 10.1 Pilot and run
+
+- **Pilot (job 12710): passed.** The schedule alternated correctly
+  (`cotrain_fp=true` on every 4th step), losses finite, max grad 118.7, no
+  NaN/OOM.
+- **Full run (job 12711): complete, 2 000 steps**, all step checkpoints on
+  disk. The run trained under heavy co-tenant contention and took ~2 h.
+- The fp16 readout did **not** stay fresher: it reached **86–89 WER** at steps
+  1500/2000, so the mechanism's premise (a periodic fp refresh keeps the fp
+  path healthy) did not hold. The offline ternary readout was
+  **10.70 @1500 / 10.06 @2000**, better than the control's 12.61/11.12 — but
+  the streaming guardrail at 2000 collapsed (85.4), another offline/streaming
+  divergence.
+
+### 10.2 Official evaluation (job 12725, 50 utts, 320 ms)
+
+| state | clean | other | CER c/o | loops c/o | RTF c/o |
+|---|---:|---:|---:|---:|---:|
+| **control b12/step1600** | **15.148** | **18.977** | 6.668 / 7.601 | 0 / 4 | 21.96 / 21.73* |
+| **CT 25% / step1600** | **16.314** | **17.386** | 9.205 / 8.131 | 0 / 0 | 4.26 / 4.08 |
+
+\* control RTF measured under heavier contention; not a controlled comparison.
+
+**Deltas vs control:** **+1.165 clean / −1.591 other**. Paired bootstrap:
+clean **+1.165 [−3.750, +7.403]**, other **−1.591 [−3.838, +0.719]**; the
+utterance counts are 8/14/28 and 7/15/28 (better/worse/ties). The `other` gain
+is the best single-split value measured in this project (**17.386**), but the
+clean regression is larger in the wrong direction.
+
+### 10.3 Verdict
+
+**CT is rejected as a pair improvement.** It trades clean for `other`: the
+hard split improves by 1.59 points, but clean loses 1.17, and the
+both-splits rule is not met. The `other` gain is recorded as a single-split
+record (not a promotion), and the clean regression is the blocker. The
+step-2000 checkpoint exists but was **not** officially evaluated: the primary
+state already failed and the step-2000 streaming guardrail collapsed (85.4);
+scoring it would not change the rejection. The offline ternary at 2000
+(10.06) is reported only as an offline diagnostic.
+
+### 10.4 Why it failed
+
+- The fp steps at the same LR did not refresh the fp path: the fp16 readout
+  drifted to 86–89, worse than the control's 18.9 at 2000.
+- The 25% fp budget reduced ternary optimization and shifted the content/stop
+  balance: clean regressed while `other` improved. This is a *dose* effect, not
+  a free gain.
+- The offline improvement (10.06) did not transfer to streaming, confirming
+  the project's standing rule that offline WER is not the streaming metric.
+
+### 10.5 Next justified step
+
+A **lower fp dose** (e.g., every 8th step = 12.5%) is the next single-variable
+test: if the `other` gain is dose-driven while the clean loss shrinks, it could
+approach a pair win; if clean remains worse, the co-training axis is closed.
+Do not repeat 25% unchanged and do not promote the single-split `other` record.
+
+

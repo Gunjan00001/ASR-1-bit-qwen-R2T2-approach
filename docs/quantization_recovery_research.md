@@ -224,3 +224,14 @@ both-splits improvement.
 The pre-registered details are in
 [`docs/quantization_recovery_experiment.md`](quantization_recovery_experiment.md)
 §9.
+
+### 6.1 CT result
+
+25% fp co-training produced a **split trade-off**: clean **16.314** (worse by
++1.165) and other **17.386** (better by −1.591, a new single-split record) at
+step 1600. The both-splits rule is not met, so CT is **rejected as a pair
+improvement**. The fp16 readout drifted to 86–89, so the intended refresh did
+not happen. The next single-variable test is a **12.5% fp dose** (every 8th
+step) to see whether the `other` gain survives while the clean loss shrinks;
+if not, the co-training axis is closed. Do not promote the single-split
+`other` result.
