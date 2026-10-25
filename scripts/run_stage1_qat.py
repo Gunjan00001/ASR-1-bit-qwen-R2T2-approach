@@ -57,6 +57,7 @@ from asr1bit.train.checkpoints import (
     save_checkpoint,
     step_checkpoint_path,
 )
+from asr1bit.train.cotrain import cotrain_alpha
 from asr1bit.train.dataset import build_examples, collate, load_train_utterances
 from asr1bit.train.inloop_eval import (
     evaluate,
@@ -120,6 +121,12 @@ def parse_args() -> argparse.Namespace:
                    help="Apply QEC to every N-th BitLinear (1 = all layers).")
     p.add_argument("--qec-eps", type=float, default=1e-6,
                    help="Denominator floor for the relative output error.")
+    p.add_argument(
+        "--cotrain-fp-every", type=int, default=0,
+        help="Every N-th step after the quantization delay runs at alpha=0 "
+             "(full precision) while the rest run at the scheduled ternary "
+             "alpha. 0 = disabled; the deployed model remains ternary.",
+    )
     p.add_argument("--frozen-teacher", type=int, default=0,
                    help="1 = distillation teacher is a frozen fp copy of the pretrained model.")
     p.add_argument("--log-grad-norms", type=int, default=1)
@@ -440,6 +447,10 @@ def main() -> int:
             alpha = quantization_delay_alpha(step, alpha_warmup)
         else:
             alpha = 1.0
+        if args.cotrain_fp_every > 0:
+            alpha = cotrain_alpha(
+                step, alpha, fp_every=args.cotrain_fp_every, start_step=alpha_warmup
+            )
         set_qat_alpha(model, alpha)
         if batches is None:
             base = ((step - start_step) * args.batch_size) % len(train_examples)
@@ -521,6 +532,8 @@ def main() -> int:
             if qec_value is not None:
                 record["qec"] = qec_value
                 record["qec_weight"] = args.qec_weight
+            if args.cotrain_fp_every > 0:
+                record["cotrain_fp"] = alpha == 0.0
             record.update(scale_stats(model))
             history.append(record)
             print(json.dumps(record), flush=True)
@@ -626,6 +639,8 @@ def main() -> int:
     if args.qec_weight > 0:
         # Never let a QEC arm overwrite the control's results JSON.
         tag += f"_qec{args.qec_weight:g}_s{args.qec_stride}"
+    if args.cotrain_fp_every > 0:
+        tag += f"_ct{args.cotrain_fp_every}"
     (out_dir / f"stage1_{tag}.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     print("wrote", out_dir / f"stage1_{tag}.json", flush=True)
     return 0

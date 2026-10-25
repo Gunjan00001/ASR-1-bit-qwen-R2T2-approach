@@ -173,7 +173,42 @@ Artifact: `artifacts/stage1/packed_size_qec_step1600.json`.
 ### 8.7 Next justified step (not run here)
 
 A **quantized-vs-fp self-consistency objective on the task output** (match the
-quantized student's logits to its own fp logits, or a co-training schedule that
-periodically refreshes the fp path) is a different mechanism from layer-output
-QEC and should be pre-registered separately. Do not repeat QEC at a higher λ
-without a new hypothesis.
+quantized student's logits to its own fp logits) is a different mechanism from
+layer-output QEC and should be pre-registered separately. Do not repeat QEC at
+a higher λ without a new hypothesis.
+
+## 9. Experiment 2 — precision co-training (pre-registered)
+
+_Written before any CT result was observed._
+
+**Single variable:** `--cotrain-fp-every 4` — after the baseline's 2% alpha
+delay, every 4th step (1-indexed) runs the forward/backward at `alpha=0`; the
+other steps use the scheduled ternary alpha. The deployed model remains
+ternary; no quantizer, streaming algorithm or data change.
+
+| field | value |
+|---|---|
+| control | b12/step1600: 15.148 / 18.977 (50 utts) |
+| model / policy | Qwen3-ASR-1.7B / `decoder_attn_ffn`, ternary 1.58, per-tensor learnable scale |
+| init | `data/checkpoints/qat_17b_recover7/last.pt` |
+| data / mix | 6 000 aligned (cached), stop-stride 2, mix 0.5, train-n 2 400 |
+| steps / batch | 2 000 / 1 |
+| optimizer / lr | fp32 AdamW / 2.5e-6 cosine, 100 warmup |
+| alpha | delay 2%; CT overrides every 4th step after the delay |
+| teacher | frozen fp copy, KL 0.05, T=2.0 |
+| checkpoints | every 400 + `last.pt` |
+| primary state | step 1600; secondary step 2000 |
+| launcher | `scripts/qat_cotrain_b12.pbs`; pilot `scripts/qat_cotrain_pilot.pbs` |
+
+**Pilot safety:** 100 steps, no in-loop evals; abort on non-finite loss, max
+grad >1 000 for two consecutive logs, loss >10× the control for 50 steps, or
+OOM.
+
+**Acceptance:** step-1600 official clean **and** other both below
+15.1483 / 18.9773; if both improve, a 100-utt paired confirmation (same
+`sample_n=100, seed=0`) must also improve both. **Reject** if either split is
+worse at the primary state or the pilot violates safety. No promotion from a
+guardrail or a single split.
+
+**Budget:** pilot ~10 min; full run ~2 h; step-1600 evaluations ~0.5–4 h.
+

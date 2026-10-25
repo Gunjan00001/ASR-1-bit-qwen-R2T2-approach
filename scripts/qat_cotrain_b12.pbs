@@ -1,0 +1,90 @@
+#!/bin/bash
+#PBS -N asr1bit-cotrain-b12
+#PBS -q gpu
+#PBS -l select=1:ncpus=4:ngpus=1:mem=64gb
+#PBS -l walltime=12:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/cotrain_b12.out
+#
+# Quantization recovery — precision co-training (25% fp steps after the delay).
+# aligned17b11 (deep 9.85 base, lr 2.5e-6, 1 200 aligned) set the line-best pair
+# (16.53 clean / 22.05 other, zero loops). The 0.6B showed the scaled aligned
+# set (6 000) is what buys the best `other` there (11.55/18.98). This run changes
+# exactly one variable from b11: --aligned-n 1 200 -> 6 000. Alignment is cached
+# under its utterance-set key, so this is a fresh aligner pass (~2-3 h) but any
+# later 6 000-aligned run will hit the cache.
+#
+# Submit: qsub scripts/qat_cotrain_b12.pbs
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage3/qat_cotrain_b12.log"
+
+PY=/home/jiit_992401210050/miniconda3/bin/python  # bitsandbytes lives in the shared env
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-1.7B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-1.7B
+else
+  MODEL=Qwen/Qwen3-ASR-1.7B
+fi
+if [ -f /tmp/asr1bit/qat_clean_train.100_n8000.pt ]; then
+  CACHE=/tmp/asr1bit/qat_clean_train.100_n8000.pt
+else
+  CACHE="$ROOT/data/qat_clean_train.100_n8000.pt"
+fi
+
+PICK=$(bash scripts/pick_gpu_wait.sh 45000 "${PICK_WAIT_MIN:-120}") || exit 0
+PICK="${QAT_GPU:-$PICK}"
+export CUDA_VISIBLE_DEVICES="$PICK"
+
+{
+  echo "=== host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+"$PY" scripts/run_stage1_qat.py \
+  --model "$MODEL" \
+  --policy decoder_attn_ffn \
+  --bit-width 1.58 \
+  --learnable-scale 1 \
+  --init-from data/checkpoints/qat_17b_recover7/last.pt \
+  --aligned-targets 1 \
+  --aligned-n 6000 \
+  --aligned-lookahead-ms 0 \
+  --aligned-stop-stride 2 \
+  --op-max-samples 2400 \
+  --op-mix-frac 0.5 \
+  --op-chunk-ms 320 \
+  --steps 2000 \
+  --train-cache "$CACHE" \
+  --train-n 2400 \
+  --eval-n 50 \
+  --eval-every 500 \
+  --eval-both 0 \
+  --eval-fp16 1 \
+  --stream-eval-every 250 \
+  --stream-eval-n 20 \
+  --lr 2.5e-6 \
+  --warmup-steps 100 \
+  --lr-schedule cosine \
+  --batch-size 1 \
+  --optimizer adamw \
+  --max-new-tokens 128 \
+  --alpha-mode delay \
+  --alpha-warmup-frac 0.02 \
+  --distill-weight 0.05 \
+  --distill-temp 2.0 \
+  --frozen-teacher 1 \
+  --cotrain-fp-every 4 \
+  --lazy-collate 1 \
+  --save-dir data/checkpoints/qat_cotrain_b12 \
+  --keep-step-checkpoints 400 \
+  --save-every 250 \
+  --out artifacts/stage1 \
+  2>&1 | tee -a "$LOG"

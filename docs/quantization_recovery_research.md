@@ -183,7 +183,44 @@ The QEC experiment was executed and is **negative**: at the primary state
 15.148 / 18.977, and its step-2000 clean state collapses (73.94). The QEC term
 stayed flat (~0.29), so the failure is hypothesis-level, not implementation:
 matching the ternary layer to its own fp response does not reduce task damage.
-**Reject H1; do not repeat it at a higher λ without a new mechanism.** The next
-justified direction is a task-output self-consistency objective or a
-precision co-training schedule, pre-registered separately. Full results:
-[`docs/quantization_recovery_experiment.md`](quantization_recovery_experiment.md).
+**Reject H1; do not repeat it at a higher λ without a new mechanism.** Full
+results: [`docs/quantization_recovery_experiment.md`](quantization_recovery_experiment.md).
+
+## 6. Selected second experiment: precision co-training (H3)
+
+After QEC's rejection, the next training-side hypothesis is **precision
+co-training**: after the baseline's quantization delay, every 4th step runs at
+`alpha=0` (fp) while the other 75% run at the ternary operating point. The
+deployed model is unchanged ternary; the variable is only the precision
+schedule.
+
+**Mechanism.** Periodically refresh the fp path so the shadow weights stay in a
+good basin while the ternary function is optimized. The frozen-teacher KL
+slows drift but does not refresh the fp path; the project's fp16 readout rises
+from 2.4 to 19–25 during QAT, which is direct evidence of drift.
+
+**Evidence.** The plan's D5/T2.2 lists co-training/stochastic precision as the
+untested recovery lever; stochastic rounding (the other quantizer-side lever)
+was measured harmful. Co-training adds no inference cost, no parameters and no
+representation change.
+
+**Risks.** fp steps consume 25% of the ternary optimization budget; the two
+gradients may conflict; the schedule can under-train the ternary path. These
+are measured by the same official protocol, not assumed.
+
+**Code.** `src/asr1bit/train/cotrain.py` (`cotrain_alpha`, deterministic,
+start-step aware), trainer flag `--cotrain-fp-every`, 8 tests. Implemented.
+
+**GPU.** Same model/data/budget as the control; no extra forward per step, so
+roughly the baseline training time.
+
+**Prediction.** CT with 25% fp steps improves both clean and other WER vs
+15.15/18.98 at the primary state.
+
+**Rejection.** Either split is worse at the primary state; training violates
+the numerical safety criteria; or a 100-utt confirmation fails to reproduce a
+both-splits improvement.
+
+The pre-registered details are in
+[`docs/quantization_recovery_experiment.md`](quantization_recovery_experiment.md)
+§9.
