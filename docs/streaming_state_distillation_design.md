@@ -84,9 +84,25 @@ Fixed for every arm: 1.7B, `decoder_attn_ffn` ternary 1.58, init
 `data/checkpoints/qat_17b_recover7/last.pt` (offline 9.85), 6 000 aligned
 utterances (cached), mix 0.5, batch 1, fp32 AdamW, lr 2.5e-6 cosine, warmup
 100, 2 000 steps, frozen teacher, KL weight 0.05. Only the variable named in
-the row changes. State checkpoints every 400 steps; official evaluation of
-steps 1 200 / 1 600 / 2 000 on clean and other (50-utt protocol), LSP loop
-policy on.
+the row changes. State checkpoints every 400 steps; LSP loop policy on.
+
+**Evaluation cost (measured before any state-distillation result was seen):**
+one 50-utt official sweep (clean + other, 320 ms, RTF ≈22) is **~4.1 GPU-hours**
+(the control's clean 7 962 s + other 6 860 s). The pre-registered order is
+therefore cost-aware and fixed now:
+
+1. **step 1600** (the control's best state) for every arm — the primary
+   comparison;
+2. **step 2000** for an arm whose step-1600 pair is within 2 points of the
+   control or better;
+3. **step 1200** only if the step-1600 state is broken (loops) and the
+   trajectory suggests a late repair, as in b11;
+4. the layer/normalisation ablations (E/F/G) are screened at step 1600 only.
+
+A **full** LibriSpeech split is not runnable under this protocol: at the
+measured RTF, test-clean (2 620 utts) would cost ~110 GPU-hours per split on a
+shared 8-GPU node. This is a resource limitation, reported as such; the 50-utt
+subset remains a diagnostic, not a full-test-set claim.
 
 | arm | variable vs control | status |
 |---|---|---|

@@ -1,0 +1,82 @@
+#!/bin/bash
+#PBS -N asr1bit-sd-eval
+#PBS -q gpu
+#PBS -l select=1:ncpus=1:ngpus=1:mem=64gb
+#PBS -l walltime=12:00:00
+#PBS -j oe
+#PBS -o /home/jiit_992401210050/sd_eval.out
+#
+# Official evaluation sweep for one streaming-state-distillation arm.
+# Scores the state checkpoints in priority order (1600 -> 2000 -> 1200),
+# both clean and other, with the same protocol as the b12 control:
+# official prefix algorithm, 320 ms, 50 utts, LSP margin 3 + loop truncation.
+#
+# Submit after the arm's step1600 checkpoint exists:
+#   qsub -v ARM=b05 scripts/eval_sd_sweep.pbs
+#   qsub -v ARM=c01,STATES="1600 2000" scripts/eval_sd_sweep.pbs
+#
+# Every result JSON is written as soon as its split finishes, so a walltime
+# cut never loses completed evaluations.
+
+set -u
+unset CUDA_VISIBLE_DEVICES
+
+ARM="${ARM:?set ARM=b05|c01|d20|e08|f20|g_noLN}"
+STATES="${STATES:-1600 2000 1200}"
+
+ROOT="/home/jiit_992401210050/Desktop/ASR 1bit qwen"
+cd "$ROOT" || exit 1
+
+export PYTHONPATH="$ROOT/src"
+export TOKENIZERS_PARALLELISM=false
+export HF_HOME=/tmp/asr1bit/hf
+LOG="artifacts/stage3/eval_sd_${ARM}.log"
+
+PY=/home/jiit_992401210050/miniconda3/bin/python
+if [ -x /tmp/asr1bit/miniconda3/bin/python ]; then PY=/tmp/asr1bit/miniconda3/bin/python; fi
+if [ -d /tmp/asr1bit/models/Qwen3-ASR-1.7B ]; then
+  MODEL=/tmp/asr1bit/models/Qwen3-ASR-1.7B
+else
+  MODEL=Qwen/Qwen3-ASR-1.7B
+fi
+
+PICK=$(bash scripts/pick_gpu_wait.sh 45000 "${PICK_WAIT_MIN:-90}") || exit 0
+export CUDA_VISIBLE_DEVICES="${EVAL_GPU:-$PICK}"
+
+{
+  echo "=== eval sweep arm=$ARM states=$STATES | host $(hostname) | GPU $CUDA_VISIBLE_DEVICES | $(date) ==="
+  nvidia-smi --query-gpu=index,name,memory.used,utilization.gpu --format=csv,noheader
+} | tee "$LOG"
+
+for STATE in $STATES; do
+  CKPT="data/checkpoints/qat_stream_sd_${ARM}/step${STATE}.pt"
+  if [ ! -f "$CKPT" ]; then
+    echo "skip missing checkpoint $CKPT" | tee -a "$LOG"
+    continue
+  fi
+  for CFG in clean other; do
+    TAG="sd_${ARM}_step${STATE}"
+    OUT="artifacts/stage1/streaming_${TAG}_${CFG}.json"
+    if [ -f "$OUT" ]; then
+      echo "skip existing $OUT" | tee -a "$LOG"
+      continue
+    fi
+    echo "=== $TAG $CFG ===" | tee -a "$LOG"
+    "$PY" scripts/eval_streaming.py \
+      --model "$MODEL" \
+      --checkpoint "$CKPT" \
+      --policy "${POLICY:-decoder_attn_ffn}" \
+      --bit-width "${BIT_WIDTH:-1.58}" \
+      --group-size "${GROUP_SIZE:-0}" \
+      --chunk-ms 320 \
+      --n 50 \
+      --max-new-tokens 32 \
+      --unfixed-token-num 5 \
+      --lsp-margin-words 3 \
+      --lsp-truncate-loops 1 \
+      --conditions quantized \
+      --config "$CFG" \
+      --out "$OUT" \
+      2>&1 | tee -a "$LOG"
+  done
+done

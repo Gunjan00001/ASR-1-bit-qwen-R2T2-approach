@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N asr1bit-sd-d20
 #PBS -q gpu
-#PBS -l select=1:ncpus=4:ngpus=1:mem=64gb
+#PBS -l select=1:ncpus=1:ngpus=1:mem=64gb
 #PBS -l walltime=12:00:00
 #PBS -j oe
 #PBS -o /home/jiit_992401210050/stream_sd_d20.out
