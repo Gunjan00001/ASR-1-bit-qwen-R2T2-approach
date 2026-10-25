@@ -175,3 +175,15 @@ fails.
   from a guardrail or a single split.
 - Full splits are not runnable (~110 GPU-hours/split); this is stated wherever
   a number is quoted.
+
+## 5. Result and decision
+
+The QEC experiment was executed and is **negative**: at the primary state
+(step 1600) it scores **15.466 clean / 19.091 other** vs the control's
+15.148 / 18.977, and its step-2000 clean state collapses (73.94). The QEC term
+stayed flat (~0.29), so the failure is hypothesis-level, not implementation:
+matching the ternary layer to its own fp response does not reduce task damage.
+**Reject H1; do not repeat it at a higher λ without a new mechanism.** The next
+justified direction is a task-output self-consistency objective or a
+precision co-training schedule, pre-registered separately. Full results:
+[`docs/quantization_recovery_experiment.md`](quantization_recovery_experiment.md).

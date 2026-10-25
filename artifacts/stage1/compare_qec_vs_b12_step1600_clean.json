@@ -1,0 +1,17 @@
+{
+  "control": "artifacts/stage1/streaming_qat_stream_aligned17b12_step1600_clean.json",
+  "candidate": "artifacts/stage1/streaming_qec_step1600_clean.json",
+  "n_utterances": 50,
+  "control_wer": 15.1483,
+  "candidate_wer": 15.4661,
+  "delta_wer": 0.3178,
+  "bootstrap_95ci": [
+    -1.986,
+    2.5145
+  ],
+  "candidate_better_utterances": 11,
+  "candidate_worse_utterances": 9,
+  "ties": 30,
+  "resamples": 10000,
+  "seed": 0
+}

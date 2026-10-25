@@ -92,3 +92,75 @@ If the pilot passes, the full 2 000-step run is launched.
 ## 8. Results
 
 _Appended after the run; nothing in this section is a pre-registration._
+
+### 8.1 Pilot (job 12705)
+
+100 steps, no in-loop evals, QEC λ=0.5. **Passed** the safety criteria:
+QEC loss **0.2948** at step 6 and **0.2948** at step 100, finite throughout;
+max pre-clip grad 69.6 (control max ≈353); no NaN/Inf/OOM. The pilot's
+`qat_seconds` was 62 s for 100 steps.
+
+### 8.2 Full run (job 12706)
+
+2 000 steps completed; all step checkpoints on disk. The QEC term was
+**essentially flat**:
+
+| steps | mean QEC |
+|---|---:|
+| 0–250 | 0.2955 |
+| 250–500 | 0.2929 |
+| 500–750 | 0.2920 |
+
+Training was stable (no non-finite values; max grad 200.5, in-family with the
+control's 352.8). The flat term means the shadow weights could not reduce the
+per-layer output error further; the regularizer provided a nearly constant
+gradient constraint rather than a shrinking objective.
+
+### 8.3 Official evaluation (50 utts, official prefix algorithm, 320 ms)
+
+| state | clean | other | CER c/o | loops c/o | RTF c/o | raw c/o |
+|---|---:|---:|---:|---:|---:|---:|
+| **control b12/step1600** | **15.148** | **18.977** | 6.668 / 7.601 | 0 / 4 | 21.96 / 21.73* | 15.042 / 18.977 |
+| **QEC step1600** | 15.466 | 19.091 | 7.022 / 7.578 | 0 / 0 | 3.07 / 2.70 | 15.466 / 18.750 |
+| QEC step2000 | 73.941 | 18.409 | 57.317 / 7.888 | 22 / 1 | 4.68 / 4.10 | 73.941 / 18.068 |
+
+\* the control's RTF was measured under heavy contention; RTF is not a
+controlled comparison. The QEC step-2000 clean state collapsed (22 loop
+truncations); step 1600 is its best state.
+
+**Deltas vs control:** step 1600 **+0.318 clean / +0.114 other** (both worse);
+step 2000 +58.79 / −0.57 (collapse on clean). Paired bootstrap (10 000
+resamples, same references): clean **+0.318 [−1.986, +2.515]**, other
+**+0.114 [−1.247, +1.332]**; both intervals include zero, and the
+utterance-level counts are 11/9/30 and 8/7/35 (better/worse/ties). No 100-utt
+confirmation was triggered because the primary state did not improve both
+splits.
+
+### 8.4 Verdict
+
+**Reject H1 (QEC).** The implementation is correct — the term was active,
+finite and gradient-carrying — but it did not reduce the functional error or
+the WER. The primary state is worse on both splits, and the late state
+collapses on clean. A higher λ is not justified: the term itself did not
+decrease, so increasing its weight would add a constant constraint without a
+new mechanism.
+
+### 8.5 Why it failed (hypothesis-level, not implementation)
+
+- The target `Wx` is the shadow's own fp response; the ternary grid is already
+  the nearest representable function, so the output error sits at a local
+  minimum (0.29) that the regularizer cannot shrink.
+- The CE/KL objectives already move the shadow toward task-useful regions; the
+  QEC gradient is largely orthogonal and can over-constrain that movement,
+  which is consistent with the small clean/other regression.
+- This is another case where a *weight/response-space* objective fails to
+  transfer: the project's reconstruction-to-WER disconnect is confirmed at the
+  layer-output level.
+
+### 8.6 Next justified step (not run here)
+
+A **quantized-vs-fp self-consistency objective on the task output** (match the
+quantized student's logits to its own fp logits, or a co-training schedule that
+periodically refreshes the fp path) is a different mechanism from layer-output
+QEC and should be pre-registered separately. Do not repeat QEC at a higher λ
+without a new hypothesis.
